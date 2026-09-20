@@ -39,10 +39,10 @@ import (
 )
 
 func main() {
-	// Base URL defaults to https://api.atlas.dev; override for self-hosted.
+	// Base URL defaults to https://api.atlasauth.net; override for self-hosted.
 	c := atlas.New(
 		"sk_live_...",
-		atlas.WithBaseURL("https://api.atlas.dev"),
+		atlas.WithBaseURL("https://api.atlasauth.net"),
 	)
 	ctx := context.Background()
 

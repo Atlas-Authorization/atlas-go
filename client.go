@@ -15,7 +15,7 @@
 // The client depends on nothing but the standard library (net/http +
 // encoding/json). Every request is authenticated with
 // `Authorization: Bearer sk_...`, sends and accepts JSON, and reads the BAPI
-// origin from BaseURL (default https://api.atlas.dev, overridable per client).
+// origin from BaseURL (default https://api.atlasauth.net, overridable per client).
 //
 // Usage:
 //
@@ -38,7 +38,7 @@ import (
 
 // DefaultBaseURL is the Atlas Backend API origin (BAPI_ORIGIN), overridable per
 // client with WithBaseURL.
-const DefaultBaseURL = "https://api.atlas.dev"
+const DefaultBaseURL = "https://api.atlasauth.net"
 
 // userAgent identifies this SDK build to the API.
 const userAgent = "atlas-go"
@@ -103,7 +103,7 @@ type Client struct {
 // Option configures a Client at construction time.
 type Option func(*Client)
 
-// WithBaseURL overrides the BAPI origin (default https://api.atlas.dev). A
+// WithBaseURL overrides the BAPI origin (default https://api.atlasauth.net). A
 // trailing slash is tolerated.
 func WithBaseURL(baseURL string) Option {
 	return func(c *Client) {
