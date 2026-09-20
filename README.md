@@ -15,11 +15,11 @@ snake_case wire types, the same `{ errors: [...] }` error envelope.
 ## Install
 
 ```sh
-go get github.com/atlas-auth/atlas-go
+go get github.com/Atlas-Authorization/atlas-go
 ```
 
 ```go
-import atlas "github.com/atlas-auth/atlas-go"
+import atlas "github.com/Atlas-Authorization/atlas-go"
 ```
 
 Requires Go 1.21+.
@@ -35,7 +35,7 @@ import (
 	"fmt"
 	"log"
 
-	atlas "github.com/atlas-auth/atlas-go"
+	atlas "github.com/Atlas-Authorization/atlas-go"
 )
 
 func main() {
