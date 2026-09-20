@@ -299,7 +299,7 @@ func TestPathEscaping(t *testing.T) {
 
 // Example shows the canonical create-user + branch-on-APIError flow.
 func Example() {
-	c := New("sk_live_...", WithBaseURL("https://api.atlas.dev"))
+	c := New("sk_live_...", WithBaseURL("https://api.atlasauth.net"))
 	_, err := c.Users.Create(context.Background(), CreateUserParams{EmailAddress: "ada@example.com"})
 	var apiErr *APIError
 	if errors.As(err, &apiErr) && apiErr.Code() == "FORM_IDENTIFIER_EXISTS" {
