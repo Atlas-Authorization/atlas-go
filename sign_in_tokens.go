@@ -3,6 +3,10 @@ package atlas
 import "context"
 
 // SignInTokensService is the /v1/sign_in_tokens namespace.
+//
+// Deprecated: POST /v1/sign_in_tokens is deprecated (Sunset 2026-04-01). Use
+// SessionsService.Create (POST /v1/sessions), which mints a real redeemable
+// session in one call.
 type SignInTokensService struct{ client *Client }
 
 // SignInToken is a one-time sign-in token.

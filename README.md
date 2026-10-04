@@ -147,8 +147,8 @@ per request. `AtlasBackend` caches the JWKS in-process and refetches on an unkno
 
 ```go
 backend, err := atlas.NewAtlasBackend(atlas.AtlasBackendOptions{
-	JWKSURL: "https://your-instance.atlas.dev/.well-known/jwks.json",
-	Issuer:  "https://your-instance.atlas.dev", // required — pins the token's iss
+	JWKSURL: "https://auth.yourdomain.com/.well-known/jwks.json",
+	Issuer:  "https://auth.yourdomain.com", // required — pins the token's iss
 	// AuthorizedParties: []string{"https://app.example.com"}, // optional azp allowlist
 })
 if err != nil {
