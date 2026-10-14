@@ -36,6 +36,19 @@ const (
 	ErrCodeWrongKeySurface = "WRONG_KEY_SURFACE"
 	// ErrCodeInvalidKey: the key is malformed, unknown or revoked.
 	ErrCodeInvalidKey = "INVALID_KEY"
+	// ErrCodeLimitExceeded: a usage debit would exceed an API key's spend cap.
+	// RecordUsage reports it as APIKeyUsageDebit.Code (Allowed=false), not as
+	// an error.
+	ErrCodeLimitExceeded = "LIMIT_EXCEEDED"
+	// ErrCodeIdempotencyConflict: an idempotency key was reused with a
+	// different request (for example another unit or amount).
+	ErrCodeIdempotencyConflict = "IDEMPOTENCY_CONFLICT"
+	// ErrCodeSessionRevoked, ErrCodeSessionIdleExpired, ErrCodeSessionExpired:
+	// the session has ended (signed out, timed out from inactivity, or past
+	// its absolute expiry) and cannot be kept alive.
+	ErrCodeSessionRevoked     = "SESSION_REVOKED"
+	ErrCodeSessionIdleExpired = "SESSION_IDLE_EXPIRED"
+	ErrCodeSessionExpired     = "SESSION_EXPIRED"
 )
 
 // APIError is returned by every SDK method on a non-2xx response. It carries the

@@ -2,6 +2,7 @@ package atlas
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"strconv"
 )
@@ -21,10 +22,101 @@ type APIKey struct {
 	Name        *string                `json:"name"`
 	Prefix      string                 `json:"prefix"`
 	Claims      map[string]interface{} `json:"claims"`
-	LastUsedAt  *int64                 `json:"last_used_at"`
-	ExpiresAt   *int64                 `json:"expires_at"`
-	RevokedAt   *int64                 `json:"revoked_at"`
-	CreatedAt   int64                  `json:"created_at"`
+	// Limits are the key's spend caps; nil when it has none.
+	Limits []APIKeyLimit `json:"limits"`
+	// Usage is each cap with its current-window usage (empty without caps).
+	Usage      []APIKeyLimitState `json:"usage"`
+	LastUsedAt *int64             `json:"last_used_at"`
+	ExpiresAt  *int64             `json:"expires_at"`
+	RevokedAt  *int64             `json:"revoked_at"`
+	CreatedAt  int64              `json:"created_at"`
+}
+
+// API key spend-cap periods. Request caps a single debit; day and month are
+// UTC calendar windows; total never resets.
+const (
+	APIKeyLimitPeriodRequest = "request"
+	APIKeyLimitPeriodDay     = "day"
+	APIKeyLimitPeriodMonth   = "month"
+	APIKeyLimitPeriodTotal   = "total"
+)
+
+// APIKeyLimit is a per-key spend cap, metered with APIKeysService.RecordUsage.
+type APIKeyLimit struct {
+	// Unit is app-defined, e.g. "requests" or "usd_cents".
+	Unit string `json:"unit"`
+	// Amount is the cap, in Unit.
+	Amount int64 `json:"amount"`
+	// Period is request, day, month or total.
+	Period string `json:"period"`
+}
+
+// APIKeyLimitState is a spend cap with its current-window usage.
+type APIKeyLimitState struct {
+	Unit   string `json:"unit"`
+	Period string `json:"period"`
+	Amount int64  `json:"amount"`
+	// Used in the current window (always 0 for a per-request cap).
+	Used int64 `json:"used"`
+	// Remaining is Amount - Used, never below 0.
+	Remaining int64 `json:"remaining"`
+	// WindowStart is epoch ms; nil for a per-request cap.
+	WindowStart *int64 `json:"window_start"`
+	// ResetsAt is epoch ms; nil for per-request and total caps.
+	ResetsAt *int64 `json:"resets_at"`
+}
+
+// APIKeyUsageCounter is a raw usage counter for one unit in its current window.
+type APIKeyUsageCounter struct {
+	Unit string `json:"unit"`
+	// Period is day, month or total.
+	Period      string `json:"period"`
+	Used        int64  `json:"used"`
+	WindowStart int64  `json:"window_start"`
+	// ResetsAt is epoch ms; nil for total.
+	ResetsAt *int64 `json:"resets_at"`
+}
+
+// RecordAPIKeyUsageParams is the body of POST /v1/api_keys/:id/usage.
+type RecordAPIKeyUsageParams struct {
+	// Amount to debit, in Unit (a positive integer).
+	Amount int64 `json:"amount"`
+	// Unit to debit, matching the unit of the caps it should count against.
+	Unit string `json:"unit"`
+	// IdempotencyKey makes a retry return the first outcome without counting
+	// again (kept 24 hours).
+	IdempotencyKey string `json:"idempotency_key,omitempty"`
+}
+
+// APIKeyUsageDebit is the outcome of a usage debit. A refusal is not an error:
+// Allowed is false, Code is "LIMIT_EXCEEDED", and nothing was recorded.
+type APIKeyUsageDebit struct {
+	Object  string `json:"object"`
+	KeyID   string `json:"key_id"`
+	Unit    string `json:"unit"`
+	Amount  int64  `json:"amount"`
+	Allowed bool   `json:"allowed"`
+	// Code is set only when Allowed is false.
+	Code string `json:"code,omitempty"`
+	// Exceeded lists the caps that refused the debit (empty when allowed).
+	Exceeded []APIKeyLimitState `json:"exceeded"`
+	// Usage is every cap on the key after this call.
+	Usage []APIKeyLimitState `json:"usage"`
+	// Counters are the debited unit's day, month and total counters.
+	Counters []APIKeyUsageCounter `json:"counters"`
+	// IdempotentReplay is true when this is the stored outcome of an earlier
+	// call with the same idempotency key.
+	IdempotentReplay bool `json:"idempotent_replay"`
+}
+
+// APIKeyUsage is a key's current-window usage.
+type APIKeyUsage struct {
+	Object string             `json:"object"`
+	KeyID  string             `json:"key_id"`
+	Limits []APIKeyLimit      `json:"limits"`
+	Usage  []APIKeyLimitState `json:"usage"`
+	// Counters cover every unit the key has been debited in, capped or not.
+	Counters []APIKeyUsageCounter `json:"counters"`
 }
 
 // APIKeyWithSecret is the mint response: the key plus its secret, revealed once.
@@ -42,13 +134,34 @@ type CreateAPIKeyParams struct {
 	Claims      map[string]interface{} `json:"claims,omitempty"`
 	// ExpiresAt is epoch ms; a nil pointer never expires.
 	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// Limits are per-key spend caps, metered with RecordUsage.
+	Limits []APIKeyLimit `json:"limits,omitempty"`
 }
 
-// UpdateAPIKeyParams is the body of PATCH /v1/api_keys/:id.
+// UpdateAPIKeyParams is the body of PATCH /v1/api_keys/:id. Set Limits to
+// replace the spend caps, or ClearLimits to send limits: null and remove them
+// (usage counters are kept).
 type UpdateAPIKeyParams struct {
-	Name      *string                `json:"name,omitempty"`
-	Claims    map[string]interface{} `json:"claims,omitempty"`
-	ExpiresAt *int64                 `json:"expires_at,omitempty"`
+	Name        *string                `json:"name,omitempty"`
+	Claims      map[string]interface{} `json:"claims,omitempty"`
+	ExpiresAt   *int64                 `json:"expires_at,omitempty"`
+	Limits      []APIKeyLimit          `json:"limits,omitempty"`
+	ClearLimits bool                   `json:"-"`
+}
+
+// MarshalJSON renders limits: null when ClearLimits is set.
+func (p UpdateAPIKeyParams) MarshalJSON() ([]byte, error) {
+	type alias UpdateAPIKeyParams
+	raw, err := json.Marshal(alias(p))
+	if err != nil || !p.ClearLimits {
+		return raw, err
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil, err
+	}
+	m["limits"] = nil
+	return json.Marshal(m)
 }
 
 // APIKeyVerification is the verify verdict. Every negative — unknown, malformed,
@@ -60,8 +173,16 @@ type APIKeyVerification struct {
 	ID          string                 `json:"id,omitempty"`
 	SubjectType string                 `json:"subject_type,omitempty"`
 	SubjectID   string                 `json:"subject_id,omitempty"`
+	Name        *string                `json:"name,omitempty"`
 	Claims      map[string]interface{} `json:"claims,omitempty"`
-	LastUsedAt  *int64                 `json:"last_used_at,omitempty"`
+	Scopes      []string               `json:"scopes,omitempty"`
+	Constraints map[string]interface{} `json:"constraints,omitempty"`
+	// Limits are the key's spend caps (nil when none).
+	Limits []APIKeyLimit `json:"limits,omitempty"`
+	// Usage is each cap with its current-window usage.
+	Usage      []APIKeyLimitState `json:"usage,omitempty"`
+	LastUsedAt *int64             `json:"last_used_at,omitempty"`
+	ExpiresAt  *int64             `json:"expires_at,omitempty"`
 }
 
 // ListAPIKeysParams optionally narrows the listing to one subject.
@@ -118,6 +239,24 @@ func (s *APIKeysService) Update(ctx context.Context, id string, params UpdateAPI
 func (s *APIKeysService) Delete(ctx context.Context, id string, opts ...RequestOption) (*APIKeyRevokeResult, error) {
 	out := &APIKeyRevokeResult{}
 	return out, s.client.del(ctx, "/v1/api_keys/"+url.PathEscape(id), out, opts...)
+}
+
+// RecordUsage meters usage against a key's spend caps, atomically. When the
+// debit fits every cap for the unit it is recorded and Allowed is true; when it
+// would exceed one, nothing is recorded and the call returns (without an error)
+// Allowed=false and Code "LIMIT_EXCEEDED". Reusing an idempotency key with a
+// different unit or amount is a 409 IDEMPOTENCY_CONFLICT; a revoked or expired
+// key is a 409 CONFLICT. POST /v1/api_keys/:id/usage.
+func (s *APIKeysService) RecordUsage(ctx context.Context, id string, params RecordAPIKeyUsageParams, opts ...RequestOption) (*APIKeyUsageDebit, error) {
+	out := &APIKeyUsageDebit{}
+	return out, s.client.post(ctx, "/v1/api_keys/"+url.PathEscape(id)+"/usage", params, out, opts...)
+}
+
+// GetUsage returns a key's current-window usage: each cap's state plus every
+// unit's counters. GET /v1/api_keys/:id/usage.
+func (s *APIKeysService) GetUsage(ctx context.Context, id string) (*APIKeyUsage, error) {
+	out := &APIKeyUsage{}
+	return out, s.client.get(ctx, "/v1/api_keys/"+url.PathEscape(id)+"/usage", nil, out)
 }
 
 // APIKeyRevokeResult acknowledges a key revoke.

@@ -4,7 +4,33 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
-## 0.3.0 (unreleased — next tag `v0.3.0`)
+## 0.4.0 (unreleased — next tag `v0.4.0`)
+
+### Added
+
+- **API key spend caps.** `CreateAPIKeyParams.Limits` and
+  `UpdateAPIKeyParams.Limits` (`[]APIKeyLimit`: `Unit`, `Amount`, `Period` —
+  `APIKeyLimitPeriodRequest`, `Day`, `Month`, `Total`);
+  `UpdateAPIKeyParams.ClearLimits` sends `limits: null` to remove them.
+  `APIKey` gains `Limits` and `Usage` (`[]APIKeyLimitState`: `Unit`, `Period`,
+  `Amount`, `Used`, `Remaining`, `WindowStart`, `ResetsAt`).
+- **Usage metering.** `APIKeys.RecordUsage(ctx, id, RecordAPIKeyUsageParams{Amount,
+  Unit, IdempotencyKey})` returns `*APIKeyUsageDebit` (`KeyID`, `Unit`, `Amount`,
+  `Allowed`, `Code`, `Exceeded`, `Usage`, `Counters`, `IdempotentReplay`); a
+  refusal is `Allowed=false` with `Code` `"LIMIT_EXCEEDED"`, not an error.
+  `APIKeys.GetUsage(ctx, id)` returns `*APIKeyUsage` (`KeyID`, `Limits`, `Usage`,
+  `Counters` of `APIKeyUsageCounter`).
+- **Verify.** `APIKeyVerification` gains `Name`, `Scopes`, `Constraints`,
+  `Limits`, `Usage` and `ExpiresAt`.
+- **Session keep-alive.** `Sessions.Touch(ctx, id)` returns `*TouchedSession`
+  (the session plus `Extended`). `Session` gains `IdleExpiresAt`.
+- **Users.** `CreateUserParams.Notify` and `ImportUsersParams.Notify` (`*bool`;
+  unset or false sends nothing to the user).
+- **Error codes.** `ErrCodeLimitExceeded`, `ErrCodeIdempotencyConflict`,
+  `ErrCodeSessionRevoked`, `ErrCodeSessionIdleExpired`, `ErrCodeSessionExpired`.
+- Coverage: 450 of 450 Backend API and platform operations.
+
+## 0.3.0
 
 ### Added
 

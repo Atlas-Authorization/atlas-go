@@ -69,6 +69,9 @@ type CreateUserParams struct {
 	PublicMetadata  Metadata `json:"public_metadata,omitempty"`
 	PrivateMetadata Metadata `json:"private_metadata,omitempty"`
 	UnsafeMetadata  Metadata `json:"unsafe_metadata,omitempty"`
+	// Notify says whether the create may notify the user. Unset or false
+	// guarantees no email, SMS or push is sent as a consequence of the create.
+	Notify *bool `json:"notify,omitempty"`
 }
 
 // UpdateUserParams is the body of PATCH /v1/users/:id.

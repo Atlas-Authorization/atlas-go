@@ -19,7 +19,28 @@ type Session struct {
 	LastActiveAt             int64   `json:"last_active_at"`
 	ExpireAt                 int64   `json:"expire_at"`
 	AbandonAt                int64   `json:"abandon_at"`
-	CreatedAt                int64   `json:"created_at"`
+	// IdleExpiresAt is epoch ms when the session ends from inactivity unless
+	// there is activity first (same value as AbandonAt).
+	IdleExpiresAt int64 `json:"idle_expires_at,omitempty"`
+	CreatedAt     int64 `json:"created_at"`
+}
+
+// TouchedSession is the session after a keep-alive touch.
+type TouchedSession struct {
+	Session
+	// Extended is true when this touch moved the inactivity window; false when
+	// a touch within the last 60 seconds already had.
+	Extended bool `json:"extended"`
+}
+
+// Touch keeps a session alive from your backend: it slides the inactivity
+// window as if the user had just loaded a page. It never extends past the
+// absolute expiry and never revives an ended session (409 SESSION_REVOKED,
+// SESSION_IDLE_EXPIRED or SESSION_EXPIRED). At most one effective write per
+// minute, so calling it on every request is safe. POST /v1/sessions/:id/touch.
+func (s *SessionsService) Touch(ctx context.Context, id string, opts ...RequestOption) (*TouchedSession, error) {
+	out := &TouchedSession{}
+	return out, s.client.post(ctx, "/v1/sessions/"+url.PathEscape(id)+"/touch", nil, out, opts...)
 }
 
 // RevokeSessionResult is the acknowledgement of a single session revoke.

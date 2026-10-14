@@ -107,6 +107,53 @@ if errors.As(err, &apiErr) {
 `apiErr.HasCode("...")` checks any error in the envelope; `apiErr.Errors[i].Meta`
 carries extras such as a rate limit's `retry_after`.
 
+## API key spend caps
+
+Give an end-user API key caps per unit and period (`request`, `day`, `month` or
+`total`), then meter what each call costs. A debit that would exceed a cap records
+nothing and returns `Allowed=false`; it is not an error.
+
+```go
+key, err := c.APIKeys.Create(ctx, atlas.CreateAPIKeyParams{
+	SubjectType: "user",
+	SubjectID:   "user_123",
+	Limits: []atlas.APIKeyLimit{
+		{Unit: "requests", Amount: 1000, Period: atlas.APIKeyLimitPeriodDay},
+		{Unit: "usd_cents", Amount: 5000, Period: atlas.APIKeyLimitPeriodMonth},
+	},
+})
+
+debit, err := c.APIKeys.RecordUsage(ctx, key.ID, atlas.RecordAPIKeyUsageParams{
+	Unit: "usd_cents", Amount: 12,
+	IdempotencyKey: "req_8f2c", // a retry returns the first outcome without counting again
+})
+if err == nil && !debit.Allowed {
+	// debit.Code == atlas.ErrCodeLimitExceeded; debit.Exceeded lists the caps
+}
+
+usage, err := c.APIKeys.GetUsage(ctx, key.ID) // Used / Remaining / ResetsAt per cap
+_, err = c.APIKeys.Update(ctx, key.ID, atlas.UpdateAPIKeyParams{ClearLimits: true})
+```
+
+`APIKeys.Verify` also returns the key's `Name`, `Scopes`, `Constraints`, `Limits`
+and current `Usage`.
+
+## Session keep-alive
+
+If your app loads the Atlas frontend SDK only on some pages, time spent on the
+other pages can count as inactivity. Touch the session from your backend to
+slide its inactivity window:
+
+```go
+s, err := c.Sessions.Touch(ctx, sessionID)
+// s.IdleExpiresAt is the new deadline; s.Extended is false when a touch in the last minute already did it
+```
+
+A touch never extends past the session's absolute expiry and never revives an
+ended session (409 `SESSION_REVOKED`, `SESSION_IDLE_EXPIRED` or
+`SESSION_EXPIRED`). It writes at most once a minute, so calling it on every
+request is safe.
+
 ## Pagination
 
 Cursor-paginated list methods (`Users.List`, `Organizations.List`,

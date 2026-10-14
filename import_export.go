@@ -82,6 +82,9 @@ type ImportUserRow struct {
 type ImportUsersParams struct {
 	Users  []ImportUserRow `json:"users"`
 	Upsert *bool           `json:"upsert,omitempty"`
+	// Notify says whether the import may notify the imported users. Unset or
+	// false sends nothing.
+	Notify *bool `json:"notify,omitempty"`
 }
 
 // ImportUsers imports users through the same per-row path sign-up uses.
