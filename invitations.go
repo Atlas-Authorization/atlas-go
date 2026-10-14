@@ -39,7 +39,32 @@ func (s *InvitationsService) Create(ctx context.Context, params CreateInvitation
 }
 
 // Revoke revokes an invitation. POST /v1/invitations/:id/revoke.
-func (s *InvitationsService) Revoke(ctx context.Context, id string) (*Invitation, error) {
+func (s *InvitationsService) Revoke(ctx context.Context, id string, opts ...RequestOption) (*Invitation, error) {
 	out := &Invitation{}
-	return out, s.client.post(ctx, "/v1/invitations/"+url.PathEscape(id)+"/revoke", nil, out)
+	return out, s.client.post(ctx, "/v1/invitations/"+url.PathEscape(id)+"/revoke", nil, out, opts...)
+}
+
+// BulkError is one rejected entry of a bulk create: its index in the request,
+// the address, and a stable error code.
+type BulkError struct {
+	Index        int     `json:"index"`
+	EmailAddress *string `json:"email_address"`
+	Code         string  `json:"code"`
+	Message      string  `json:"message"`
+}
+
+// BulkInvitationsResponse lists the invitations created and the per-entry
+// errors.
+type BulkInvitationsResponse struct {
+	Object string       `json:"object"`
+	Data   []Invitation `json:"data"`
+	Errors []BulkError  `json:"errors"`
+}
+
+// CreateBulk creates up to 100 invitations; invalid or duplicate entries are
+// reported in Errors without failing the rest. POST /v1/invitations/bulk.
+func (s *InvitationsService) CreateBulk(ctx context.Context, invitations []CreateInvitationParams, opts ...RequestOption) (*BulkInvitationsResponse, error) {
+	out := &BulkInvitationsResponse{}
+	body := map[string]interface{}{"invitations": invitations}
+	return out, s.client.post(ctx, "/v1/invitations/bulk", body, out, opts...)
 }

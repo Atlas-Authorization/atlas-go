@@ -12,19 +12,21 @@ type DataSubjectRequestsService struct{ client *Client }
 
 // DataSubjectRequest is a data-subject export/erasure request.
 type DataSubjectRequest struct {
-	Object          string      `json:"object"`
-	ID              string      `json:"id"`
-	Type            string      `json:"type"`
-	Status          string      `json:"status"`
-	UserID          string      `json:"user_id"`
-	RequestedByType *string     `json:"requested_by_type"`
-	RequestedByID   *string     `json:"requested_by_id"`
-	Reason          *string     `json:"reason"`
-	ScheduledFor    *int64      `json:"scheduled_for"`
-	RequestedAt     int64       `json:"requested_at"`
-	UpdatedAt       int64       `json:"updated_at"`
-	CompletedAt     *int64      `json:"completed_at"`
-	Result          interface{} `json:"result,omitempty"`
+	Object          string  `json:"object"`
+	ID              string  `json:"id"`
+	Type            string  `json:"type"`
+	Status          string  `json:"status"`
+	UserID          string  `json:"user_id"`
+	RequestedByType *string `json:"requested_by_type"`
+	RequestedByID   *string `json:"requested_by_id"`
+	Reason          *string `json:"reason"`
+	ScheduledFor    *int64  `json:"scheduled_for"`
+	// ETA is when the request is expected to complete (epoch ms), when known.
+	ETA         *int64      `json:"eta,omitempty"`
+	RequestedAt int64       `json:"requested_at"`
+	UpdatedAt   int64       `json:"updated_at"`
+	CompletedAt *int64      `json:"completed_at"`
+	Result      interface{} `json:"result,omitempty"`
 }
 
 // ListDataSubjectRequestsParams filters the list. GET /v1/data_subject_requests.
@@ -84,4 +86,29 @@ func (s *DataSubjectRequestsService) Reject(ctx context.Context, id, reason stri
 		body["reason"] = reason
 	}
 	return out, s.client.post(ctx, "/v1/data_subject_requests/"+url.PathEscape(id)+"/reject", body, out, opts...)
+}
+
+// CreateDataSubjectRequestParams is the body of POST /v1/data_subject_requests.
+// Identify the subject by UserID or SubjectEmail; Type is "export" or
+// "erasure".
+type CreateDataSubjectRequestParams struct {
+	UserID       string `json:"user_id,omitempty"`
+	SubjectEmail string `json:"subject_email,omitempty"`
+	Type         string `json:"type"`
+	Reason       string `json:"reason,omitempty"`
+}
+
+// Create opens an export or erasure request for a user from the backend.
+// POST /v1/data_subject_requests.
+func (s *DataSubjectRequestsService) Create(ctx context.Context, params CreateDataSubjectRequestParams, opts ...RequestOption) (*DataSubjectRequest, error) {
+	out := &DataSubjectRequest{}
+	return out, s.client.post(ctx, "/v1/data_subject_requests", params, out, opts...)
+}
+
+// Cancel cancels a scheduled erasure inside its grace window (409 once it is
+// processing or terminal; exports cannot be cancelled).
+// POST /v1/data_subject_requests/:id/cancel.
+func (s *DataSubjectRequestsService) Cancel(ctx context.Context, id string, opts ...RequestOption) (*DataSubjectRequest, error) {
+	out := &DataSubjectRequest{}
+	return out, s.client.post(ctx, "/v1/data_subject_requests/"+url.PathEscape(id)+"/cancel", nil, out, opts...)
 }

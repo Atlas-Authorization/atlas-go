@@ -107,63 +107,63 @@ func (s *UsersService) Create(ctx context.Context, params CreateUserParams, opts
 }
 
 // Update patches a user. PATCH /v1/users/:id.
-func (s *UsersService) Update(ctx context.Context, id string, params UpdateUserParams) (*User, error) {
+func (s *UsersService) Update(ctx context.Context, id string, params UpdateUserParams, opts ...RequestOption) (*User, error) {
 	out := &User{}
-	return out, s.client.patch(ctx, "/v1/users/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/users/"+url.PathEscape(id), params, out, opts...)
 }
 
 // ReplaceMetadata replaces the named metadata bags wholesale.
 // PUT /v1/users/:id/metadata.
-func (s *UsersService) ReplaceMetadata(ctx context.Context, id string, params ReplaceUserMetadataParams) (*User, error) {
+func (s *UsersService) ReplaceMetadata(ctx context.Context, id string, params ReplaceUserMetadataParams, opts ...RequestOption) (*User, error) {
 	out := &User{}
-	return out, s.client.put(ctx, "/v1/users/"+url.PathEscape(id)+"/metadata", params, out)
+	return out, s.client.put(ctx, "/v1/users/"+url.PathEscape(id)+"/metadata", params, out, opts...)
 }
 
 // Ban bans a user. POST /v1/users/:id/ban.
-func (s *UsersService) Ban(ctx context.Context, id string) (*User, error) {
+func (s *UsersService) Ban(ctx context.Context, id string, opts ...RequestOption) (*User, error) {
 	out := &User{}
-	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/ban", nil, out)
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/ban", nil, out, opts...)
 }
 
 // Unban lifts a ban. POST /v1/users/:id/unban.
-func (s *UsersService) Unban(ctx context.Context, id string) (*User, error) {
+func (s *UsersService) Unban(ctx context.Context, id string, opts ...RequestOption) (*User, error) {
 	out := &User{}
-	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/unban", nil, out)
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/unban", nil, out, opts...)
 }
 
 // Lock locks a user, optionally for a bounded duration. POST /v1/users/:id/lock.
-func (s *UsersService) Lock(ctx context.Context, id string, durationInSeconds int) (*User, error) {
+func (s *UsersService) Lock(ctx context.Context, id string, durationInSeconds int, opts ...RequestOption) (*User, error) {
 	body := map[string]interface{}{}
 	if durationInSeconds > 0 {
 		body["duration_in_seconds"] = durationInSeconds
 	}
 	out := &User{}
-	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/lock", body, out)
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/lock", body, out, opts...)
 }
 
 // Unlock unlocks a user. POST /v1/users/:id/unlock.
-func (s *UsersService) Unlock(ctx context.Context, id string) (*User, error) {
+func (s *UsersService) Unlock(ctx context.Context, id string, opts ...RequestOption) (*User, error) {
 	out := &User{}
-	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/unlock", nil, out)
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/unlock", nil, out, opts...)
 }
 
 // Delete removes a user. DELETE /v1/users/:id.
-func (s *UsersService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *UsersService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/users/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/users/"+url.PathEscape(id), out, opts...)
 }
 
 // ResetMFA clears every MFA factor for a user. POST /v1/users/:id/reset_mfa.
-func (s *UsersService) ResetMFA(ctx context.Context, id string) (*User, error) {
+func (s *UsersService) ResetMFA(ctx context.Context, id string, opts ...RequestOption) (*User, error) {
 	out := &User{}
-	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/reset_mfa", nil, out)
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/reset_mfa", nil, out, opts...)
 }
 
 // DeleteMFAFactor removes one MFA factor.
 // DELETE /v1/users/:id/mfa/:factorId.
-func (s *UsersService) DeleteMFAFactor(ctx context.Context, id, factorID string) (*DeletedObject, error) {
+func (s *UsersService) DeleteMFAFactor(ctx context.Context, id, factorID string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/users/"+url.PathEscape(id)+"/mfa/"+url.PathEscape(factorID), out)
+	return out, s.client.del(ctx, "/v1/users/"+url.PathEscape(id)+"/mfa/"+url.PathEscape(factorID), out, opts...)
 }
 
 // ListSessions lists a user's sessions. GET /v1/users/:id/sessions.
@@ -174,9 +174,9 @@ func (s *UsersService) ListSessions(ctx context.Context, id string) (*ListPage[U
 
 // RevokeSessions revokes all of a user's sessions.
 // POST /v1/users/:id/sessions/revoke.
-func (s *UsersService) RevokeSessions(ctx context.Context, id string) (*RevokeSessionsResult, error) {
+func (s *UsersService) RevokeSessions(ctx context.Context, id string, opts ...RequestOption) (*RevokeSessionsResult, error) {
 	out := &RevokeSessionsResult{}
-	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/sessions/revoke", nil, out)
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/sessions/revoke", nil, out, opts...)
 }
 
 // RevokeSessionsResult is the acknowledgement of a bulk session revoke.
@@ -188,24 +188,24 @@ type RevokeSessionsResult struct {
 
 // AddEmail adds an email address to a user.
 // POST /v1/users/:id/email_addresses.
-func (s *UsersService) AddEmail(ctx context.Context, id, emailAddress string) (*EmailAddress, error) {
+func (s *UsersService) AddEmail(ctx context.Context, id, emailAddress string, opts ...RequestOption) (*EmailAddress, error) {
 	out := &EmailAddress{}
 	body := map[string]string{"email_address": emailAddress}
-	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/email_addresses", body, out)
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/email_addresses", body, out, opts...)
 }
 
 // VerifyEmail marks an email verified.
 // POST /v1/users/:id/email_addresses/:emailId/verify.
-func (s *UsersService) VerifyEmail(ctx context.Context, id, emailID string) (*EmailAddress, error) {
+func (s *UsersService) VerifyEmail(ctx context.Context, id, emailID string, opts ...RequestOption) (*EmailAddress, error) {
 	out := &EmailAddress{}
-	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/email_addresses/"+url.PathEscape(emailID)+"/verify", nil, out)
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/email_addresses/"+url.PathEscape(emailID)+"/verify", nil, out, opts...)
 }
 
 // SetPrimaryEmail promotes an email to primary.
 // POST /v1/users/:id/email_addresses/:emailId/primary.
-func (s *UsersService) SetPrimaryEmail(ctx context.Context, id, emailID string) (*EmailAddress, error) {
+func (s *UsersService) SetPrimaryEmail(ctx context.Context, id, emailID string, opts ...RequestOption) (*EmailAddress, error) {
 	out := &EmailAddress{}
-	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/email_addresses/"+url.PathEscape(emailID)+"/primary", nil, out)
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/email_addresses/"+url.PathEscape(emailID)+"/primary", nil, out, opts...)
 }
 
 // GetOAuthAccessToken fetches a live provider credential for a user.
@@ -320,9 +320,9 @@ func (s *UsersService) ConnectExternalAccount(ctx context.Context, id string, pa
 
 // UnlinkIdentity extracts a linked provider identity into a brand-new standalone
 // user. DELETE /v1/users/:id/identities/:identityId.
-func (s *UsersService) UnlinkIdentity(ctx context.Context, id, identityID string) (*UnlinkIdentityResult, error) {
+func (s *UsersService) UnlinkIdentity(ctx context.Context, id, identityID string, opts ...RequestOption) (*UnlinkIdentityResult, error) {
 	out := &UnlinkIdentityResult{}
-	return out, s.client.del(ctx, "/v1/users/"+url.PathEscape(id)+"/identities/"+url.PathEscape(identityID), out)
+	return out, s.client.del(ctx, "/v1/users/"+url.PathEscape(id)+"/identities/"+url.PathEscape(identityID), out, opts...)
 }
 
 // ListGrants returns the OAuth clients this user has authorized.
@@ -334,14 +334,14 @@ func (s *UsersService) ListGrants(ctx context.Context, id string) (*ListPage[Gra
 
 // RevokeAllGrants revokes every consent grant the user holds, cascading to the
 // associated tokens. DELETE /v1/users/:id/grants.
-func (s *UsersService) RevokeAllGrants(ctx context.Context, id string) (*RevokeGrantsResult, error) {
+func (s *UsersService) RevokeAllGrants(ctx context.Context, id string, opts ...RequestOption) (*RevokeGrantsResult, error) {
 	out := &RevokeGrantsResult{}
-	return out, s.client.del(ctx, "/v1/users/"+url.PathEscape(id)+"/grants", out)
+	return out, s.client.del(ctx, "/v1/users/"+url.PathEscape(id)+"/grants", out, opts...)
 }
 
 // RevokeGrant revokes ONE consent grant (and its live tokens). Grants are
 // instance-scoped, so this is not nested under a user id. DELETE /v1/grants/:id.
-func (s *UsersService) RevokeGrant(ctx context.Context, grantID string) (*RevokeGrantResult, error) {
+func (s *UsersService) RevokeGrant(ctx context.Context, grantID string, opts ...RequestOption) (*RevokeGrantResult, error) {
 	out := &RevokeGrantResult{}
-	return out, s.client.del(ctx, "/v1/grants/"+url.PathEscape(grantID), out)
+	return out, s.client.del(ctx, "/v1/grants/"+url.PathEscape(grantID), out, opts...)
 }

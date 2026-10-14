@@ -97,23 +97,23 @@ func (s *ActionsService) Get(ctx context.Context, id string) (*Action, error) {
 }
 
 // Update patches an action. PATCH /v1/actions/:id.
-func (s *ActionsService) Update(ctx context.Context, id string, params UpdateActionParams) (*Action, error) {
+func (s *ActionsService) Update(ctx context.Context, id string, params UpdateActionParams, opts ...RequestOption) (*Action, error) {
 	out := &Action{}
-	return out, s.client.patch(ctx, "/v1/actions/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/actions/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes an action. DELETE /v1/actions/:id.
-func (s *ActionsService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *ActionsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/actions/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/actions/"+url.PathEscape(id), out, opts...)
 }
 
 // Test dry-runs an action against a sample event; nothing is persisted.
 // POST /v1/actions/:id/test.
-func (s *ActionsService) Test(ctx context.Context, id string, event ActionTestEvent) (*ActionTestResult, error) {
+func (s *ActionsService) Test(ctx context.Context, id string, event ActionTestEvent, opts ...RequestOption) (*ActionTestResult, error) {
 	out := &ActionTestResult{}
 	body := map[string]ActionTestEvent{"event": event}
-	return out, s.client.post(ctx, "/v1/actions/"+url.PathEscape(id)+"/test", body, out)
+	return out, s.client.post(ctx, "/v1/actions/"+url.PathEscape(id)+"/test", body, out, opts...)
 }
 
 // GetBindings returns the actions bound to a trigger, in run order.
@@ -125,8 +125,8 @@ func (s *ActionsService) GetBindings(ctx context.Context, trigger string) (*Acti
 
 // SetBindings replaces a trigger's ordered binding set.
 // PUT /v1/actions/bindings/:trigger.
-func (s *ActionsService) SetBindings(ctx context.Context, trigger string, actionIDs []string) (*ActionBindingList, error) {
+func (s *ActionsService) SetBindings(ctx context.Context, trigger string, actionIDs []string, opts ...RequestOption) (*ActionBindingList, error) {
 	out := &ActionBindingList{}
 	body := map[string][]string{"action_ids": actionIDs}
-	return out, s.client.put(ctx, "/v1/actions/bindings/"+url.PathEscape(trigger), body, out)
+	return out, s.client.put(ctx, "/v1/actions/bindings/"+url.PathEscape(trigger), body, out, opts...)
 }

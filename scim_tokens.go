@@ -59,7 +59,7 @@ func (s *SCIMTokensService) Create(ctx context.Context, params CreateScimTokenPa
 }
 
 // Revoke revokes a SCIM token. POST /v1/scim_tokens/:id/revoke.
-func (s *SCIMTokensService) Revoke(ctx context.Context, id string) (*ScimTokenRevokeResult, error) {
+func (s *SCIMTokensService) Revoke(ctx context.Context, id string, opts ...RequestOption) (*ScimTokenRevokeResult, error) {
 	out := &ScimTokenRevokeResult{}
-	return out, s.client.post(ctx, "/v1/scim_tokens/"+url.PathEscape(id)+"/revoke", nil, out)
+	return out, s.client.post(ctx, "/v1/scim_tokens/"+url.PathEscape(id)+"/revoke", nil, out, opts...)
 }

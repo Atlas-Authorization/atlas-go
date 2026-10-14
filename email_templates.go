@@ -53,20 +53,20 @@ func (s *EmailTemplatesService) List(ctx context.Context) (*ListPage[EmailTempla
 
 // Preview renders an unsaved draft (if a body is given) or the stored template.
 // POST /v1/email_templates/:name/preview.
-func (s *EmailTemplatesService) Preview(ctx context.Context, name string, body EmailTemplateBody) (*EmailTemplatePreview, error) {
+func (s *EmailTemplatesService) Preview(ctx context.Context, name string, body EmailTemplateBody, opts ...RequestOption) (*EmailTemplatePreview, error) {
 	out := &EmailTemplatePreview{}
-	return out, s.client.post(ctx, "/v1/email_templates/"+url.PathEscape(name)+"/preview", body, out)
+	return out, s.client.post(ctx, "/v1/email_templates/"+url.PathEscape(name)+"/preview", body, out, opts...)
 }
 
 // Update saves an override, keyed by template name.
 // PUT /v1/email_templates/:name.
-func (s *EmailTemplatesService) Update(ctx context.Context, name string, body EmailTemplateBody) (*EmailTemplateResult, error) {
+func (s *EmailTemplatesService) Update(ctx context.Context, name string, body EmailTemplateBody, opts ...RequestOption) (*EmailTemplateResult, error) {
 	out := &EmailTemplateResult{}
-	return out, s.client.put(ctx, "/v1/email_templates/"+url.PathEscape(name), body, out)
+	return out, s.client.put(ctx, "/v1/email_templates/"+url.PathEscape(name), body, out, opts...)
 }
 
 // Delete reverts to the built-in. DELETE /v1/email_templates/:name.
-func (s *EmailTemplatesService) Delete(ctx context.Context, name string) (*EmailTemplateResult, error) {
+func (s *EmailTemplatesService) Delete(ctx context.Context, name string, opts ...RequestOption) (*EmailTemplateResult, error) {
 	out := &EmailTemplateResult{}
-	return out, s.client.del(ctx, "/v1/email_templates/"+url.PathEscape(name), out)
+	return out, s.client.del(ctx, "/v1/email_templates/"+url.PathEscape(name), out, opts...)
 }

@@ -59,13 +59,13 @@ func (s *NetworkACLsService) Create(ctx context.Context, params CreateNetworkACL
 }
 
 // Update patches a rule. PATCH /v1/network_acls/:id.
-func (s *NetworkACLsService) Update(ctx context.Context, id string, params UpdateNetworkACLParams) (*NetworkACL, error) {
+func (s *NetworkACLsService) Update(ctx context.Context, id string, params UpdateNetworkACLParams, opts ...RequestOption) (*NetworkACL, error) {
 	out := &NetworkACL{}
-	return out, s.client.patch(ctx, "/v1/network_acls/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/network_acls/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes a rule. DELETE /v1/network_acls/:id.
-func (s *NetworkACLsService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *NetworkACLsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/network_acls/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/network_acls/"+url.PathEscape(id), out, opts...)
 }

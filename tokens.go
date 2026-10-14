@@ -37,7 +37,7 @@ type TokenVerification struct {
 
 // Verify authoritatively checks a session token, honouring revocation.
 // POST /v1/tokens/verify.
-func (s *TokensService) Verify(ctx context.Context, params VerifyTokenParams) (*TokenVerification, error) {
+func (s *TokensService) Verify(ctx context.Context, params VerifyTokenParams, opts ...RequestOption) (*TokenVerification, error) {
 	out := &TokenVerification{}
-	return out, s.client.post(ctx, "/v1/tokens/verify", params, out)
+	return out, s.client.post(ctx, "/v1/tokens/verify", params, out, opts...)
 }

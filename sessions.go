@@ -75,7 +75,7 @@ func (s *SessionsService) Get(ctx context.Context, id string) (*Session, error) 
 }
 
 // Revoke revokes a session. POST /v1/sessions/:id/revoke.
-func (s *SessionsService) Revoke(ctx context.Context, id string) (*RevokeSessionResult, error) {
+func (s *SessionsService) Revoke(ctx context.Context, id string, opts ...RequestOption) (*RevokeSessionResult, error) {
 	out := &RevokeSessionResult{}
-	return out, s.client.post(ctx, "/v1/sessions/"+url.PathEscape(id)+"/revoke", nil, out)
+	return out, s.client.post(ctx, "/v1/sessions/"+url.PathEscape(id)+"/revoke", nil, out, opts...)
 }

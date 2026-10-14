@@ -3,6 +3,7 @@ package atlas
 import (
 	"context"
 	"net/url"
+	"strconv"
 )
 
 // APIKeysService is the /v1/api_keys namespace — end-user API keys (Clerk
@@ -94,10 +95,10 @@ func (s *APIKeysService) Create(ctx context.Context, params CreateAPIKeyParams, 
 
 // Verify checks a presented secret. Rate-limited — an online credential check.
 // POST /v1/api_keys/verify.
-func (s *APIKeysService) Verify(ctx context.Context, secret string) (*APIKeyVerification, error) {
+func (s *APIKeysService) Verify(ctx context.Context, secret string, opts ...RequestOption) (*APIKeyVerification, error) {
 	out := &APIKeyVerification{}
 	body := map[string]string{"secret": secret}
-	return out, s.client.post(ctx, "/v1/api_keys/verify", body, out)
+	return out, s.client.post(ctx, "/v1/api_keys/verify", body, out, opts...)
 }
 
 // Get returns one key. GET /v1/api_keys/:id.
@@ -107,16 +108,16 @@ func (s *APIKeysService) Get(ctx context.Context, id string) (*APIKey, error) {
 }
 
 // Update patches a key. PATCH /v1/api_keys/:id.
-func (s *APIKeysService) Update(ctx context.Context, id string, params UpdateAPIKeyParams) (*APIKey, error) {
+func (s *APIKeysService) Update(ctx context.Context, id string, params UpdateAPIKeyParams, opts ...RequestOption) (*APIKey, error) {
 	out := &APIKey{}
-	return out, s.client.patch(ctx, "/v1/api_keys/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/api_keys/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete revokes a key. It stays queryable but never authenticates again.
 // DELETE /v1/api_keys/:id.
-func (s *APIKeysService) Delete(ctx context.Context, id string) (*APIKeyRevokeResult, error) {
+func (s *APIKeysService) Delete(ctx context.Context, id string, opts ...RequestOption) (*APIKeyRevokeResult, error) {
 	out := &APIKeyRevokeResult{}
-	return out, s.client.del(ctx, "/v1/api_keys/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/api_keys/"+url.PathEscape(id), out, opts...)
 }
 
 // APIKeyRevokeResult acknowledges a key revoke.
@@ -124,4 +125,72 @@ type APIKeyRevokeResult struct {
 	Object  string `json:"object"`
 	ID      string `json:"id"`
 	Revoked bool   `json:"revoked"`
+}
+
+// RevokedAPIKey is one entry of the revocation feed.
+type RevokedAPIKey struct {
+	Object    string `json:"object"`
+	ID        string `json:"id"`
+	RevokedAt *int64 `json:"revoked_at"`
+}
+
+// ListRevokedAPIKeysParams pages the revocation feed. Since is an ISO-8601
+// timestamp, epoch milliseconds, or a NextCursor from a prior page.
+type ListRevokedAPIKeysParams struct {
+	Since string
+	Limit int
+}
+
+// MintAPIKeyTokenParams is the body of POST /v1/api_keys/token. Audience is a
+// string or a []string.
+type MintAPIKeyTokenParams struct {
+	Secret     string      `json:"secret"`
+	TTLSeconds int         `json:"ttl_seconds,omitempty"`
+	Audience   interface{} `json:"audience,omitempty"`
+}
+
+// APIKeyTokenConfirmation binds a token to the key's registered public key.
+type APIKeyTokenConfirmation struct {
+	JKT string `json:"jkt"`
+}
+
+// APIKeyToken is a short-lived, JWKS-signed access JWT minted from an API key.
+// Cnf is set when the key registered a public key (sender-constrained).
+type APIKeyToken struct {
+	Object      string                   `json:"object"`
+	Token       string                   `json:"token"`
+	TokenType   string                   `json:"token_type"`
+	JTI         string                   `json:"jti"`
+	KeyID       string                   `json:"key_id"`
+	SubjectType string                   `json:"subject_type,omitempty"`
+	SubjectID   string                   `json:"subject_id,omitempty"`
+	Scopes      []string                 `json:"scopes"`
+	Constraints map[string]interface{}   `json:"constraints"`
+	Cnf         *APIKeyTokenConfirmation `json:"cnf,omitempty"`
+	ExpiresIn   int64                    `json:"expires_in"`
+	ExpiresAt   int64                    `json:"expires_at"`
+	Issuer      string                   `json:"issuer"`
+}
+
+// ListRevoked returns keys revoked since a cursor, so a resource server can
+// deny-list them while their short-lived tokens are still live.
+// GET /v1/api_keys/revoked.
+func (s *APIKeysService) ListRevoked(ctx context.Context, params ListRevokedAPIKeysParams) (*CursorPage[RevokedAPIKey], error) {
+	q := url.Values{}
+	if params.Since != "" {
+		q.Set("since", params.Since)
+	}
+	if params.Limit > 0 {
+		q.Set("limit", strconv.Itoa(params.Limit))
+	}
+	out := &CursorPage[RevokedAPIKey]{}
+	return out, s.client.get(ctx, "/v1/api_keys/revoked", q, out)
+}
+
+// MintToken exchanges an API key secret for a short-lived signed access JWT
+// that a resource verifies offline against the instance JWKS.
+// POST /v1/api_keys/token.
+func (s *APIKeysService) MintToken(ctx context.Context, params MintAPIKeyTokenParams, opts ...RequestOption) (*APIKeyToken, error) {
+	out := &APIKeyToken{}
+	return out, s.client.post(ctx, "/v1/api_keys/token", params, out, opts...)
 }

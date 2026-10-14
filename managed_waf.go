@@ -92,21 +92,21 @@ func (s *ManagedWAFService) Status(ctx context.Context) (*ManagedWAFStatus, erro
 }
 
 // Update sets config and write-only credentials. PUT /v1/managed_waf.
-func (s *ManagedWAFService) Update(ctx context.Context, params UpdateManagedWAFParams) (*ManagedWAF, error) {
+func (s *ManagedWAFService) Update(ctx context.Context, params UpdateManagedWAFParams, opts ...RequestOption) (*ManagedWAF, error) {
 	out := &ManagedWAF{}
-	return out, s.client.put(ctx, "/v1/managed_waf", params, out)
+	return out, s.client.put(ctx, "/v1/managed_waf", params, out, opts...)
 }
 
 // Provision applies now (idempotent create/update + associate the WebACL).
 // POST /v1/managed_waf/provision.
-func (s *ManagedWAFService) Provision(ctx context.Context) (*ManagedWAFOutcome, error) {
+func (s *ManagedWAFService) Provision(ctx context.Context, opts ...RequestOption) (*ManagedWAFOutcome, error) {
 	out := &ManagedWAFOutcome{}
-	return out, s.client.post(ctx, "/v1/managed_waf/provision", nil, out)
+	return out, s.client.post(ctx, "/v1/managed_waf/provision", nil, out, opts...)
 }
 
 // Deprovision disassociates and deletes the WebACL.
 // POST /v1/managed_waf/deprovision.
-func (s *ManagedWAFService) Deprovision(ctx context.Context) (*ManagedWAFOutcome, error) {
+func (s *ManagedWAFService) Deprovision(ctx context.Context, opts ...RequestOption) (*ManagedWAFOutcome, error) {
 	out := &ManagedWAFOutcome{}
-	return out, s.client.post(ctx, "/v1/managed_waf/deprovision", nil, out)
+	return out, s.client.post(ctx, "/v1/managed_waf/deprovision", nil, out, opts...)
 }

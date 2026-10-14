@@ -84,9 +84,9 @@ func (s *SSOOnboardingService) Create(ctx context.Context, params CreateSSOOnboa
 }
 
 // Delete removes a profile. DELETE /v1/sso_onboarding_profiles/:id.
-func (s *SSOOnboardingService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *SSOOnboardingService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/sso_onboarding_profiles/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/sso_onboarding_profiles/"+url.PathEscape(id), out, opts...)
 }
 
 // CreateTicket issues a one-time ticket for a profile. The token is returned
@@ -98,7 +98,7 @@ func (s *SSOOnboardingService) CreateTicket(ctx context.Context, profileID strin
 
 // RevokeTicket kills a still-live ticket.
 // POST /v1/sso_onboarding_tickets/:ticketId/revoke.
-func (s *SSOOnboardingService) RevokeTicket(ctx context.Context, ticketID string) (*TicketRevokeResult, error) {
+func (s *SSOOnboardingService) RevokeTicket(ctx context.Context, ticketID string, opts ...RequestOption) (*TicketRevokeResult, error) {
 	out := &TicketRevokeResult{}
-	return out, s.client.post(ctx, "/v1/sso_onboarding_tickets/"+url.PathEscape(ticketID)+"/revoke", nil, out)
+	return out, s.client.post(ctx, "/v1/sso_onboarding_tickets/"+url.PathEscape(ticketID)+"/revoke", nil, out, opts...)
 }

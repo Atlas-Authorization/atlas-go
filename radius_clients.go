@@ -62,13 +62,13 @@ func (s *RadiusClientsService) Get(ctx context.Context, id string) (*RadiusClien
 }
 
 // Update patches a client. PATCH /v1/radius_clients/:id.
-func (s *RadiusClientsService) Update(ctx context.Context, id string, params UpdateRadiusClientParams) (*RadiusClient, error) {
+func (s *RadiusClientsService) Update(ctx context.Context, id string, params UpdateRadiusClientParams, opts ...RequestOption) (*RadiusClient, error) {
 	out := &RadiusClient{}
-	return out, s.client.patch(ctx, "/v1/radius_clients/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/radius_clients/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes a client. DELETE /v1/radius_clients/:id.
-func (s *RadiusClientsService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *RadiusClientsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/radius_clients/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/radius_clients/"+url.PathEscape(id), out, opts...)
 }

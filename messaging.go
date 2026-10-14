@@ -5,9 +5,17 @@ import (
 	"net/url"
 )
 
-// MessagingService is the /v1/messaging_providers namespace — §BYOK messaging
-// provider config. A provider secret is write-only; a response reports only which
+// MessagingService is the /v1/messaging_providers namespace — use your own email
+// or SMS provider. A provider secret is write-only; a response reports only which
 // secret keys are set (SecretsSet).
+//
+// Prefer the typed SetEmailProvider / SetSMSProvider with a per-transport config
+// struct (ResendConfig, SMTPConfig, TwilioConfig, ...): each struct carries exactly
+// the keys the API accepts for that transport. Fields marked "Required on first
+// setup" must be sent the first time you configure a transport (or switch to it).
+// On an update of the SAME transport, an omitted (empty) field keeps its stored
+// value — including a stored secret — so a from-address change need not re-send
+// the API key.
 type MessagingService struct{ client *Client }
 
 // MessagingProvider is one configured channel provider, secrets omitted.
@@ -29,8 +37,10 @@ type MessagingProviders struct {
 	SMS    *MessagingProvider `json:"sms"`
 }
 
-// MessagingProviderInput is the body of a provider set. Config carries the
-// write-only secret keys on write.
+// MessagingProviderInput is the untyped body of a provider set. Config carries
+// the write-only secret keys on write. The API refuses any config key the
+// transport does not use; prefer SetEmailProvider / SetSMSProvider with a typed
+// config struct.
 type MessagingProviderInput struct {
 	Transport   string                 `json:"transport"`
 	FromAddress string                 `json:"from_address,omitempty"`
@@ -60,28 +70,28 @@ func (s *MessagingService) Get(ctx context.Context) (*MessagingProviders, error)
 }
 
 // SetEmail configures the email provider. PUT /v1/messaging_providers/email.
-func (s *MessagingService) SetEmail(ctx context.Context, params MessagingProviderInput) (*MessagingProvider, error) {
+func (s *MessagingService) SetEmail(ctx context.Context, params MessagingProviderInput, opts ...RequestOption) (*MessagingProvider, error) {
 	out := &MessagingProvider{}
-	return out, s.client.put(ctx, "/v1/messaging_providers/email", params, out)
+	return out, s.client.put(ctx, "/v1/messaging_providers/email", params, out, opts...)
 }
 
 // SetSMS configures the SMS provider. PUT /v1/messaging_providers/sms.
-func (s *MessagingService) SetSMS(ctx context.Context, params MessagingProviderInput) (*MessagingProvider, error) {
+func (s *MessagingService) SetSMS(ctx context.Context, params MessagingProviderInput, opts ...RequestOption) (*MessagingProvider, error) {
 	out := &MessagingProvider{}
-	return out, s.client.put(ctx, "/v1/messaging_providers/sms", params, out)
+	return out, s.client.put(ctx, "/v1/messaging_providers/sms", params, out, opts...)
 }
 
 // DeleteChannel removes a channel's provider config.
 // DELETE /v1/messaging_providers/:channel.
-func (s *MessagingService) DeleteChannel(ctx context.Context, channel string) (*DeletedMessagingProvider, error) {
+func (s *MessagingService) DeleteChannel(ctx context.Context, channel string, opts ...RequestOption) (*DeletedMessagingProvider, error) {
 	out := &DeletedMessagingProvider{}
-	return out, s.client.del(ctx, "/v1/messaging_providers/"+url.PathEscape(channel), out)
+	return out, s.client.del(ctx, "/v1/messaging_providers/"+url.PathEscape(channel), out, opts...)
 }
 
 // Test sends a fixed, clearly-marked test message through the channel.
 // POST /v1/messaging_providers/:channel/test.
-func (s *MessagingService) Test(ctx context.Context, channel, to string) (*MessagingTestResult, error) {
+func (s *MessagingService) Test(ctx context.Context, channel, to string, opts ...RequestOption) (*MessagingTestResult, error) {
 	out := &MessagingTestResult{}
 	body := map[string]string{"to": to}
-	return out, s.client.post(ctx, "/v1/messaging_providers/"+url.PathEscape(channel)+"/test", body, out)
+	return out, s.client.post(ctx, "/v1/messaging_providers/"+url.PathEscape(channel)+"/test", body, out, opts...)
 }

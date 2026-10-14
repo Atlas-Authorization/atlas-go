@@ -77,12 +77,12 @@ func (s *LocalizationsService) Get(ctx context.Context, id string) (*Localizatio
 }
 
 // Update patches a row. PATCH /v1/localizations/:id.
-func (s *LocalizationsService) Update(ctx context.Context, id string, params UpdateLocalizationParams) (*Localization, error) {
+func (s *LocalizationsService) Update(ctx context.Context, id string, params UpdateLocalizationParams, opts ...RequestOption) (*Localization, error) {
 	out := &Localization{}
-	return out, s.client.patch(ctx, "/v1/localizations/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/localizations/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes a row. DELETE /v1/localizations/:id.
-func (s *LocalizationsService) Delete(ctx context.Context, id string) error {
-	return s.client.del(ctx, "/v1/localizations/"+url.PathEscape(id), nil)
+func (s *LocalizationsService) Delete(ctx context.Context, id string, opts ...RequestOption) error {
+	return s.client.del(ctx, "/v1/localizations/"+url.PathEscape(id), nil, opts...)
 }

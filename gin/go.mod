@@ -3,7 +3,7 @@ module github.com/Atlas-Authorization/atlas-go/gin
 go 1.21
 
 require (
-	github.com/Atlas-Authorization/atlas-go v0.2.0
+	github.com/Atlas-Authorization/atlas-go v0.0.0
 	github.com/gin-gonic/gin v1.10.0
 )
 
@@ -36,3 +36,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
+replace github.com/Atlas-Authorization/atlas-go => ../

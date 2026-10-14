@@ -67,13 +67,13 @@ func (s *ResourceServersService) Create(ctx context.Context, params CreateResour
 }
 
 // Update patches a resource server. PATCH /v1/resource_servers/:id.
-func (s *ResourceServersService) Update(ctx context.Context, id string, params UpdateResourceServerParams) (*ResourceServer, error) {
+func (s *ResourceServersService) Update(ctx context.Context, id string, params UpdateResourceServerParams, opts ...RequestOption) (*ResourceServer, error) {
 	out := &ResourceServer{}
-	return out, s.client.patch(ctx, "/v1/resource_servers/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/resource_servers/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes a resource server. DELETE /v1/resource_servers/:id.
-func (s *ResourceServersService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *ResourceServersService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/resource_servers/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/resource_servers/"+url.PathEscape(id), out, opts...)
 }

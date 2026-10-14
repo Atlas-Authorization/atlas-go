@@ -46,7 +46,7 @@ func (s *ActorTokensService) Create(ctx context.Context, params CreateActorToken
 }
 
 // Revoke revokes an actor token. POST /v1/actor_tokens/:id/revoke.
-func (s *ActorTokensService) Revoke(ctx context.Context, id string) (*ActorTokenRevokeResult, error) {
+func (s *ActorTokensService) Revoke(ctx context.Context, id string, opts ...RequestOption) (*ActorTokenRevokeResult, error) {
 	out := &ActorTokenRevokeResult{}
-	return out, s.client.post(ctx, "/v1/actor_tokens/"+url.PathEscape(id)+"/revoke", nil, out)
+	return out, s.client.post(ctx, "/v1/actor_tokens/"+url.PathEscape(id)+"/revoke", nil, out, opts...)
 }

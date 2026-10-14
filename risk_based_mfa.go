@@ -52,7 +52,7 @@ func (s *RiskBasedMFAService) Get(ctx context.Context) (*RiskBasedMFA, error) {
 }
 
 // Update changes any subset of the config. PATCH /v1/risk_based_mfa.
-func (s *RiskBasedMFAService) Update(ctx context.Context, params UpdateRiskBasedMFAParams) (*RiskBasedMFA, error) {
+func (s *RiskBasedMFAService) Update(ctx context.Context, params UpdateRiskBasedMFAParams, opts ...RequestOption) (*RiskBasedMFA, error) {
 	out := &RiskBasedMFA{}
-	return out, s.client.patch(ctx, "/v1/risk_based_mfa", params, out)
+	return out, s.client.patch(ctx, "/v1/risk_based_mfa", params, out, opts...)
 }

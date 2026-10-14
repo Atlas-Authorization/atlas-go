@@ -75,20 +75,20 @@ func (s *LogStreamsService) Create(ctx context.Context, params CreateLogStreamPa
 }
 
 // Update patches a stream. PATCH /v1/log_streams/:id.
-func (s *LogStreamsService) Update(ctx context.Context, id string, params UpdateLogStreamParams) (*LogStream, error) {
+func (s *LogStreamsService) Update(ctx context.Context, id string, params UpdateLogStreamParams, opts ...RequestOption) (*LogStream, error) {
 	out := &LogStream{}
-	return out, s.client.patch(ctx, "/v1/log_streams/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/log_streams/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes a stream. DELETE /v1/log_streams/:id.
-func (s *LogStreamsService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *LogStreamsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/log_streams/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/log_streams/"+url.PathEscape(id), out, opts...)
 }
 
 // Test sends one synthetic event with the real credentials.
 // POST /v1/log_streams/:id/test.
-func (s *LogStreamsService) Test(ctx context.Context, id string) (*LogStreamTestResult, error) {
+func (s *LogStreamsService) Test(ctx context.Context, id string, opts ...RequestOption) (*LogStreamTestResult, error) {
 	out := &LogStreamTestResult{}
-	return out, s.client.post(ctx, "/v1/log_streams/"+url.PathEscape(id)+"/test", nil, out)
+	return out, s.client.post(ctx, "/v1/log_streams/"+url.PathEscape(id)+"/test", nil, out, opts...)
 }

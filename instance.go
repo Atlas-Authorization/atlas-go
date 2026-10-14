@@ -40,7 +40,7 @@ func (s *InstanceService) Get(ctx context.Context) (*Instance, error) {
 }
 
 // Update patches the mutable instance config. PATCH /v1/instance.
-func (s *InstanceService) Update(ctx context.Context, params UpdateInstanceParams) (*InstanceUpdateResult, error) {
+func (s *InstanceService) Update(ctx context.Context, params UpdateInstanceParams, opts ...RequestOption) (*InstanceUpdateResult, error) {
 	out := &InstanceUpdateResult{}
-	return out, s.client.patch(ctx, "/v1/instance", params, out)
+	return out, s.client.patch(ctx, "/v1/instance", params, out, opts...)
 }

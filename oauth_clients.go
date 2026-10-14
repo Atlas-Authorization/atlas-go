@@ -90,22 +90,22 @@ func (s *OAuthClientsService) Create(ctx context.Context, params CreateOAuthClie
 }
 
 // Update patches an OAuth client. PATCH /v1/oauth_clients/:id.
-func (s *OAuthClientsService) Update(ctx context.Context, id string, params UpdateOAuthClientParams) (*OAuthClient, error) {
+func (s *OAuthClientsService) Update(ctx context.Context, id string, params UpdateOAuthClientParams, opts ...RequestOption) (*OAuthClient, error) {
 	out := &OAuthClient{}
-	return out, s.client.patch(ctx, "/v1/oauth_clients/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/oauth_clients/"+url.PathEscape(id), params, out, opts...)
 }
 
 // RotateSecret rotates the client secret; the response carries it once.
 // POST /v1/oauth_clients/:id/rotate_secret.
-func (s *OAuthClientsService) RotateSecret(ctx context.Context, id string) (*OAuthClientWithSecret, error) {
+func (s *OAuthClientsService) RotateSecret(ctx context.Context, id string, opts ...RequestOption) (*OAuthClientWithSecret, error) {
 	out := &OAuthClientWithSecret{}
-	return out, s.client.post(ctx, "/v1/oauth_clients/"+url.PathEscape(id)+"/rotate_secret", nil, out)
+	return out, s.client.post(ctx, "/v1/oauth_clients/"+url.PathEscape(id)+"/rotate_secret", nil, out, opts...)
 }
 
 // Delete removes an OAuth client. DELETE /v1/oauth_clients/:id.
-func (s *OAuthClientsService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *OAuthClientsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/oauth_clients/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/oauth_clients/"+url.PathEscape(id), out, opts...)
 }
 
 // OAuthClientGrantsService is /v1/oauth_clients/:id/grants.
@@ -124,13 +124,34 @@ func (s *OAuthClientGrantsService) List(ctx context.Context, clientID string) (*
 }
 
 // Create creates a client grant.
-func (s *OAuthClientGrantsService) Create(ctx context.Context, clientID string, params CreateClientGrantParams) (*ClientGrant, error) {
+func (s *OAuthClientGrantsService) Create(ctx context.Context, clientID string, params CreateClientGrantParams, opts ...RequestOption) (*ClientGrant, error) {
 	out := &ClientGrant{}
-	return out, s.client.post(ctx, "/v1/oauth_clients/"+url.PathEscape(clientID)+"/grants", params, out)
+	return out, s.client.post(ctx, "/v1/oauth_clients/"+url.PathEscape(clientID)+"/grants", params, out, opts...)
 }
 
 // Delete removes a client grant.
-func (s *OAuthClientGrantsService) Delete(ctx context.Context, clientID, grantID string) (*DeletedObject, error) {
+func (s *OAuthClientGrantsService) Delete(ctx context.Context, clientID, grantID string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/oauth_clients/"+url.PathEscape(clientID)+"/grants/"+url.PathEscape(grantID), out)
+	return out, s.client.del(ctx, "/v1/oauth_clients/"+url.PathEscape(clientID)+"/grants/"+url.PathEscape(grantID), out, opts...)
+}
+
+// ImportOAuthClient is one client to import. Supply ClientSecret (hashed on
+// arrival) or a pre-hashed ClientSecretHash, or neither for a public client.
+type ImportOAuthClient struct {
+	ClientID                string   `json:"client_id"`
+	ClientSecret            string   `json:"client_secret,omitempty"`
+	ClientSecretHash        string   `json:"client_secret_hash,omitempty"`
+	Name                    string   `json:"name"`
+	RedirectURIs            []string `json:"redirect_uris"`
+	AllowedScopes           []string `json:"allowed_scopes,omitempty"`
+	GrantTypes              []string `json:"grant_types,omitempty"`
+	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method,omitempty"`
+}
+
+// Import bulk-imports OAuth clients for a migration (idempotent per client_id).
+// POST /v1/oauth_clients/import.
+func (s *OAuthClientsService) Import(ctx context.Context, clients []ImportOAuthClient, opts ...RequestOption) (*ListPage[OAuthClient], error) {
+	out := &ListPage[OAuthClient]{}
+	body := map[string]interface{}{"clients": clients}
+	return out, s.client.post(ctx, "/v1/oauth_clients/import", body, out, opts...)
 }

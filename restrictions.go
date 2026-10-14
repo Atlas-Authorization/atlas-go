@@ -22,13 +22,13 @@ func (s *AllowlistService) List(ctx context.Context) (*ListPage[Identifier], err
 }
 
 // Add adds an allowlist identifier. POST /v1/allowlist_identifiers.
-func (s *AllowlistService) Add(ctx context.Context, identifier string) (*Identifier, error) {
-	return addRestriction(ctx, s.client, "/v1/allowlist_identifiers", identifier)
+func (s *AllowlistService) Add(ctx context.Context, identifier string, opts ...RequestOption) (*Identifier, error) {
+	return addRestriction(ctx, s.client, "/v1/allowlist_identifiers", identifier, opts...)
 }
 
 // Remove removes an allowlist identifier. DELETE /v1/allowlist_identifiers/:id.
-func (s *AllowlistService) Remove(ctx context.Context, id string) (*DeletedObject, error) {
-	return removeRestriction(ctx, s.client, "/v1/allowlist_identifiers", id)
+func (s *AllowlistService) Remove(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
+	return removeRestriction(ctx, s.client, "/v1/allowlist_identifiers", id, opts...)
 }
 
 // BlocklistService is the /v1/blocklist_identifiers namespace.
@@ -40,13 +40,13 @@ func (s *BlocklistService) List(ctx context.Context) (*ListPage[Identifier], err
 }
 
 // Add adds a blocklist identifier. POST /v1/blocklist_identifiers.
-func (s *BlocklistService) Add(ctx context.Context, identifier string) (*Identifier, error) {
-	return addRestriction(ctx, s.client, "/v1/blocklist_identifiers", identifier)
+func (s *BlocklistService) Add(ctx context.Context, identifier string, opts ...RequestOption) (*Identifier, error) {
+	return addRestriction(ctx, s.client, "/v1/blocklist_identifiers", identifier, opts...)
 }
 
 // Remove removes a blocklist identifier. DELETE /v1/blocklist_identifiers/:id.
-func (s *BlocklistService) Remove(ctx context.Context, id string) (*DeletedObject, error) {
-	return removeRestriction(ctx, s.client, "/v1/blocklist_identifiers", id)
+func (s *BlocklistService) Remove(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
+	return removeRestriction(ctx, s.client, "/v1/blocklist_identifiers", id, opts...)
 }
 
 // Allowlist and blocklist share an identical route shape; only the path differs.
@@ -55,13 +55,13 @@ func listRestriction(ctx context.Context, c *Client, path string) (*ListPage[Ide
 	return out, c.get(ctx, path, nil, out)
 }
 
-func addRestriction(ctx context.Context, c *Client, path, identifier string) (*Identifier, error) {
+func addRestriction(ctx context.Context, c *Client, path, identifier string, opts ...RequestOption) (*Identifier, error) {
 	out := &Identifier{}
 	body := map[string]string{"identifier": identifier}
-	return out, c.post(ctx, path, body, out)
+	return out, c.post(ctx, path, body, out, opts...)
 }
 
-func removeRestriction(ctx context.Context, c *Client, path, id string) (*DeletedObject, error) {
+func removeRestriction(ctx context.Context, c *Client, path, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, c.del(ctx, path+"/"+url.PathEscape(id), out)
+	return out, c.del(ctx, path+"/"+url.PathEscape(id), out, opts...)
 }

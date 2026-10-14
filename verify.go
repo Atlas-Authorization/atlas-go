@@ -447,6 +447,11 @@ func (b *AtlasBackend) now() time.Time {
 }
 
 func (b *AtlasBackend) selectKey(set *jwks, kid string) *rsa.PublicKey {
+	return selectRSAKey(set, kid)
+}
+
+// selectRSAKey picks the RSA key matching kid (any RSA key when kid is empty).
+func selectRSAKey(set *jwks, kid string) *rsa.PublicKey {
 	for _, k := range set.Keys {
 		if k.Kty != "RSA" {
 			continue

@@ -97,15 +97,15 @@ func (s *SSOConnectionsService) Create(ctx context.Context, params CreateSsoConn
 }
 
 // Update patches an SSO connection (type is ignored). PATCH /v1/sso_connections/:id.
-func (s *SSOConnectionsService) Update(ctx context.Context, id string, params UpdateSsoConnectionParams) (*SsoConnection, error) {
+func (s *SSOConnectionsService) Update(ctx context.Context, id string, params UpdateSsoConnectionParams, opts ...RequestOption) (*SsoConnection, error) {
 	out := &SsoConnection{}
-	return out, s.client.patch(ctx, "/v1/sso_connections/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/sso_connections/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes an SSO connection. DELETE /v1/sso_connections/:id.
-func (s *SSOConnectionsService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *SSOConnectionsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/sso_connections/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/sso_connections/"+url.PathEscape(id), out, opts...)
 }
 
 // SAMLMetadata returns the SP SAML metadata for a connection.

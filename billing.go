@@ -104,15 +104,15 @@ func (s *BillingService) GetPlan(ctx context.Context, id string) (*BillingPlan, 
 }
 
 // UpdatePlan patches a plan. PATCH /v1/billing/plans/:id.
-func (s *BillingService) UpdatePlan(ctx context.Context, id string, params UpdateBillingPlanParams) (*BillingPlan, error) {
+func (s *BillingService) UpdatePlan(ctx context.Context, id string, params UpdateBillingPlanParams, opts ...RequestOption) (*BillingPlan, error) {
 	out := &BillingPlan{}
-	return out, s.client.patch(ctx, "/v1/billing/plans/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/billing/plans/"+url.PathEscape(id), params, out, opts...)
 }
 
 // DeletePlan removes a plan. DELETE /v1/billing/plans/:id.
-func (s *BillingService) DeletePlan(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *BillingService) DeletePlan(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/billing/plans/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/billing/plans/"+url.PathEscape(id), out, opts...)
 }
 
 // ListSubscriptions returns the subscription read view.
@@ -120,4 +120,62 @@ func (s *BillingService) DeletePlan(ctx context.Context, id string) (*DeletedObj
 func (s *BillingService) ListSubscriptions(ctx context.Context, params ListSubscriptionsParams) (*ListPage[BillingSubscription], error) {
 	out := &ListPage[BillingSubscription]{}
 	return out, s.client.get(ctx, "/v1/billing/subscriptions", params.values(), out)
+}
+
+// ImportSubscriptionParams adopts an existing Stripe subscription onto an Atlas
+// subject. SubjectType is "user" or "org"; PlanID is resolved from the
+// subscription price when empty.
+type ImportSubscriptionParams struct {
+	SubjectType          string `json:"subject_type"`
+	SubjectID            string `json:"subject_id"`
+	StripeSubscriptionID string `json:"stripe_subscription_id"`
+	StripeCustomerID     string `json:"stripe_customer_id,omitempty"`
+	PlanID               string `json:"plan_id,omitempty"`
+}
+
+// ReportUsageParams reports metered usage. IdempotencyKey de-duplicates
+// retries; SubjectType is "user" or "org".
+type ReportUsageParams struct {
+	SubjectType    string  `json:"subject_type"`
+	SubjectID      string  `json:"subject_id"`
+	Quantity       float64 `json:"quantity"`
+	IdempotencyKey string  `json:"idempotency_key"`
+}
+
+// UsageRecordResult is the result of reporting usage: whether it was newly
+// recorded, whether the plan is metered, and the running total.
+type UsageRecordResult struct {
+	Object   string  `json:"object"`
+	Recorded bool    `json:"recorded"`
+	Metered  bool    `json:"metered"`
+	Total    float64 `json:"total"`
+}
+
+// SeatSync is the result of syncing a per-seat subscription's quantity.
+type SeatSync struct {
+	Object      string `json:"object"`
+	SubjectType string `json:"subject_type"`
+	SubjectID   string `json:"subject_id"`
+	Quantity    int    `json:"quantity"`
+}
+
+// ImportSubscription adopts an existing Stripe subscription without
+// re-charging. POST /v1/billing/subscriptions/import.
+func (s *BillingService) ImportSubscription(ctx context.Context, params ImportSubscriptionParams, opts ...RequestOption) (*BillingSubscription, error) {
+	out := &BillingSubscription{}
+	return out, s.client.post(ctx, "/v1/billing/subscriptions/import", params, out, opts...)
+}
+
+// ReportUsage reports metered usage for a subject. POST /v1/billing/usage.
+func (s *BillingService) ReportUsage(ctx context.Context, params ReportUsageParams, opts ...RequestOption) (*UsageRecordResult, error) {
+	out := &UsageRecordResult{}
+	return out, s.client.post(ctx, "/v1/billing/usage", params, out, opts...)
+}
+
+// SyncSeats syncs a per-seat subscription's Stripe quantity to the
+// organization's member count. subjectType is "org" or "user".
+// POST /v1/billing/subjects/:type/:id/sync_seats.
+func (s *BillingService) SyncSeats(ctx context.Context, subjectType, subjectID string, opts ...RequestOption) (*SeatSync, error) {
+	out := &SeatSync{}
+	return out, s.client.post(ctx, "/v1/billing/subjects/"+url.PathEscape(subjectType)+"/"+url.PathEscape(subjectID)+"/sync_seats", nil, out, opts...)
 }

@@ -63,13 +63,13 @@ func (s *LTIPlatformsService) Create(ctx context.Context, params CreateLTIPlatfo
 }
 
 // Update patches a platform. PATCH /v1/lti_platforms/:id.
-func (s *LTIPlatformsService) Update(ctx context.Context, id string, params UpdateLTIPlatformParams) (*LTIPlatform, error) {
+func (s *LTIPlatformsService) Update(ctx context.Context, id string, params UpdateLTIPlatformParams, opts ...RequestOption) (*LTIPlatform, error) {
 	out := &LTIPlatform{}
-	return out, s.client.patch(ctx, "/v1/lti_platforms/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/lti_platforms/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes a platform. DELETE /v1/lti_platforms/:id.
-func (s *LTIPlatformsService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *LTIPlatformsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/lti_platforms/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/lti_platforms/"+url.PathEscape(id), out, opts...)
 }

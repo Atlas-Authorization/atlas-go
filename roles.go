@@ -71,17 +71,17 @@ func (s *RolesService) Create(ctx context.Context, params CreateRoleParams, opts
 }
 
 // Update patches a role. PATCH /v1/roles/:id.
-func (s *RolesService) Update(ctx context.Context, id string, params UpdateRoleParams) (*Role, error) {
+func (s *RolesService) Update(ctx context.Context, id string, params UpdateRoleParams, opts ...RequestOption) (*Role, error) {
 	out := &Role{}
-	return out, s.client.patch(ctx, "/v1/roles/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/roles/"+url.PathEscape(id), params, out, opts...)
 }
 
 // SetPermissions replaces a role's permission set wholesale.
 // PUT /v1/roles/:id/permissions.
-func (s *RolesService) SetPermissions(ctx context.Context, id string, permissions []string) (*RolePermissionsResult, error) {
+func (s *RolesService) SetPermissions(ctx context.Context, id string, permissions []string, opts ...RequestOption) (*RolePermissionsResult, error) {
 	out := &RolePermissionsResult{}
 	body := map[string][]string{"permissions": permissions}
-	return out, s.client.put(ctx, "/v1/roles/"+url.PathEscape(id)+"/permissions", body, out)
+	return out, s.client.put(ctx, "/v1/roles/"+url.PathEscape(id)+"/permissions", body, out, opts...)
 }
 
 // DeleteRoleResult acknowledges a role deletion, reporting how many members were
@@ -136,14 +136,14 @@ type UpdatePermissionParams struct {
 }
 
 // Update relabels a custom permission. PATCH /v1/permissions/:id.
-func (s *PermissionsService) Update(ctx context.Context, id string, params UpdatePermissionParams) (*Permission, error) {
+func (s *PermissionsService) Update(ctx context.Context, id string, params UpdatePermissionParams, opts ...RequestOption) (*Permission, error) {
 	out := &Permission{}
-	return out, s.client.patch(ctx, "/v1/permissions/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/permissions/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes a custom permission. DELETE /v1/permissions/:id. Fails with
 // role_in_use if a role still grants it.
-func (s *PermissionsService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *PermissionsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/permissions/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/permissions/"+url.PathEscape(id), out, opts...)
 }

@@ -37,7 +37,7 @@ func (s *RateLimitPolicyService) Get(ctx context.Context) (*RateLimitPolicy, err
 
 // Update adjusts either budget; omitted knobs are unchanged.
 // PATCH /v1/rate_limit_policy.
-func (s *RateLimitPolicyService) Update(ctx context.Context, params UpdateRateLimitPolicyParams) (*RateLimitPolicy, error) {
+func (s *RateLimitPolicyService) Update(ctx context.Context, params UpdateRateLimitPolicyParams, opts ...RequestOption) (*RateLimitPolicy, error) {
 	out := &RateLimitPolicy{}
-	return out, s.client.patch(ctx, "/v1/rate_limit_policy", params, out)
+	return out, s.client.patch(ctx, "/v1/rate_limit_policy", params, out, opts...)
 }

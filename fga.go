@@ -173,9 +173,9 @@ func (s *FGAStoresService) Get(ctx context.Context, id string) (*FGAStore, error
 }
 
 // Delete removes a store. DELETE /v1/fga/stores/:id.
-func (s *FGAStoresService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *FGAStoresService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/fga/stores/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/fga/stores/"+url.PathEscape(id), out, opts...)
 }
 
 // --- Models ----------------------------------------------------------------
@@ -210,34 +210,34 @@ func (s *FGAService) Write(ctx context.Context, storeID string, params FGAWriteP
 }
 
 // Read queries stored tuples. POST .../read.
-func (s *FGAService) Read(ctx context.Context, storeID string, params FGAReadParams) (*ListPage[FGATuple], error) {
+func (s *FGAService) Read(ctx context.Context, storeID string, params FGAReadParams, opts ...RequestOption) (*ListPage[FGATuple], error) {
 	out := &ListPage[FGATuple]{}
-	return out, s.client.post(ctx, "/v1/fga/stores/"+url.PathEscape(storeID)+"/read", params, out)
+	return out, s.client.post(ctx, "/v1/fga/stores/"+url.PathEscape(storeID)+"/read", params, out, opts...)
 }
 
 // Check resolves a single access question. POST .../check.
-func (s *FGAService) Check(ctx context.Context, storeID string, params FGACheckParams) (*FGACheckResult, error) {
+func (s *FGAService) Check(ctx context.Context, storeID string, params FGACheckParams, opts ...RequestOption) (*FGACheckResult, error) {
 	out := &FGACheckResult{}
-	return out, s.client.post(ctx, "/v1/fga/stores/"+url.PathEscape(storeID)+"/check", params, out)
+	return out, s.client.post(ctx, "/v1/fga/stores/"+url.PathEscape(storeID)+"/check", params, out, opts...)
 }
 
 // BatchCheck resolves many access questions in one round trip. POST .../batch-check.
-func (s *FGAService) BatchCheck(ctx context.Context, storeID string, params FGABatchCheckParams) (*FGABatchCheckResult, error) {
+func (s *FGAService) BatchCheck(ctx context.Context, storeID string, params FGABatchCheckParams, opts ...RequestOption) (*FGABatchCheckResult, error) {
 	out := &FGABatchCheckResult{}
-	return out, s.client.post(ctx, "/v1/fga/stores/"+url.PathEscape(storeID)+"/batch-check", params, out)
+	return out, s.client.post(ctx, "/v1/fga/stores/"+url.PathEscape(storeID)+"/batch-check", params, out, opts...)
 }
 
 // ListObjects lists the objects of a type a user has a relation to.
 // POST .../list-objects.
-func (s *FGAService) ListObjects(ctx context.Context, storeID string, params FGAListObjectsParams) (*FGAListObjectsResult, error) {
+func (s *FGAService) ListObjects(ctx context.Context, storeID string, params FGAListObjectsParams, opts ...RequestOption) (*FGAListObjectsResult, error) {
 	out := &FGAListObjectsResult{}
-	return out, s.client.post(ctx, "/v1/fga/stores/"+url.PathEscape(storeID)+"/list-objects", params, out)
+	return out, s.client.post(ctx, "/v1/fga/stores/"+url.PathEscape(storeID)+"/list-objects", params, out, opts...)
 }
 
 // Expand expands the full userset tree for an object#relation. POST .../expand.
-func (s *FGAService) Expand(ctx context.Context, storeID string, params FGAExpandParams) (*FGAExpandResult, error) {
+func (s *FGAService) Expand(ctx context.Context, storeID string, params FGAExpandParams, opts ...RequestOption) (*FGAExpandResult, error) {
 	out := &FGAExpandResult{}
-	return out, s.client.post(ctx, "/v1/fga/stores/"+url.PathEscape(storeID)+"/expand", params, out)
+	return out, s.client.post(ctx, "/v1/fga/stores/"+url.PathEscape(storeID)+"/expand", params, out, opts...)
 }
 
 // BoundStore binds a default store id so an app that uses one store can call the

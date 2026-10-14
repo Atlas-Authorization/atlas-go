@@ -70,51 +70,51 @@ func (s *InstanceSecurityService) Get(ctx context.Context) (*InstanceSecurity, e
 }
 
 // Update patches the security config. PATCH /v1/instance/security.
-func (s *InstanceSecurityService) Update(ctx context.Context, params UpdateInstanceSecurityParams) (*InstanceSecurityResult, error) {
+func (s *InstanceSecurityService) Update(ctx context.Context, params UpdateInstanceSecurityParams, opts ...RequestOption) (*InstanceSecurityResult, error) {
 	out := &InstanceSecurityResult{}
-	return out, s.client.patch(ctx, "/v1/instance/security", params, out)
+	return out, s.client.patch(ctx, "/v1/instance/security", params, out, opts...)
 }
 
 // SetCaptchaSecret stores the captcha provider secret.
 // PUT /v1/instance/captcha_secret.
-func (s *InstanceSecurityService) SetCaptchaSecret(ctx context.Context, secret string) (*CaptchaSecretResult, error) {
+func (s *InstanceSecurityService) SetCaptchaSecret(ctx context.Context, secret string, opts ...RequestOption) (*CaptchaSecretResult, error) {
 	out := &CaptchaSecretResult{}
 	body := map[string]string{"secret": secret}
-	return out, s.client.put(ctx, "/v1/instance/captcha_secret", body, out)
+	return out, s.client.put(ctx, "/v1/instance/captcha_secret", body, out, opts...)
 }
 
 // DeleteCaptchaSecret removes the captcha secret. DELETE /v1/instance/captcha_secret.
-func (s *InstanceSecurityService) DeleteCaptchaSecret(ctx context.Context) (*CaptchaSecretResult, error) {
+func (s *InstanceSecurityService) DeleteCaptchaSecret(ctx context.Context, opts ...RequestOption) (*CaptchaSecretResult, error) {
 	out := &CaptchaSecretResult{}
-	return out, s.client.del(ctx, "/v1/instance/captcha_secret", out)
+	return out, s.client.del(ctx, "/v1/instance/captcha_secret", out, opts...)
 }
 
 // SetKerberosSecret stores the Kerberos/IWA trusted-proxy secret.
 // PUT /v1/instance/kerberos_secret.
-func (s *InstanceSecurityService) SetKerberosSecret(ctx context.Context, secret string) (*KerberosSecretResult, error) {
+func (s *InstanceSecurityService) SetKerberosSecret(ctx context.Context, secret string, opts ...RequestOption) (*KerberosSecretResult, error) {
 	out := &KerberosSecretResult{}
 	body := map[string]string{"secret": secret}
-	return out, s.client.put(ctx, "/v1/instance/kerberos_secret", body, out)
+	return out, s.client.put(ctx, "/v1/instance/kerberos_secret", body, out, opts...)
 }
 
 // DeleteKerberosSecret removes the Kerberos secret.
 // DELETE /v1/instance/kerberos_secret.
-func (s *InstanceSecurityService) DeleteKerberosSecret(ctx context.Context) (*KerberosSecretResult, error) {
+func (s *InstanceSecurityService) DeleteKerberosSecret(ctx context.Context, opts ...RequestOption) (*KerberosSecretResult, error) {
 	out := &KerberosSecretResult{}
-	return out, s.client.del(ctx, "/v1/instance/kerberos_secret", out)
+	return out, s.client.del(ctx, "/v1/instance/kerberos_secret", out, opts...)
 }
 
 // SetLDAPBindPassword stores an LDAP connection's bind password.
 // PUT /v1/instance/ldap_connections/:connectionId/bind_password.
-func (s *InstanceSecurityService) SetLDAPBindPassword(ctx context.Context, connectionID, bindPassword string) (*LDAPBindPasswordResult, error) {
+func (s *InstanceSecurityService) SetLDAPBindPassword(ctx context.Context, connectionID, bindPassword string, opts ...RequestOption) (*LDAPBindPasswordResult, error) {
 	out := &LDAPBindPasswordResult{}
 	body := map[string]string{"bind_password": bindPassword}
-	return out, s.client.put(ctx, "/v1/instance/ldap_connections/"+url.PathEscape(connectionID)+"/bind_password", body, out)
+	return out, s.client.put(ctx, "/v1/instance/ldap_connections/"+url.PathEscape(connectionID)+"/bind_password", body, out, opts...)
 }
 
 // DeleteLDAPBindPassword removes an LDAP connection's bind password.
 // DELETE /v1/instance/ldap_connections/:connectionId/bind_password.
-func (s *InstanceSecurityService) DeleteLDAPBindPassword(ctx context.Context, connectionID string) (*LDAPBindPasswordResult, error) {
+func (s *InstanceSecurityService) DeleteLDAPBindPassword(ctx context.Context, connectionID string, opts ...RequestOption) (*LDAPBindPasswordResult, error) {
 	out := &LDAPBindPasswordResult{}
-	return out, s.client.del(ctx, "/v1/instance/ldap_connections/"+url.PathEscape(connectionID)+"/bind_password", out)
+	return out, s.client.del(ctx, "/v1/instance/ldap_connections/"+url.PathEscape(connectionID)+"/bind_password", out, opts...)
 }

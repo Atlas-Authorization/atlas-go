@@ -47,9 +47,12 @@ const userAgent = "atlas-go"
 // with New; then reach for a namespace field (Client.Users, Client.Organizations,
 // …). It is safe for concurrent use by multiple goroutines.
 type Client struct {
-	baseURL    string
-	secretKey  string
-	httpClient *http.Client
+	baseURL         string
+	secretKey       string
+	platformKey     string
+	httpClient      *http.Client
+	strict          *bool
+	onUnknownFields UnknownFieldsHandler
 
 	// Namespaces — one per BAPI area, mirroring the TypeScript SDK.
 	Users            *UsersService
@@ -98,6 +101,29 @@ type Client struct {
 	Instance            *InstanceService
 	InstanceSecurity    *InstanceSecurityService
 	Tokens              *TokensService
+
+	EmailAddresses             *EmailAddressesService
+	OrganizationSettingsSchema *OrganizationSettingsSchemaService
+	Machines                   *MachinesService
+	SessionExchangeApps        *SessionExchangeAppsService
+	RedirectURLs               *RedirectURLsService
+	Tickets                    *TicketsService
+	Notifications              *NotificationsService
+	OpenFGA                    *OpenFGAService
+	Connectors                 *ConnectorsService
+	AuditEvents                *AuditEventsService
+	Diagnostics                *DiagnosticsService
+	Analytics                  *AnalyticsService
+	Captcha                    *CaptchaService
+	Testing                    *TestingService
+	MCP                        *MCPService
+	LegacyAuth                 *LegacyAuthService
+	OrgLDAPConnections         *OrgLDAPConnectionsService
+	PCA                        *PCAService
+	Design                     *DesignService
+	EntitlementOverrides       *EntitlementOverridesService
+	// Platform is the platform-key surface (/v1/platform/*); see WithPlatformKey.
+	Platform *PlatformService
 }
 
 // Option configures a Client at construction time.
@@ -121,6 +147,35 @@ func WithHTTPClient(hc *http.Client) Option {
 			c.httpClient = hc
 		}
 	}
+}
+
+// WithStrict sets the strict-bodies default for every write (POST, PUT,
+// PATCH): WithStrict(true) sends `Atlas-Strict: true`, so a body field the
+// endpoint does not accept is refused with 422 UNKNOWN_FIELD instead of being
+// ignored. WithStrict(false) sends `Atlas-Strict: false`, opting out of an
+// instance that is strict by default. Override per call with StrictBody.
+func WithStrict(on bool) Option {
+	return func(c *Client) { c.strict = &on }
+}
+
+// WithUnknownFieldsHandler registers a callback for the `Atlas-Unknown-Fields`
+// response header: the body fields an endpoint ignored on a non-strict write.
+// Use it to log typos without turning on strict mode.
+func WithUnknownFieldsHandler(fn UnknownFieldsHandler) Option {
+	return func(c *Client) { c.onUnknownFields = fn }
+}
+
+// WithPlatformKey sets the platform key ("psk_...") used for the platform
+// surface (Client.Platform: apps, Sign in with Atlas apps, account design
+// images). Without it, platform calls are signed with the key given to New.
+func WithPlatformKey(platformKey string) Option {
+	return func(c *Client) { c.platformKey = platformKey }
+}
+
+// NewPlatform builds a Client for the platform surface only, signed with a
+// platform key ("psk_..."). Equivalent to New("", WithPlatformKey(key), ...).
+func NewPlatform(platformKey string, opts ...Option) *Client {
+	return New("", append([]Option{WithPlatformKey(platformKey)}, opts...)...)
 }
 
 // New builds a Client bound to the given instance secret key ("sk_..."). The
@@ -192,16 +247,49 @@ func New(secretKey string, opts ...Option) *Client {
 	c.Instance = &InstanceService{client: c}
 	c.InstanceSecurity = &InstanceSecurityService{client: c}
 	c.Tokens = &TokensService{client: c}
+
+	c.EmailAddresses = &EmailAddressesService{client: c}
+	c.OrganizationSettingsSchema = &OrganizationSettingsSchemaService{client: c}
+	c.Machines = &MachinesService{client: c, EnrolmentTokens: &MachineEnrolmentTokensService{client: c}}
+	c.SessionExchangeApps = &SessionExchangeAppsService{client: c}
+	c.RedirectURLs = &RedirectURLsService{client: c}
+	c.Tickets = &TicketsService{client: c}
+	c.Notifications = &NotificationsService{
+		client:     c,
+		Categories: &NotificationCategoriesService{client: c},
+		Templates:  &NotificationTemplatesService{client: c},
+	}
+	c.OpenFGA = &OpenFGAService{client: c}
+	c.Connectors = &ConnectorsService{client: c}
+	c.AuditEvents = &AuditEventsService{client: c}
+	c.Diagnostics = &DiagnosticsService{client: c}
+	c.Analytics = &AnalyticsService{client: c}
+	c.Captcha = &CaptchaService{client: c}
+	c.Testing = &TestingService{client: c}
+	c.MCP = &MCPService{client: c}
+	c.LegacyAuth = &LegacyAuthService{client: c}
+	c.OrgLDAPConnections = &OrgLDAPConnectionsService{client: c}
+	c.PCA = &PCAService{client: c}
+	c.Design = &DesignService{client: c, Assets: &DesignAssetsService{client: c}}
+	c.EntitlementOverrides = &EntitlementOverridesService{client: c}
+	c.Platform = &PlatformService{
+		client:       c,
+		Apps:         &PlatformAppsService{client: c},
+		AtlasIDApps:  &AtlasIDAppsService{client: c},
+		DesignAssets: &PlatformDesignAssetsService{client: c},
+	}
 	return c
 }
 
-// requestConfig accumulates per-call options (currently the Idempotency-Key).
+// requestConfig accumulates per-call options.
 type requestConfig struct {
 	idempotencyKey string
+	strict         *bool
+	headers        map[string]string
 }
 
-// RequestOption tunes a single request. The only one today is
-// WithIdempotencyKey, accepted on create/mutation methods.
+// RequestOption tunes a single request: WithIdempotencyKey on creates, and
+// StrictBody on any write to override the client's strict-bodies setting.
 type RequestOption func(*requestConfig)
 
 // WithIdempotencyKey sets the Idempotency-Key header (§9.1) so a retried create
@@ -210,21 +298,83 @@ func WithIdempotencyKey(key string) RequestOption {
 	return func(rc *requestConfig) { rc.idempotencyKey = key }
 }
 
+// StrictBody overrides the client-level strict setting (see WithStrict) for one
+// write. StrictBody(true) sends `Atlas-Strict: true`, so an unknown body field is
+// refused with 422 UNKNOWN_FIELD before anything is written; StrictBody(false)
+// sends `Atlas-Strict: false`, opting this call out of an instance that rejects
+// unknown fields by default.
+func StrictBody(on bool) RequestOption {
+	return func(rc *requestConfig) { rc.strict = &on }
+}
+
+// WithHeader sets an extra request header on one call (for example a header a
+// newer API version accepts before this SDK models it).
+func WithHeader(name, value string) RequestOption {
+	return func(rc *requestConfig) {
+		if rc.headers == nil {
+			rc.headers = map[string]string{}
+		}
+		rc.headers[name] = value
+	}
+}
+
+// UnknownFieldsHandler receives the body fields an endpoint ignored, as reported
+// by the `Atlas-Unknown-Fields` response header (dotted paths for nested
+// fields). It is called only when the header is present and non-empty.
+type UnknownFieldsHandler func(method, path string, fields []string)
+
+// authKind selects which credential a request is signed with.
+type authKind int
+
+const (
+	authSecret   authKind = iota // sk_ — the Backend API
+	authPlatform                 // psk_ — /v1/platform/*
+)
+
 // do performs a single BAPI request. body is JSON-encoded when non-nil; a 2xx
 // body is decoded into out when out is non-nil. A non-2xx becomes an *APIError.
 func (c *Client) do(ctx context.Context, method, path string, query url.Values, body, out interface{}, opts ...RequestOption) error {
+	return c.doAuth(ctx, authSecret, method, path, query, body, out, opts...)
+}
+
+// doAuth is do with an explicit credential choice.
+func (c *Client) doAuth(ctx context.Context, auth authKind, method, path string, query url.Values, body, out interface{}, opts ...RequestOption) error {
+	var payload []byte
+	contentType := ""
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("atlas: encoding request body: %w", err)
+		}
+		payload = encoded
+		contentType = "application/json"
+	}
+	_, err := c.send(ctx, auth, method, path, query, contentType, payload, body != nil, out, opts...)
+	return err
+}
+
+// doRaw sends raw request bytes (an image upload, say) with the given
+// content type, decoding a JSON 2xx response into out.
+func (c *Client) doRaw(ctx context.Context, auth authKind, method, path string, query url.Values, contentType string, payload []byte, out interface{}, opts ...RequestOption) error {
+	_, err := c.send(ctx, auth, method, path, query, contentType, payload, true, out, opts...)
+	return err
+}
+
+// doBytes performs a request and returns the raw 2xx body without decoding it
+// (streamed exports such as JSONL / CSV).
+func (c *Client) doBytes(ctx context.Context, method, path string, query url.Values) ([]byte, error) {
+	return c.send(ctx, authSecret, method, path, query, "", nil, false, nil)
+}
+
+func (c *Client) send(ctx context.Context, auth authKind, method, path string, query url.Values, contentType string, payload []byte, hasBody bool, out interface{}, opts ...RequestOption) ([]byte, error) {
 	var cfg requestConfig
 	for _, opt := range opts {
 		opt(&cfg)
 	}
 
 	var reader io.Reader
-	if body != nil {
-		encoded, err := json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("atlas: encoding request body: %w", err)
-		}
-		reader = bytes.NewReader(encoded)
+	if hasBody {
+		reader = bytes.NewReader(payload)
 	}
 
 	fullURL := c.baseURL + path
@@ -234,16 +384,36 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 
 	req, err := http.NewRequestWithContext(ctx, method, fullURL, reader)
 	if err != nil {
-		return fmt.Errorf("atlas: building request: %w", err)
+		return nil, fmt.Errorf("atlas: building request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.secretKey)
+	key := c.secretKey
+	if auth == authPlatform && c.platformKey != "" {
+		key = c.platformKey
+	}
+	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", userAgent)
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if hasBody && contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 	if cfg.idempotencyKey != "" {
 		req.Header.Set("Idempotency-Key", cfg.idempotencyKey)
+	}
+	if isWrite(method) {
+		strict := c.strict
+		if cfg.strict != nil {
+			strict = cfg.strict
+		}
+		if strict != nil {
+			if *strict {
+				req.Header.Set("Atlas-Strict", "true")
+			} else {
+				req.Header.Set("Atlas-Strict", "false")
+			}
+		}
+	}
+	for name, value := range cfg.headers {
+		req.Header.Set(name, value)
 	}
 
 	hc := c.httpClient
@@ -252,26 +422,50 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	}
 	resp, err := hc.Do(req)
 	if err != nil {
-		return fmt.Errorf("atlas: performing request: %w", err)
+		return nil, fmt.Errorf("atlas: performing request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("atlas: reading response body: %w", err)
+		return nil, fmt.Errorf("atlas: reading response body: %w", err)
+	}
+
+	if c.onUnknownFields != nil {
+		if fields := parseUnknownFields(resp.Header.Get("Atlas-Unknown-Fields")); len(fields) > 0 {
+			c.onUnknownFields(method, path, fields)
+		}
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return parseError(resp.StatusCode, raw)
+		return nil, parseError(resp.StatusCode, raw)
 	}
 
 	if out == nil || len(raw) == 0 {
-		return nil
+		return raw, nil
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
-		return fmt.Errorf("atlas: decoding response body: %w", err)
+		return raw, fmt.Errorf("atlas: decoding response body: %w", err)
 	}
-	return nil
+	return raw, nil
+}
+
+func isWrite(method string) bool {
+	return method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch
+}
+
+// parseUnknownFields splits the comma-separated Atlas-Unknown-Fields header.
+func parseUnknownFields(header string) []string {
+	if strings.TrimSpace(header) == "" {
+		return nil
+	}
+	var fields []string
+	for _, f := range strings.Split(header, ",") {
+		if f = strings.TrimSpace(f); f != "" {
+			fields = append(fields, f)
+		}
+	}
+	return fields
 }
 
 // get/post/patch/put/del are thin verb helpers over do, keeping namespace
@@ -284,14 +478,46 @@ func (c *Client) post(ctx context.Context, path string, body, out interface{}, o
 	return c.do(ctx, http.MethodPost, path, nil, body, out, opts...)
 }
 
-func (c *Client) patch(ctx context.Context, path string, body, out interface{}) error {
-	return c.do(ctx, http.MethodPatch, path, nil, body, out)
+func (c *Client) patch(ctx context.Context, path string, body, out interface{}, opts ...RequestOption) error {
+	return c.do(ctx, http.MethodPatch, path, nil, body, out, opts...)
 }
 
-func (c *Client) put(ctx context.Context, path string, body, out interface{}) error {
-	return c.do(ctx, http.MethodPut, path, nil, body, out)
+func (c *Client) put(ctx context.Context, path string, body, out interface{}, opts ...RequestOption) error {
+	return c.do(ctx, http.MethodPut, path, nil, body, out, opts...)
 }
 
-func (c *Client) del(ctx context.Context, path string, out interface{}) error {
-	return c.do(ctx, http.MethodDelete, path, nil, nil, out)
+func (c *Client) del(ctx context.Context, path string, out interface{}, opts ...RequestOption) error {
+	return c.do(ctx, http.MethodDelete, path, nil, nil, out, opts...)
+}
+
+// delQ is del with a query string.
+func (c *Client) delQ(ctx context.Context, path string, query url.Values, out interface{}, opts ...RequestOption) error {
+	return c.do(ctx, http.MethodDelete, path, query, nil, out, opts...)
+}
+
+// postQ is post with a query string.
+func (c *Client) postQ(ctx context.Context, path string, query url.Values, body, out interface{}, opts ...RequestOption) error {
+	return c.do(ctx, http.MethodPost, path, query, body, out, opts...)
+}
+
+// platGet/platPost/platPatch/platPut/platDel sign with the platform key
+// (psk_) — the /v1/platform/* surface.
+func (c *Client) platGet(ctx context.Context, path string, query url.Values, out interface{}) error {
+	return c.doAuth(ctx, authPlatform, http.MethodGet, path, query, nil, out)
+}
+
+func (c *Client) platPost(ctx context.Context, path string, body, out interface{}, opts ...RequestOption) error {
+	return c.doAuth(ctx, authPlatform, http.MethodPost, path, nil, body, out, opts...)
+}
+
+func (c *Client) platPatch(ctx context.Context, path string, body, out interface{}, opts ...RequestOption) error {
+	return c.doAuth(ctx, authPlatform, http.MethodPatch, path, nil, body, out, opts...)
+}
+
+func (c *Client) platPut(ctx context.Context, path string, body, out interface{}, opts ...RequestOption) error {
+	return c.doAuth(ctx, authPlatform, http.MethodPut, path, nil, body, out, opts...)
+}
+
+func (c *Client) platDel(ctx context.Context, path string, out interface{}, opts ...RequestOption) error {
+	return c.doAuth(ctx, authPlatform, http.MethodDelete, path, nil, nil, out, opts...)
 }

@@ -126,29 +126,30 @@ func (s *OrganizationsService) Create(ctx context.Context, params CreateOrganiza
 }
 
 // Update patches an organization. PATCH /v1/organizations/:id.
-func (s *OrganizationsService) Update(ctx context.Context, id string, params UpdateOrganizationParams) (*Organization, error) {
+func (s *OrganizationsService) Update(ctx context.Context, id string, params UpdateOrganizationParams, opts ...RequestOption) (*Organization, error) {
 	out := &Organization{}
-	return out, s.client.patch(ctx, "/v1/organizations/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/organizations/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes an organization. DELETE /v1/organizations/:id.
-func (s *OrganizationsService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *OrganizationsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/organizations/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/organizations/"+url.PathEscape(id), out, opts...)
 }
 
 // UpdateMetadata replaces the named metadata bags wholesale.
 // PUT /v1/organizations/:id/metadata.
-func (s *OrganizationsService) UpdateMetadata(ctx context.Context, id string, params ReplaceOrganizationMetadataParams) (*Organization, error) {
+func (s *OrganizationsService) UpdateMetadata(ctx context.Context, id string, params ReplaceOrganizationMetadataParams, opts ...RequestOption) (*Organization, error) {
 	out := &Organization{}
-	return out, s.client.put(ctx, "/v1/organizations/"+url.PathEscape(id)+"/metadata", params, out)
+	return out, s.client.put(ctx, "/v1/organizations/"+url.PathEscape(id)+"/metadata", params, out, opts...)
 }
 
-// UpdatePolicy patches an organization's security policy.
+// UpdatePolicy patches an organization's security policy from a raw map (a nil
+// value clears a key). See SetPolicy for the typed form.
 // PATCH /v1/organizations/:id/policy. Fields on this route are camelCase.
-func (s *OrganizationsService) UpdatePolicy(ctx context.Context, id string, policy map[string]interface{}) (*OrganizationPolicy, error) {
+func (s *OrganizationsService) UpdatePolicy(ctx context.Context, id string, policy map[string]interface{}, opts ...RequestOption) (*OrganizationPolicy, error) {
 	out := &OrganizationPolicy{}
-	return out, s.client.patch(ctx, "/v1/organizations/"+url.PathEscape(id)+"/policy", policy, out)
+	return out, s.client.patch(ctx, "/v1/organizations/"+url.PathEscape(id)+"/policy", policy, out, opts...)
 }
 
 // OrgHierarchyNode is one org in an ancestor chain or child list.
@@ -166,14 +167,19 @@ type OrganizationHierarchy struct {
 	Children       []OrgHierarchyNode `json:"children"`
 }
 
-// OrganizationEntitlements is the org's active feature set, resolved from its
-// plan + overrides against the instance catalog.
+// OrganizationEntitlements is the org's effective entitlement: the resolved
+// plan, feature keys and numeric limits, with sales-led overrides applied and
+// plan limits merged. Plan is nil (and Features/Limits empty) when the org
+// holds no entitlement.
 type OrganizationEntitlements struct {
 	Object         string                 `json:"object"`
 	OrganizationID string                 `json:"organization_id"`
 	Plan           *string                `json:"plan"`
-	Features       map[string]interface{} `json:"features"`
-	Catalog        struct {
+	Features       []string               `json:"features"`
+	Limits         map[string]interface{} `json:"limits"`
+	// Deprecated: the API no longer returns a catalog on this route; always
+	// empty.
+	Catalog struct {
 		Features interface{} `json:"features"`
 		Plans    interface{} `json:"plans"`
 	} `json:"catalog"`
@@ -181,14 +187,14 @@ type OrganizationEntitlements struct {
 
 // SetParent sets (or clears, with an empty parentOrganizationID) the org's
 // parent in the B2B2B hierarchy. PUT /v1/organizations/:id/parent.
-func (s *OrganizationsService) SetParent(ctx context.Context, id, parentOrganizationID string) (*Organization, error) {
+func (s *OrganizationsService) SetParent(ctx context.Context, id, parentOrganizationID string, opts ...RequestOption) (*Organization, error) {
 	out := &Organization{}
 	var parent *string
 	if parentOrganizationID != "" {
 		parent = &parentOrganizationID
 	}
 	body := map[string]*string{"parent_organization_id": parent}
-	return out, s.client.put(ctx, "/v1/organizations/"+url.PathEscape(id)+"/parent", body, out)
+	return out, s.client.put(ctx, "/v1/organizations/"+url.PathEscape(id)+"/parent", body, out, opts...)
 }
 
 // Hierarchy returns an org's ancestor chain and direct children.
@@ -229,16 +235,16 @@ func (s *OrgMembershipsService) Add(ctx context.Context, orgID string, params Ad
 }
 
 // Update changes a member's role.
-func (s *OrgMembershipsService) Update(ctx context.Context, orgID, userID, role string) (*OrganizationMembership, error) {
+func (s *OrgMembershipsService) Update(ctx context.Context, orgID, userID, role string, opts ...RequestOption) (*OrganizationMembership, error) {
 	out := &OrganizationMembership{}
 	body := map[string]string{"role": role}
-	return out, s.client.patch(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/memberships/"+url.PathEscape(userID), body, out)
+	return out, s.client.patch(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/memberships/"+url.PathEscape(userID), body, out, opts...)
 }
 
 // Remove removes a member.
-func (s *OrgMembershipsService) Remove(ctx context.Context, orgID, userID string) (*DeletedObject, error) {
+func (s *OrgMembershipsService) Remove(ctx context.Context, orgID, userID string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/memberships/"+url.PathEscape(userID), out)
+	return out, s.client.del(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/memberships/"+url.PathEscape(userID), out, opts...)
 }
 
 // --- Organization invitations ---------------------------------------------
@@ -266,9 +272,9 @@ func (s *OrgInvitationsService) Create(ctx context.Context, orgID string, params
 }
 
 // Revoke revokes an organization invitation.
-func (s *OrgInvitationsService) Revoke(ctx context.Context, orgID, invitationID string) (*OrganizationInvitation, error) {
+func (s *OrgInvitationsService) Revoke(ctx context.Context, orgID, invitationID string, opts ...RequestOption) (*OrganizationInvitation, error) {
 	out := &OrganizationInvitation{}
-	return out, s.client.post(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/invitations/"+url.PathEscape(invitationID)+"/revoke", nil, out)
+	return out, s.client.post(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/invitations/"+url.PathEscape(invitationID)+"/revoke", nil, out, opts...)
 }
 
 // --- Organization domains --------------------------------------------------
@@ -296,15 +302,15 @@ func (s *OrgDomainsService) Create(ctx context.Context, orgID string, params Cre
 }
 
 // Verify triggers verification of an organization domain.
-func (s *OrgDomainsService) Verify(ctx context.Context, orgID, domainID string) (*OrgDomain, error) {
+func (s *OrgDomainsService) Verify(ctx context.Context, orgID, domainID string, opts ...RequestOption) (*OrgDomain, error) {
 	out := &OrgDomain{}
-	return out, s.client.post(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/domains/"+url.PathEscape(domainID)+"/verify", nil, out)
+	return out, s.client.post(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/domains/"+url.PathEscape(domainID)+"/verify", nil, out, opts...)
 }
 
 // Delete removes an organization domain.
-func (s *OrgDomainsService) Delete(ctx context.Context, orgID, domainID string) (*DeletedObject, error) {
+func (s *OrgDomainsService) Delete(ctx context.Context, orgID, domainID string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/domains/"+url.PathEscape(domainID), out)
+	return out, s.client.del(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/domains/"+url.PathEscape(domainID), out, opts...)
 }
 
 // --- Group → role grants ---------------------------------------------------
@@ -324,13 +330,13 @@ type GroupRoleGrant struct {
 
 // Grant grants a role to a directory group.
 // PUT /v1/organizations/:id/groups/:groupId/roles/:roleId.
-func (s *OrgGroupRolesService) Grant(ctx context.Context, orgID, groupID, roleID string) (*GroupRoleGrant, error) {
+func (s *OrgGroupRolesService) Grant(ctx context.Context, orgID, groupID, roleID string, opts ...RequestOption) (*GroupRoleGrant, error) {
 	out := &GroupRoleGrant{}
-	return out, s.client.put(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/groups/"+url.PathEscape(groupID)+"/roles/"+url.PathEscape(roleID), nil, out)
+	return out, s.client.put(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/groups/"+url.PathEscape(groupID)+"/roles/"+url.PathEscape(roleID), nil, out, opts...)
 }
 
 // Revoke revokes a group→role grant.
-func (s *OrgGroupRolesService) Revoke(ctx context.Context, orgID, groupID, roleID string) (*GroupRoleGrant, error) {
+func (s *OrgGroupRolesService) Revoke(ctx context.Context, orgID, groupID, roleID string, opts ...RequestOption) (*GroupRoleGrant, error) {
 	out := &GroupRoleGrant{}
-	return out, s.client.del(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/groups/"+url.PathEscape(groupID)+"/roles/"+url.PathEscape(roleID), out)
+	return out, s.client.del(ctx, "/v1/organizations/"+url.PathEscape(orgID)+"/groups/"+url.PathEscape(groupID)+"/roles/"+url.PathEscape(roleID), out, opts...)
 }

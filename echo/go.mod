@@ -3,7 +3,7 @@ module github.com/Atlas-Authorization/atlas-go/echo
 go 1.21
 
 require (
-	github.com/Atlas-Authorization/atlas-go v0.2.0
+	github.com/Atlas-Authorization/atlas-go v0.0.0
 	github.com/labstack/echo/v4 v4.12.0
 )
 
@@ -19,3 +19,4 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 )
 
+replace github.com/Atlas-Authorization/atlas-go => ../

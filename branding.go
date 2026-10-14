@@ -93,14 +93,14 @@ func (s *BrandingService) Get(ctx context.Context) (*BrandingResponse, error) {
 
 // Update partially merges branding — one field changes, the rest is preserved.
 // PATCH /v1/branding.
-func (s *BrandingService) Update(ctx context.Context, params Branding) (*BrandingResponse, error) {
+func (s *BrandingService) Update(ctx context.Context, params Branding, opts ...RequestOption) (*BrandingResponse, error) {
 	out := &BrandingResponse{}
-	return out, s.client.patch(ctx, "/v1/branding", params, out)
+	return out, s.client.patch(ctx, "/v1/branding", params, out, opts...)
 }
 
 // Preview renders a draft through the live sign-in renderer without saving it.
 // POST /v1/branding/preview.
-func (s *BrandingService) Preview(ctx context.Context, params Branding) (*HostedPagePreview, error) {
+func (s *BrandingService) Preview(ctx context.Context, params Branding, opts ...RequestOption) (*HostedPagePreview, error) {
 	out := &HostedPagePreview{}
-	return out, s.client.post(ctx, "/v1/branding/preview", params, out)
+	return out, s.client.post(ctx, "/v1/branding/preview", params, out, opts...)
 }

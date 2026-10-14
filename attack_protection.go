@@ -55,7 +55,7 @@ func (s *AttackProtectionService) Get(ctx context.Context) (*AttackProtection, e
 }
 
 // Update patches the writable flags. PATCH /v1/attack_protection.
-func (s *AttackProtectionService) Update(ctx context.Context, params UpdateAttackProtectionParams) (*AttackProtection, error) {
+func (s *AttackProtectionService) Update(ctx context.Context, params UpdateAttackProtectionParams, opts ...RequestOption) (*AttackProtection, error) {
 	out := &AttackProtection{}
-	return out, s.client.patch(ctx, "/v1/attack_protection", params, out)
+	return out, s.client.patch(ctx, "/v1/attack_protection", params, out, opts...)
 }

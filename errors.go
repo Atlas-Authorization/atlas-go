@@ -17,6 +17,27 @@ type ErrorItem struct {
 	Meta    map[string]interface{} `json:"meta,omitempty"`
 }
 
+// Stable error codes worth branching on with APIError.HasCode / Code.
+const (
+	// ErrCodeEmailDeliveryNotConfigured: the instance has no working email
+	// sender for a flow that must send mail.
+	ErrCodeEmailDeliveryNotConfigured = "EMAIL_DELIVERY_NOT_CONFIGURED"
+	// ErrCodeEmailProviderRequired: the change needs an email provider to be
+	// configured first.
+	ErrCodeEmailProviderRequired = "EMAIL_PROVIDER_REQUIRED"
+	// ErrCodeUnknownField: a strict write (Atlas-Strict: true) carried a body
+	// field the endpoint does not accept; Param names it.
+	ErrCodeUnknownField = "UNKNOWN_FIELD"
+	// ErrCodePlanInUse: a billing plan cannot be removed while subscriptions
+	// still use it.
+	ErrCodePlanInUse = "PLAN_IN_USE"
+	// ErrCodeWrongKeySurface: the key is valid but for a different API surface
+	// (for example a platform key on a secret-key route).
+	ErrCodeWrongKeySurface = "WRONG_KEY_SURFACE"
+	// ErrCodeInvalidKey: the key is malformed, unknown or revoked.
+	ErrCodeInvalidKey = "INVALID_KEY"
+)
+
 // APIError is returned by every SDK method on a non-2xx response. It carries the
 // HTTP status and the full, ordered error envelope. Recover it with errors.As:
 //

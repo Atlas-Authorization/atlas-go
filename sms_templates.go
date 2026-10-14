@@ -60,24 +60,24 @@ func (s *SMSTemplatesService) Get(ctx context.Context, name string) (*SMSTemplat
 }
 
 // Update patches a template. PATCH /v1/sms_templates/:name.
-func (s *SMSTemplatesService) Update(ctx context.Context, name string, params UpdateSMSTemplateParams) (*SMSTemplate, error) {
+func (s *SMSTemplatesService) Update(ctx context.Context, name string, params UpdateSMSTemplateParams, opts ...RequestOption) (*SMSTemplate, error) {
 	out := &SMSTemplate{}
-	return out, s.client.patch(ctx, "/v1/sms_templates/"+url.PathEscape(name), params, out)
+	return out, s.client.patch(ctx, "/v1/sms_templates/"+url.PathEscape(name), params, out, opts...)
 }
 
 // Delete reverts to the built-in. DELETE /v1/sms_templates/:name.
-func (s *SMSTemplatesService) Delete(ctx context.Context, name string) (*SMSTemplate, error) {
+func (s *SMSTemplatesService) Delete(ctx context.Context, name string, opts ...RequestOption) (*SMSTemplate, error) {
 	out := &SMSTemplate{}
-	return out, s.client.del(ctx, "/v1/sms_templates/"+url.PathEscape(name), out)
+	return out, s.client.del(ctx, "/v1/sms_templates/"+url.PathEscape(name), out, opts...)
 }
 
 // Preview renders an unsaved draft (if a body is given) or the stored/built-in.
 // POST /v1/sms_templates/:name/preview.
-func (s *SMSTemplatesService) Preview(ctx context.Context, name, body string) (*SMSTemplatePreview, error) {
+func (s *SMSTemplatesService) Preview(ctx context.Context, name, body string, opts ...RequestOption) (*SMSTemplatePreview, error) {
 	out := &SMSTemplatePreview{}
 	reqBody := map[string]string{}
 	if body != "" {
 		reqBody["body"] = body
 	}
-	return out, s.client.post(ctx, "/v1/sms_templates/"+url.PathEscape(name)+"/preview", reqBody, out)
+	return out, s.client.post(ctx, "/v1/sms_templates/"+url.PathEscape(name)+"/preview", reqBody, out, opts...)
 }

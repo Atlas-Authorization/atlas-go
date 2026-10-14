@@ -49,14 +49,14 @@ func (s *JWTTemplatesService) Create(ctx context.Context, params CreateJwtTempla
 
 // Update replaces a template's claims (the name is the key).
 // PATCH /v1/jwt_templates/:name.
-func (s *JWTTemplatesService) Update(ctx context.Context, name string, claims map[string]string) (*JwtTemplate, error) {
+func (s *JWTTemplatesService) Update(ctx context.Context, name string, claims map[string]string, opts ...RequestOption) (*JwtTemplate, error) {
 	out := &JwtTemplate{}
 	body := map[string]map[string]string{"claims": claims}
-	return out, s.client.patch(ctx, "/v1/jwt_templates/"+url.PathEscape(name), body, out)
+	return out, s.client.patch(ctx, "/v1/jwt_templates/"+url.PathEscape(name), body, out, opts...)
 }
 
 // Delete removes a JWT template. DELETE /v1/jwt_templates/:name.
-func (s *JWTTemplatesService) Delete(ctx context.Context, name string) (*JwtTemplateDeleteResult, error) {
+func (s *JWTTemplatesService) Delete(ctx context.Context, name string, opts ...RequestOption) (*JwtTemplateDeleteResult, error) {
 	out := &JwtTemplateDeleteResult{}
-	return out, s.client.del(ctx, "/v1/jwt_templates/"+url.PathEscape(name), out)
+	return out, s.client.del(ctx, "/v1/jwt_templates/"+url.PathEscape(name), out, opts...)
 }

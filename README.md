@@ -72,6 +72,11 @@ func main() {
 - `WithBaseURL(url string)` — override the BAPI origin (`BAPI_ORIGIN`).
 - `WithHTTPClient(*http.Client)` — inject a client for timeouts, proxies, or a
   test transport.
+- `WithStrict(bool)` — send `Atlas-Strict` on every write (see
+  [Strict request bodies](#strict-request-bodies)).
+- `WithUnknownFieldsHandler(fn)` — be told about body fields an endpoint ignored.
+- `WithPlatformKey("psk_...")` — the platform key used by `c.Platform`
+  (see [Platform](#platform-apps-and-sign-in-with-atlas)).
 
 The secret key is sent as `Authorization: Bearer sk_...` on every request and is
 never placed in a URL.
@@ -138,6 +143,109 @@ org, err := c.Organizations.Create(ctx,
 )
 ```
 
+## Strict request bodies
+
+By default, a body field an endpoint does not accept is ignored and named in the
+`Atlas-Unknown-Fields` response header. Turn on strict mode to have such a write
+refused with `422 UNKNOWN_FIELD` before anything is saved, or register a handler
+to log the ignored fields:
+
+```go
+c := atlas.New("sk_live_...",
+	atlas.WithStrict(true),
+	atlas.WithUnknownFieldsHandler(func(method, path string, fields []string) {
+		log.Printf("%s %s ignored fields: %v", method, path, fields)
+	}),
+)
+
+// Override per call: opt one write out of (or into) strict mode.
+_, err := c.Roles.Create(ctx, params, atlas.StrictBody(false))
+if errors.As(err, &apiErr) && apiErr.HasCode(atlas.ErrCodeUnknownField) {
+	fmt.Println("unknown field:", apiErr.Errors[0].Param)
+}
+```
+
+Every write method accepts `...atlas.RequestOption` (`WithIdempotencyKey`,
+`StrictBody`, `WithHeader`).
+
+Named error codes are exported as constants: `ErrCodeUnknownField`,
+`ErrCodeEmailDeliveryNotConfigured`, `ErrCodeEmailProviderRequired`,
+`ErrCodePlanInUse`, `ErrCodeWrongKeySurface`, `ErrCodeInvalidKey`.
+
+## Platform: apps and Sign in with Atlas
+
+Platform calls use a platform key (`psk_...`). Use `NewPlatform` for a
+platform-only client, or add `WithPlatformKey` to a regular one:
+
+```go
+p := atlas.NewPlatform("psk_live_...")
+
+app, err := p.Platform.AtlasIDApps.Create(ctx, atlas.CreateAtlasIDAppParams{
+	Name:                   "Acme",
+	RedirectURIs:           []string{"https://acme.example/callback"},
+	PostLogoutRedirectURIs: []string{"https://acme.example/"},
+	BackchannelLogoutURI:   "https://acme.example/logout/backchannel",
+})
+// app.ClientSecret is shown once.
+```
+
+`c.Platform.Apps` provisions and manages apps (instances, secret rotation with
+overlap, archive, transfer, claim); `c.Platform.AtlasIDApps` manages Sign in with
+Atlas apps (logout URIs, branding, page text, design, secret rotation, design
+preview); `c.Platform.DesignAssets` uploads and lists the images those designs use.
+
+## Sign-in page design
+
+```go
+d, err := c.Design.Get(ctx)                     // stored + resolved design
+_, err = c.Design.Update(ctx, atlas.DesignPatch{ // partial change; nil removes a setting
+	"palette": map[string]interface{}{"accent": "#4f46e5"},
+})
+logo, _ := os.ReadFile("logo.png")
+asset, err := c.Design.Assets.Upload(ctx, logo, "image/png", "logo")
+```
+
+Organizations have their own override layered over the instance design
+(`c.Design.GetOrganization`, `ReplaceOrganization`, `UpdateOrganization`).
+`c.Instance.Preflight(ctx)` checks your setup in one call and returns typed
+findings (severity, code, message, fix, subject).
+
+## Back-channel logout
+
+Verify the `logout_token` Atlas posts to your `backchannel_logout_uri`
+(OIDC Back-Channel Logout 1.0), then end the matching local sessions:
+
+```go
+v, err := atlas.NewLogoutTokenVerifier(atlas.LogoutTokenVerifierOptions{
+	JWKSURL:     "https://atlasauth.net/.well-known/jwks.json",
+	Issuer:      "https://atlasauth.net",
+	ClientID:    "your-client-id",
+	ReplayGuard: &atlas.MemoryReplayGuard{}, // use a shared store with several servers
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+http.HandleFunc("/logout/backchannel", func(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	claims, err := v.VerifyRequest(r) // reads the logout_token form field
+	if err != nil {
+		http.Error(w, "invalid logout token", http.StatusBadRequest)
+		return
+	}
+	if claims.Sid != "" {
+		endSessionsBySid(claims.Sid) // your session store
+	} else {
+		endSessionsBySubject(claims.Sub)
+	}
+	w.WriteHeader(http.StatusOK)
+})
+```
+
+The verifier accepts RS256 only and checks the issuer, audience, `iat`, `exp`,
+`jti`, the back-channel logout event, `sid`/`sub`, the absence of `nonce`, and
+`typ: logout+jwt`. With a `ReplayGuard`, a token id seen before is refused.
+
 ## Token verification
 
 Backend services verify a session JWT locally against the instance JWKS — fast,
@@ -176,8 +284,8 @@ For the handful of operations where a ~60-second revocation window is too long,
 
 ## Namespaces
 
-Full parity with the TypeScript SDK — 45 services + the token verifier covering
-the whole BAPI surface:
+Every Backend API and platform operation in the public OpenAPI document is
+covered:
 
 | Service | Field | Highlights |
 | --- | --- | --- |
@@ -221,13 +329,40 @@ the whole BAPI surface:
 | FGA | `c.FGA` | stores, models, tuples, check/batch-check/list-objects/expand; `.Store(id)` binding |
 | Instance | `c.Instance` / `c.InstanceSecurity` | config, security kill-switches, write-only secrets |
 | Tokens | `c.Tokens` | authoritative online verify |
+| Platform | `c.Platform` | `.Apps`, `.AtlasIDApps` (Sign in with Atlas), `.DesignAssets` (platform key) |
+| Design | `c.Design` | instance + organization design, preview, catalog; `.Assets` image uploads |
+| Entitlement overrides | `c.EntitlementOverrides` | grant, list, revoke sales-led overrides |
+| Email addresses | `c.EmailAddresses` | verify, make primary |
+| Machines | `c.Machines` | machine identities, approve/revoke, key + secret rotation, m2m verify; `.EnrolmentTokens` |
+| Org settings schema | `c.OrganizationSettingsSchema` | register / replace the settings JSON Schema |
+| Session exchange | `c.SessionExchangeApps` | downstream apps with back-channel logout |
+| Redirect URLs | `c.RedirectURLs` | allowlist CRUD |
+| Tickets | `c.Tickets` | mint, redeem one-time capability tickets |
+| Notifications | `c.Notifications` | send; `.Categories`, `.Templates` |
+| OpenFGA | `c.OpenFGA` | OpenFGA-compatible stores, models, check, batch-check, read/write, list-objects, expand |
+| Connectors | `c.Connectors` | community connectors, publish, install, review, directory |
+| Audit events | `c.AuditEvents` | write, batch, query, JSONL/CSV export |
+| Diagnostics / Analytics | `c.Diagnostics` / `c.Analytics` | login readiness, request inspector, config changelog; events feed, usage |
+| Captcha | `c.Captcha` | server-side token verification |
+| MCP | `c.MCP` | MCP calls; remote MCP connector settings |
+| Legacy auth / Org LDAP | `c.LegacyAuth` / `c.OrgLDAPConnections` | lazy-migration connection; org-owned LDAP CRUD + test |
+| PCA | `c.PCA` | attestors, kill switch, revocations, step-up deny |
+| Testing | `c.Testing` | paired test instance, test-user purge, testing tokens |
+
+Users and organizations also cover phone numbers, passwords, directives,
+progression and state, consents, graceful deletion and erasure, transaction
+approvals, notification preferences, organization settings, branding, audit
+streams, end-user pools, reader domains, typed security policy (`SetPolicy`) and
+cookie consent (`c.Instance.CookieConsent`). OAuth providers can be filtered and
+re-branded (display name, icon, mode, wallet settings); webhook endpoints can be
+updated in place, tested, redelivered and have their secret revealed or rotated.
 
 ## Development
 
 ```sh
 go build ./...
 go vet ./...
-go test ./...
+go test -p 1 ./...
 gofmt -l .
 ```
 

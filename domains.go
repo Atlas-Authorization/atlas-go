@@ -64,13 +64,13 @@ func (s *DomainsService) Create(ctx context.Context, params CreateDomainParams, 
 }
 
 // Verify triggers verification of a custom domain. POST /v1/domains/:id/verify.
-func (s *DomainsService) Verify(ctx context.Context, id string) (*CustomDomain, error) {
+func (s *DomainsService) Verify(ctx context.Context, id string, opts ...RequestOption) (*CustomDomain, error) {
 	out := &CustomDomain{}
-	return out, s.client.post(ctx, "/v1/domains/"+url.PathEscape(id)+"/verify", nil, out)
+	return out, s.client.post(ctx, "/v1/domains/"+url.PathEscape(id)+"/verify", nil, out, opts...)
 }
 
 // Delete removes a custom domain. DELETE /v1/domains/:id.
-func (s *DomainsService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *DomainsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/domains/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/domains/"+url.PathEscape(id), out, opts...)
 }

@@ -103,33 +103,33 @@ func (s *SCIMProvisioningService) Create(ctx context.Context, params CreateSCIMP
 }
 
 // Update patches a target. PATCH /v1/scim_provisioning_targets/:id.
-func (s *SCIMProvisioningService) Update(ctx context.Context, id string, params UpdateSCIMProvisioningTargetParams) (*SCIMProvisioningTarget, error) {
+func (s *SCIMProvisioningService) Update(ctx context.Context, id string, params UpdateSCIMProvisioningTargetParams, opts ...RequestOption) (*SCIMProvisioningTarget, error) {
 	out := &SCIMProvisioningTarget{}
-	return out, s.client.patch(ctx, "/v1/scim_provisioning_targets/"+url.PathEscape(id), params, out)
+	return out, s.client.patch(ctx, "/v1/scim_provisioning_targets/"+url.PathEscape(id), params, out, opts...)
 }
 
 // Delete removes a target. DELETE /v1/scim_provisioning_targets/:id.
-func (s *SCIMProvisioningService) Delete(ctx context.Context, id string) (*DeletedObject, error) {
+func (s *SCIMProvisioningService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
 	out := &DeletedObject{}
-	return out, s.client.del(ctx, "/v1/scim_provisioning_targets/"+url.PathEscape(id), out)
+	return out, s.client.del(ctx, "/v1/scim_provisioning_targets/"+url.PathEscape(id), out, opts...)
 }
 
 // Test probes connectivity + auth to the downstream. POST .../:id/test.
-func (s *SCIMProvisioningService) Test(ctx context.Context, id string) (*SCIMProvisioningTestResult, error) {
+func (s *SCIMProvisioningService) Test(ctx context.Context, id string, opts ...RequestOption) (*SCIMProvisioningTestResult, error) {
 	out := &SCIMProvisioningTestResult{}
-	return out, s.client.post(ctx, "/v1/scim_provisioning_targets/"+url.PathEscape(id)+"/test", nil, out)
+	return out, s.client.post(ctx, "/v1/scim_provisioning_targets/"+url.PathEscape(id)+"/test", nil, out, opts...)
 }
 
 // SyncUser forces one user's sync now. POST .../:id/sync_user.
-func (s *SCIMProvisioningService) SyncUser(ctx context.Context, id, userID string) (*SCIMProvisioningSyncResult, error) {
+func (s *SCIMProvisioningService) SyncUser(ctx context.Context, id, userID string, opts ...RequestOption) (*SCIMProvisioningSyncResult, error) {
 	out := &SCIMProvisioningSyncResult{}
 	body := map[string]string{"user_id": userID}
-	return out, s.client.post(ctx, "/v1/scim_provisioning_targets/"+url.PathEscape(id)+"/sync_user", body, out)
+	return out, s.client.post(ctx, "/v1/scim_provisioning_targets/"+url.PathEscape(id)+"/sync_user", body, out, opts...)
 }
 
 // SyncGroup forces one org's (group) sync now. POST .../:id/sync_group.
-func (s *SCIMProvisioningService) SyncGroup(ctx context.Context, id, organizationID string) (*SCIMProvisioningGroupSyncResult, error) {
+func (s *SCIMProvisioningService) SyncGroup(ctx context.Context, id, organizationID string, opts ...RequestOption) (*SCIMProvisioningGroupSyncResult, error) {
 	out := &SCIMProvisioningGroupSyncResult{}
 	body := map[string]string{"organization_id": organizationID}
-	return out, s.client.post(ctx, "/v1/scim_provisioning_targets/"+url.PathEscape(id)+"/sync_group", body, out)
+	return out, s.client.post(ctx, "/v1/scim_provisioning_targets/"+url.PathEscape(id)+"/sync_group", body, out, opts...)
 }
