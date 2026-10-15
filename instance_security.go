@@ -46,6 +46,27 @@ type CaptchaSecretResult struct {
 	Provider string `json:"provider"`
 	Set      bool   `json:"set,omitempty"`
 	Deleted  bool   `json:"deleted,omitempty"`
+	// FlowsTurnedOff lists the captcha flows a forced delete switched off.
+	FlowsTurnedOff []string `json:"flows_turned_off,omitempty"`
+}
+
+// SetCaptchaSecretParams are the options of SetCaptchaSecretWithParams.
+type SetCaptchaSecretParams struct {
+	Secret string `json:"secret"`
+	// Provider names the captcha provider the secret belongs to (defaults to the
+	// configured one). Captcha is bring-your-own-keys: store the secret before
+	// turning captcha on.
+	Provider string `json:"provider,omitempty"`
+}
+
+// DeleteCaptchaSecretParams are the options of DeleteCaptchaSecretWithParams.
+type DeleteCaptchaSecretParams struct {
+	// Provider names the captcha provider whose secret to remove (defaults to the
+	// configured one).
+	Provider string
+	// Force removes a secret a captcha flow uses (otherwise 409 CAPTCHA_IN_USE)
+	// and turns those flows off.
+	Force bool
 }
 
 // KerberosSecretResult acknowledges a Kerberos secret set/delete.
@@ -83,10 +104,35 @@ func (s *InstanceSecurityService) SetCaptchaSecret(ctx context.Context, secret s
 	return out, s.client.put(ctx, "/v1/instance/captcha_secret", body, out, opts...)
 }
 
-// DeleteCaptchaSecret removes the captcha secret. DELETE /v1/instance/captcha_secret.
-func (s *InstanceSecurityService) DeleteCaptchaSecret(ctx context.Context, opts ...RequestOption) (*CaptchaSecretResult, error) {
+// SetCaptchaSecretWithParams stores the captcha secret for a named provider,
+// so it can be stored before captcha is turned on.
+// PUT /v1/instance/captcha_secret.
+func (s *InstanceSecurityService) SetCaptchaSecretWithParams(ctx context.Context, params SetCaptchaSecretParams, opts ...RequestOption) (*CaptchaSecretResult, error) {
 	out := &CaptchaSecretResult{}
-	return out, s.client.del(ctx, "/v1/instance/captcha_secret", out, opts...)
+	return out, s.client.put(ctx, "/v1/instance/captcha_secret", params, out, opts...)
+}
+
+// DeleteCaptchaSecret removes the captcha secret. DELETE /v1/instance/captcha_secret.
+//
+// Refused with 409 CAPTCHA_IN_USE (ErrCodeCaptchaInUse) while a captcha flow
+// uses the secret; use DeleteCaptchaSecretWithParams with Force to remove it
+// anyway.
+func (s *InstanceSecurityService) DeleteCaptchaSecret(ctx context.Context, opts ...RequestOption) (*CaptchaSecretResult, error) {
+	return s.DeleteCaptchaSecretWithParams(ctx, DeleteCaptchaSecretParams{}, opts...)
+}
+
+// DeleteCaptchaSecretWithParams is DeleteCaptchaSecret with options (?provider=,
+// ?force=true). DELETE /v1/instance/captcha_secret.
+func (s *InstanceSecurityService) DeleteCaptchaSecretWithParams(ctx context.Context, params DeleteCaptchaSecretParams, opts ...RequestOption) (*CaptchaSecretResult, error) {
+	q := url.Values{}
+	if params.Provider != "" {
+		q.Set("provider", params.Provider)
+	}
+	if params.Force {
+		q.Set("force", "true")
+	}
+	out := &CaptchaSecretResult{}
+	return out, s.client.delQ(ctx, "/v1/instance/captcha_secret", q, out, opts...)
 }
 
 // SetKerberosSecret stores the Kerberos/IWA trusted-proxy secret.

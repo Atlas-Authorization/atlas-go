@@ -4,7 +4,17 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
-## 0.5.0 (unreleased — next tag `v0.5.0`)
+## 0.5.1
+
+### Added
+
+- **Captcha is bring-your-own-keys.** `ErrCodeCaptchaKeysRequired` (422) and `ErrCodeCaptchaInUse` (409, `Meta["flows"]`).
+- `InstanceSecurity.SetCaptchaSecretWithParams` (`SetCaptchaSecretParams{Secret, Provider}`) stores the secret for a named
+  provider before captcha is turned on.
+- `InstanceSecurity.DeleteCaptchaSecretWithParams` (`DeleteCaptchaSecretParams{Provider, Force}`); `CaptchaSecretResult`
+  gains `FlowsTurnedOff`.
+
+## 0.5.0
 
 All changes are backward compatible: every new field is optional and every
 existing method keeps its signature.

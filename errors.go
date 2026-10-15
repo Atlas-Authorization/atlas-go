@@ -29,6 +29,12 @@ const (
 	// email-dependent features are on and nothing else would deliver email;
 	// Meta["features"] lists them. Delete with Force to remove it anyway.
 	ErrCodeEmailProviderInUse = "EMAIL_PROVIDER_IN_USE"
+	// ErrCodeCaptchaKeysRequired: captcha is bring-your-own-keys; turning it on
+	// (or switching provider) needs that provider's site key and secret stored.
+	ErrCodeCaptchaKeysRequired = "CAPTCHA_KEYS_REQUIRED"
+	// ErrCodeCaptchaInUse: a captcha key a live flow uses cannot be removed;
+	// Meta["flows"] lists them. Delete with Force to remove it anyway.
+	ErrCodeCaptchaInUse = "CAPTCHA_IN_USE"
 	// ErrCodeUnknownField: a strict write (Atlas-Strict: true) carried a body
 	// field the endpoint does not accept; Param names it.
 	ErrCodeUnknownField = "UNKNOWN_FIELD"

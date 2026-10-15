@@ -176,3 +176,38 @@ func TestSessionGetAndListDecodeIdleExpiresAt(t *testing.T) {
 		t.Fatalf("list = %+v %v", page, err)
 	}
 }
+
+func TestCaptchaSecretBYOK(t *testing.T) {
+	c, rec := recordingClient(t, `{"object":"captcha_secret","provider":"hcaptcha","deleted":true,"flows_turned_off":["signUp"]}`)
+	ctx := context.Background()
+
+	if _, err := c.InstanceSecurity.SetCaptchaSecretWithParams(ctx, SetCaptchaSecretParams{Secret: "s3cret", Provider: "turnstile"}); err != nil {
+		t.Fatal(err)
+	}
+	rec.expect(t, "PUT", "/v1/instance/captcha_secret")
+	if rec.Body["provider"] != "turnstile" || rec.Body["secret"] != "s3cret" {
+		t.Errorf("body = %v", rec.Body)
+	}
+
+	out, err := c.InstanceSecurity.DeleteCaptchaSecretWithParams(ctx, DeleteCaptchaSecretParams{Provider: "hcaptcha", Force: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec.expect(t, "DELETE", "/v1/instance/captcha_secret")
+	if rec.Query != "force=true&provider=hcaptcha" {
+		t.Errorf("query = %q", rec.Query)
+	}
+	if len(out.FlowsTurnedOff) != 1 || out.FlowsTurnedOff[0] != "signUp" {
+		t.Errorf("decoded = %+v", out)
+	}
+
+	if _, err := c.InstanceSecurity.DeleteCaptchaSecret(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Query != "" {
+		t.Errorf("query = %q, want none", rec.Query)
+	}
+	if ErrCodeCaptchaKeysRequired != "CAPTCHA_KEYS_REQUIRED" || ErrCodeCaptchaInUse != "CAPTCHA_IN_USE" {
+		t.Error("captcha error codes")
+	}
+}
