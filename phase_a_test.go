@@ -301,7 +301,7 @@ func TestErrorCodeConstants(t *testing.T) {
 	if !errors.As(err, &apiErr) || !apiErr.HasCode(ErrCodeUnknownField) || apiErr.Errors[0].Param != "nmae" {
 		t.Errorf("err = %v", err)
 	}
-	for _, code := range []string{ErrCodeEmailDeliveryNotConfigured, ErrCodeEmailProviderRequired, ErrCodePlanInUse, ErrCodeWrongKeySurface, ErrCodeInvalidKey} {
+	for _, code := range []string{ErrCodeEmailDeliveryNotConfigured, ErrCodeEmailProviderRequired, ErrCodeEmailProviderInUse, ErrCodePlanInUse, ErrCodeWrongKeySurface, ErrCodeInvalidKey} {
 		if code == "" || strings.ToUpper(code) != code {
 			t.Errorf("bad code constant %q", code)
 		}

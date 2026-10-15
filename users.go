@@ -38,14 +38,19 @@ type EmailAddress struct {
 
 // UserSession is a session as listed under a user.
 type UserSession struct {
-	Object       string `json:"object"`
-	ID           string `json:"id"`
-	UserID       string `json:"user_id"`
-	Status       string `json:"status"`
-	LastActiveAt int64  `json:"last_active_at"`
-	ExpireAt     int64  `json:"expire_at"`
-	AbandonAt    int64  `json:"abandon_at"`
-	CreatedAt    int64  `json:"created_at"`
+	Object                   string  `json:"object"`
+	ID                       string  `json:"id"`
+	UserID                   string  `json:"user_id"`
+	Status                   string  `json:"status"`
+	LastActiveOrganizationID *string `json:"last_active_organization_id"`
+	ImpersonatedBy           *string `json:"impersonated_by"`
+	LastActiveAt             int64   `json:"last_active_at"`
+	ExpireAt                 int64   `json:"expire_at"`
+	AbandonAt                int64   `json:"abandon_at"`
+	// IdleExpiresAt is epoch ms when the session ends from inactivity unless
+	// there is activity first (same value as AbandonAt).
+	IdleExpiresAt int64 `json:"idle_expires_at,omitempty"`
+	CreatedAt     int64 `json:"created_at"`
 }
 
 // OAuthAccessToken is a live provider credential. The field is `token`, not

@@ -81,11 +81,36 @@ func (s *MessagingService) SetSMS(ctx context.Context, params MessagingProviderI
 	return out, s.client.put(ctx, "/v1/messaging_providers/sms", params, out, opts...)
 }
 
+// DeleteMessagingProviderParams are the options of DeleteChannelWithParams.
+type DeleteMessagingProviderParams struct {
+	// Force removes the email provider even while email-dependent features are
+	// on and nothing else would deliver email (sent as ?force=true).
+	Force bool
+}
+
 // DeleteChannel removes a channel's provider config.
 // DELETE /v1/messaging_providers/:channel.
+//
+// Removing the email provider is refused with 409 EMAIL_PROVIDER_IN_USE
+// (ErrCodeEmailProviderInUse) while nothing else would deliver email; the
+// error's Meta["features"] lists the email-dependent features that are on
+// (for example "emailCode", "emailLink", "emailVerification",
+// "passwordReset"). Use DeleteChannelWithParams with Force to remove it anyway.
 func (s *MessagingService) DeleteChannel(ctx context.Context, channel string, opts ...RequestOption) (*DeletedMessagingProvider, error) {
+	return s.DeleteChannelWithParams(ctx, channel, DeleteMessagingProviderParams{}, opts...)
+}
+
+// DeleteChannelWithParams is DeleteChannel with options. Force sends
+// ?force=true, removing the email provider even when the API would otherwise
+// refuse with 409 EMAIL_PROVIDER_IN_USE.
+// DELETE /v1/messaging_providers/:channel.
+func (s *MessagingService) DeleteChannelWithParams(ctx context.Context, channel string, params DeleteMessagingProviderParams, opts ...RequestOption) (*DeletedMessagingProvider, error) {
+	q := url.Values{}
+	if params.Force {
+		q.Set("force", "true")
+	}
 	out := &DeletedMessagingProvider{}
-	return out, s.client.del(ctx, "/v1/messaging_providers/"+url.PathEscape(channel), out, opts...)
+	return out, s.client.delQ(ctx, "/v1/messaging_providers/"+url.PathEscape(channel), q, out, opts...)
 }
 
 // Test sends a fixed, clearly-marked test message through the channel.

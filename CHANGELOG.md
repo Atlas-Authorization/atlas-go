@@ -4,6 +4,39 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.5.0 (unreleased — next tag `v0.5.0`)
+
+All changes are backward compatible: every new field is optional and every
+existing method keeps its signature.
+
+### Added
+
+- **Logout without confirmation.** `CreateOAuthClientParams.SkipLogoutConfirmation`
+  and `UpdateOAuthClientParams.SkipLogoutConfirmation` (`*bool`, sent as
+  `skip_logout_confirmation`); `OAuthClient` gains `SkipLogoutConfirmation`
+  (`bool`, default false). First-party clients only (a third-party client is
+  refused with `422 VALIDATION_FAILED`, param `skip_logout_confirmation`). When
+  true, RP-initiated logout with this client and an exactly registered
+  `post_logout_redirect_uri` ends the session and redirects straight back with
+  `state`, without the confirmation page.
+- **Cookie settings link.** `SetCookieConsentParams.SettingsLink`
+  (`*CookieSettingsLinkInput`: `Label`, `Preset`, `Attributes`; nil for no
+  link). `CookieConsent` gains `SettingsLink` (`*CookieSettingsLink`: `Label`,
+  `Preset` (`*string`), `Attributes`, `RenderedAttributes`). Preset constants
+  `CookieSettingsLinkPresetCookiemunch`, `CookieSettingsLinkPresetCookiebot`,
+  `CookieSettingsLinkPresetOneTrust`, `CookieSettingsLinkPresetCustom`; an
+  unknown preset still decodes.
+- **Force-remove the email provider.** `Messaging.DeleteChannelWithParams(ctx,
+  channel, DeleteMessagingProviderParams{Force})` sends `?force=true` when
+  `Force` is set (no query otherwise); `Messaging.DeleteChannel` is unchanged.
+  Without it, removing the email provider is refused with
+  `409 EMAIL_PROVIDER_IN_USE` (`Meta["features"]` lists the email-dependent
+  features that are on) while nothing else would deliver email.
+- **Sessions.** `UserSession` (the `Users.ListSessions` item) gains
+  `IdleExpiresAt`, `LastActiveOrganizationID` and `ImpersonatedBy`, matching
+  `Session`.
+- **Error codes.** `ErrCodeEmailProviderInUse`.
+
 ## 0.4.0 (unreleased — next tag `v0.4.0`)
 
 ### Added

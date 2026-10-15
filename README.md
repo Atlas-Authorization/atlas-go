@@ -154,6 +154,52 @@ ended session (409 `SESSION_REVOKED`, `SESSION_IDLE_EXPIRED` or
 `SESSION_EXPIRED`). It writes at most once a minute, so calling it on every
 request is safe.
 
+`Users.ListSessions` items carry the same `IdleExpiresAt`,
+`LastActiveOrganizationID` and `ImpersonatedBy` fields as `Sessions.Get`.
+
+## Logout without a confirmation page
+
+A first-party OAuth client can skip the logout confirmation page: RP-initiated
+logout (`/oauth2/logout`) with its `client_id` and an exactly registered
+`post_logout_redirect_uri` then ends the session and redirects straight back
+with `state`. A third-party client is refused with `422 VALIDATION_FAILED`.
+
+```go
+skip := true
+_, err := c.OAuthClients.Update(ctx, clientID, atlas.UpdateOAuthClientParams{SkipLogoutConfirmation: &skip})
+```
+
+## Cookie settings link
+
+Add a "cookie settings" link to the hosted pages that reopens your consent
+manager. It needs a preset or at least one attribute:
+
+```go
+cc, err := c.Instance.SetCookieConsent(ctx, atlas.SetCookieConsentParams{
+	ScriptURL: "https://consent.cookiebot.com/uc.js",
+	SiteID:    "your-cbid",
+	SettingsLink: &atlas.CookieSettingsLinkInput{
+		Label:  "Cookie settings",
+		Preset: atlas.CookieSettingsLinkPresetCookiebot,
+	},
+})
+// cc.SettingsLink.RenderedAttributes: your attributes plus the preset's trigger
+```
+
+## Removing the email provider
+
+Removing the email provider is refused with `409 EMAIL_PROVIDER_IN_USE` while
+email-dependent features (email codes, email links, email verification,
+password reset) are on and nothing else would deliver email; the error's
+`Meta["features"]` lists them. Force it if you mean it:
+
+```go
+_, err := c.Messaging.DeleteChannel(ctx, "email")
+if errors.As(err, &apiErr) && apiErr.HasCode(atlas.ErrCodeEmailProviderInUse) {
+	_, err = c.Messaging.DeleteChannelWithParams(ctx, "email", atlas.DeleteMessagingProviderParams{Force: true})
+}
+```
+
 ## Pagination
 
 Cursor-paginated list methods (`Users.List`, `Organizations.List`,
@@ -217,7 +263,8 @@ Every write method accepts `...atlas.RequestOption` (`WithIdempotencyKey`,
 
 Named error codes are exported as constants: `ErrCodeUnknownField`,
 `ErrCodeEmailDeliveryNotConfigured`, `ErrCodeEmailProviderRequired`,
-`ErrCodePlanInUse`, `ErrCodeWrongKeySurface`, `ErrCodeInvalidKey`.
+`ErrCodeEmailProviderInUse`, `ErrCodePlanInUse`, `ErrCodeWrongKeySurface`,
+`ErrCodeInvalidKey`.
 
 ## Platform: apps and Sign in with Atlas
 
@@ -342,7 +389,7 @@ covered:
 | Invitations | `c.Invitations` | list, create, revoke |
 | Roles / Permissions | `c.Roles` / `c.Permissions` | CRUD, `SetPermissions`, delete-with-reassign |
 | API keys | `c.APIKeys` | mint, verify, CRUD (end-user keys) |
-| OAuth clients | `c.OAuthClients` | CRUD, rotate secret; `.Grants` |
+| OAuth clients | `c.OAuthClients` | CRUD, rotate secret, skip logout confirmation; `.Grants` |
 | OAuth providers | `c.OAuthProviders` | catalog, upsert credentials, enable, scope, test |
 | Resource servers | `c.ResourceServers` | CRUD (API audiences + scopes) |
 | SSO connections | `c.SSOConnections` | CRUD, SAML metadata |
@@ -368,7 +415,7 @@ covered:
 | Localizations | `c.Localizations` | per-locale overrides CRUD |
 | Actions | `c.Actions` | CRUD, test, trigger bindings |
 | Billing | `c.Billing` | plans CRUD, subscriptions read |
-| Messaging | `c.Messaging` | BYOK email/SMS providers, test |
+| Messaging | `c.Messaging` | BYOK email/SMS providers, test, delete (with force) |
 | Import / export | `c.ImportExport` | user import/export jobs |
 | Data-subject requests | `c.DataSubjectRequests` | list, get, fulfill, reject (GDPR) |
 | RADIUS clients | `c.RadiusClients` | CRUD |

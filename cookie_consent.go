@@ -17,6 +17,44 @@ type CookieConsent struct {
 	BlockingMode *string `json:"blocking_mode,omitempty"`
 	// ExtraOrigins are other https URLs the CMP loads from or calls.
 	ExtraOrigins []string `json:"extra_origins,omitempty"`
+	// SettingsLink is the "cookie settings" link rendered on the hosted pages;
+	// nil when none is set.
+	SettingsLink *CookieSettingsLink `json:"settings_link,omitempty"`
+}
+
+// Cookie settings link presets: the CMP whose preferences dialog the link
+// opens. CookieSettingsLink.Preset is a plain string so a preset added later
+// still decodes.
+const (
+	CookieSettingsLinkPresetCookiemunch = "cookiemunch"
+	CookieSettingsLinkPresetCookiebot   = "cookiebot"
+	CookieSettingsLinkPresetOneTrust    = "onetrust"
+	CookieSettingsLinkPresetCustom      = "custom"
+)
+
+// CookieSettingsLink is the "cookie settings" link as the API returns it.
+type CookieSettingsLink struct {
+	Label string `json:"label"`
+	// Preset is one of the CookieSettingsLinkPreset* values, or nil.
+	Preset *string `json:"preset"`
+	// Attributes are the attributes you set on the link.
+	Attributes map[string]string `json:"attributes"`
+	// RenderedAttributes are the attributes the rendered link carries: yours
+	// plus the preset's trigger.
+	RenderedAttributes map[string]string `json:"rendered_attributes"`
+}
+
+// CookieSettingsLinkInput is the "cookie settings" link to render on the
+// hosted pages. It needs a Preset or at least one attribute (400 otherwise).
+type CookieSettingsLinkInput struct {
+	// Label is the link text (required, 1-60 characters).
+	Label string `json:"label"`
+	// Preset is one of the CookieSettingsLinkPreset* values; empty for none.
+	Preset string `json:"preset,omitempty"`
+	// Attributes are extra link attributes: data-*, aria-*, id, class and
+	// href (https or a #fragment). At most 10; each value at most 200
+	// characters.
+	Attributes map[string]string `json:"attributes,omitempty"`
 }
 
 // SetCookieConsentParams is the body of PUT /v1/instance/cookie_consent. It
@@ -28,6 +66,9 @@ type SetCookieConsentParams struct {
 	SiteID       string   `json:"site_id,omitempty"`
 	BlockingMode string   `json:"blocking_mode,omitempty"`
 	ExtraOrigins []string `json:"extra_origins,omitempty"`
+	// SettingsLink renders a "cookie settings" link on the hosted pages; nil
+	// for no link.
+	SettingsLink *CookieSettingsLinkInput `json:"settings_link,omitempty"`
 }
 
 // CookieConsent reads the hosted pages' cookie-consent setting.

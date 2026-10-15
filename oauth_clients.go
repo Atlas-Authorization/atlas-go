@@ -26,8 +26,13 @@ type OAuthClient struct {
 	SecretPrefix            *string  `json:"secret_prefix"`
 	IsPublic                bool     `json:"is_public"`
 	FirstParty              bool     `json:"first_party"`
-	CreatedAt               int64    `json:"created_at"`
-	UpdatedAt               int64    `json:"updated_at"`
+	// SkipLogoutConfirmation is true when RP-initiated logout (/oauth2/logout)
+	// with this client_id and an exactly registered post_logout_redirect_uri
+	// ends the session and redirects straight back (with state) without the
+	// confirmation page. First-party clients only.
+	SkipLogoutConfirmation bool  `json:"skip_logout_confirmation"`
+	CreatedAt              int64 `json:"created_at"`
+	UpdatedAt              int64 `json:"updated_at"`
 }
 
 // OAuthClientWithSecret carries the client_secret, revealed once on create and
@@ -58,6 +63,13 @@ type CreateOAuthClientParams struct {
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method,omitempty"`
 	LogoURL                 string   `json:"logo_url,omitempty"`
 	FirstParty              *bool    `json:"first_party,omitempty"`
+	// SkipLogoutConfirmation, when true, lets RP-initiated logout
+	// (/oauth2/logout) with this client_id and an exactly registered
+	// post_logout_redirect_uri end the session and redirect straight back with
+	// state, without the confirmation page. First-party clients only: on a
+	// third-party client the API answers 422 VALIDATION_FAILED (param
+	// skip_logout_confirmation).
+	SkipLogoutConfirmation *bool `json:"skip_logout_confirmation,omitempty"`
 }
 
 // UpdateOAuthClientParams is the body of PATCH /v1/oauth_clients/:id.
@@ -68,6 +80,13 @@ type UpdateOAuthClientParams struct {
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method,omitempty"`
 	LogoURL                 string   `json:"logo_url,omitempty"`
 	FirstParty              *bool    `json:"first_party,omitempty"`
+	// SkipLogoutConfirmation, when true, lets RP-initiated logout
+	// (/oauth2/logout) with this client_id and an exactly registered
+	// post_logout_redirect_uri end the session and redirect straight back with
+	// state, without the confirmation page. First-party clients only: on a
+	// third-party client the API answers 422 VALIDATION_FAILED (param
+	// skip_logout_confirmation).
+	SkipLogoutConfirmation *bool `json:"skip_logout_confirmation,omitempty"`
 }
 
 // List returns all OAuth clients. GET /v1/oauth_clients.

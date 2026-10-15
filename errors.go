@@ -25,6 +25,10 @@ const (
 	// ErrCodeEmailProviderRequired: the change needs an email provider to be
 	// configured first.
 	ErrCodeEmailProviderRequired = "EMAIL_PROVIDER_REQUIRED"
+	// ErrCodeEmailProviderInUse: the email provider cannot be removed while
+	// email-dependent features are on and nothing else would deliver email;
+	// Meta["features"] lists them. Delete with Force to remove it anyway.
+	ErrCodeEmailProviderInUse = "EMAIL_PROVIDER_IN_USE"
 	// ErrCodeUnknownField: a strict write (Atlas-Strict: true) carried a body
 	// field the endpoint does not accept; Param names it.
 	ErrCodeUnknownField = "UNKNOWN_FIELD"
