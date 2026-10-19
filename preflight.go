@@ -34,6 +34,31 @@ type Preflight struct {
 	CheckedAt int64 `json:"checked_at"`
 	// Findings are ordered error, then warning, then info.
 	Findings []PreflightFinding `json:"findings"`
+	// SDKVersionsSeen lists the Atlas browser SDK versions that called the
+	// instance in the last 7 days, with the advisories that apply to each.
+	SDKVersionsSeen []SDKVersionSeen `json:"sdk_versions_seen,omitempty"`
+}
+
+// SDKVersionSeen is an Atlas browser SDK version seen recently.
+type SDKVersionSeen struct {
+	Package    string        `json:"package"`
+	Version    string        `json:"version"`
+	LastSeenAt int64         `json:"last_seen_at"`
+	Advisories []SDKAdvisory `json:"advisories"`
+}
+
+// SDKAdvisory is an advisory published for an Atlas browser SDK range.
+type SDKAdvisory struct {
+	Object   string `json:"object"`
+	Package  string `json:"package"`
+	Affected string `json:"affected"`
+	FixedIn  string `json:"fixed_in"`
+	// Reason is a stable code, e.g. email_code_sign_in.
+	Reason string `json:"reason"`
+	// Severity is critical, high, medium or low.
+	Severity    string `json:"severity"`
+	Summary     string `json:"summary"`
+	PublishedAt string `json:"published_at"`
 }
 
 // Errors returns only the error-severity findings.

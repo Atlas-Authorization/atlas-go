@@ -20,6 +20,31 @@ type CookieConsent struct {
 	// SettingsLink is the "cookie settings" link rendered on the hosted pages;
 	// nil when none is set.
 	SettingsLink *CookieSettingsLink `json:"settings_link,omitempty"`
+	// Culture is page (the CMP tag carries the page language) or browser.
+	Culture string `json:"culture,omitempty"`
+	// DeclaredCookies is every cookie and browser-storage key Atlas writes for
+	// this instance, for your cookie policy (all strictly necessary).
+	DeclaredCookies []DeclaredCookie `json:"declared_cookies,omitempty"`
+}
+
+// DeclaredCookie is one cookie or browser-storage key Atlas writes.
+type DeclaredCookie struct {
+	// Name is the exact name, or nil when Pattern describes a family of keys.
+	Name *string `json:"name"`
+	// Pattern is a * wildcard for keys with an id suffix, e.g. atlasid:*.
+	Pattern *string `json:"pattern"`
+	// Store is cookie, localStorage, sessionStorage or indexedDB.
+	Store  string `json:"store"`
+	Domain string `json:"domain"`
+	// LifetimeSeconds is nil for a browser session (cookie) or until cleared.
+	LifetimeSeconds *int64 `json:"lifetime_seconds"`
+	Lifetime        string `json:"lifetime"`
+	HTTPOnly        bool   `json:"http_only"`
+	Category        string `json:"category"`
+	Purpose         string `json:"purpose"`
+	WrittenWhen     string `json:"written_when"`
+	// SetBy is atlas_frontend_api or atlas_sdk.
+	SetBy string `json:"set_by"`
 }
 
 // Cookie settings link presets: the CMP whose preferences dialog the link
@@ -69,6 +94,9 @@ type SetCookieConsentParams struct {
 	// SettingsLink renders a "cookie settings" link on the hosted pages; nil
 	// for no link.
 	SettingsLink *CookieSettingsLinkInput `json:"settings_link,omitempty"`
+	// Culture is page (default: the CMP tag carries the page language) or
+	// browser (no attribute; the CMP picks its own language).
+	Culture string `json:"culture,omitempty"`
 }
 
 // CookieConsent reads the hosted pages' cookie-consent setting.

@@ -94,6 +94,19 @@ var (
 	ErrUnauthorizedParty = &VerificationError{Reason: "unauthorized_party"}
 )
 
+// Retryable reports whether the failure is temporary and on the verifier's
+// side: "no_keys", the issuer's keys could not be fetched (a network error or
+// a JWKS outage). A back-channel logout endpoint should answer 503 with
+// Retry-After then, so Atlas retries the delivery, and 400 for every other
+// reason, which Atlas never retries.
+func (e *VerificationError) Retryable() bool { return e != nil && e.Reason == "no_keys" }
+
+// IsRetryable reports whether err is a *VerificationError that is Retryable.
+func IsRetryable(err error) bool {
+	var ve *VerificationError
+	return errors.As(err, &ve) && ve.Retryable()
+}
+
 // Is lets errors.Is match VerificationErrors by Reason.
 func (e *VerificationError) Is(target error) bool {
 	t, ok := target.(*VerificationError)

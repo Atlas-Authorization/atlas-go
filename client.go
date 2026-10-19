@@ -77,30 +77,32 @@ type Client struct {
 	JWTTemplates     *JWTTemplatesService
 	APIKeys          *APIKeysService
 
-	OAuthProviders      *OAuthProvidersService
-	SSOOnboarding       *SSOOnboardingService
-	SCIMProvisioning    *SCIMProvisioningService
-	FGA                 *FGAService
-	RateLimitPolicy     *RateLimitPolicyService
-	RiskBasedMFA        *RiskBasedMFAService
-	BotSignals          *BotSignalsService
-	NetworkACLs         *NetworkACLsService
-	ManagedWAF          *ManagedWAFService
-	LogStreams          *LogStreamsService
-	Branding            *BrandingService
-	EmailTemplates      *EmailTemplatesService
-	SMSTemplates        *SMSTemplatesService
-	Localizations       *LocalizationsService
-	Actions             *ActionsService
-	Billing             *BillingService
-	Messaging           *MessagingService
-	ImportExport        *ImportExportService
-	DataSubjectRequests *DataSubjectRequestsService
-	RadiusClients       *RadiusClientsService
-	LTIPlatforms        *LTIPlatformsService
-	Instance            *InstanceService
-	InstanceSecurity    *InstanceSecurityService
-	Tokens              *TokensService
+	OAuthProviders   *OAuthProvidersService
+	SSOOnboarding    *SSOOnboardingService
+	SCIMProvisioning *SCIMProvisioningService
+	FGA              *FGAService
+	RateLimitPolicy  *RateLimitPolicyService
+	RiskBasedMFA     *RiskBasedMFAService
+	BotSignals       *BotSignalsService
+	NetworkACLs      *NetworkACLsService
+	ManagedWAF       *ManagedWAFService
+	LogStreams       *LogStreamsService
+	// LogoutNotifyEndpoints is /v1/logout_notify_endpoints — logout fan-out.
+	LogoutNotifyEndpoints *LogoutNotifyEndpointsService
+	Branding              *BrandingService
+	EmailTemplates        *EmailTemplatesService
+	SMSTemplates          *SMSTemplatesService
+	Localizations         *LocalizationsService
+	Actions               *ActionsService
+	Billing               *BillingService
+	Messaging             *MessagingService
+	ImportExport          *ImportExportService
+	DataSubjectRequests   *DataSubjectRequestsService
+	RadiusClients         *RadiusClientsService
+	LTIPlatforms          *LTIPlatformsService
+	Instance              *InstanceService
+	InstanceSecurity      *InstanceSecurityService
+	Tokens                *TokensService
 
 	EmailAddresses             *EmailAddressesService
 	OrganizationSettingsSchema *OrganizationSettingsSchemaService
@@ -233,6 +235,7 @@ func New(secretKey string, opts ...Option) *Client {
 	c.NetworkACLs = &NetworkACLsService{client: c}
 	c.ManagedWAF = &ManagedWAFService{client: c}
 	c.LogStreams = &LogStreamsService{client: c}
+	c.LogoutNotifyEndpoints = &LogoutNotifyEndpointsService{client: c}
 	c.Branding = &BrandingService{client: c}
 	c.EmailTemplates = &EmailTemplatesService{client: c}
 	c.SMSTemplates = &SMSTemplatesService{client: c}
@@ -273,10 +276,11 @@ func New(secretKey string, opts ...Option) *Client {
 	c.Design = &DesignService{client: c, Assets: &DesignAssetsService{client: c}}
 	c.EntitlementOverrides = &EntitlementOverridesService{client: c}
 	c.Platform = &PlatformService{
-		client:       c,
-		Apps:         &PlatformAppsService{client: c},
-		AtlasIDApps:  &AtlasIDAppsService{client: c},
-		DesignAssets: &PlatformDesignAssetsService{client: c},
+		client:           c,
+		Apps:             &PlatformAppsService{client: c},
+		AtlasIDApps:      &AtlasIDAppsService{client: c},
+		DesignAssets:     &PlatformDesignAssetsService{client: c},
+		AtlasIDPublisher: &AtlasIDPublisherService{client: c},
 	}
 	return c
 }

@@ -20,6 +20,9 @@ type PlatformService struct {
 	// DesignAssets is /v1/platform/design/assets — images for Sign in with
 	// Atlas app designs.
 	DesignAssets *PlatformDesignAssetsService
+	// AtlasIDPublisher is /v1/platform/atlas_id_publisher — the account's
+	// publisher name and verified domain.
+	AtlasIDPublisher *AtlasIDPublisherService
 }
 
 // --- Apps -------------------------------------------------------------------
@@ -343,6 +346,16 @@ type AtlasIDApp struct {
 	// confidential apps.
 	ClientSecret string `json:"client_secret,omitempty"`
 	Note         string `json:"note,omitempty"`
+	// WebhookURL is the per-app webhook URL, or nil.
+	WebhookURL *string `json:"webhook_url,omitempty"`
+	// WebhookEvents are the events the per-app webhook gets.
+	WebhookEvents []string `json:"webhook_events,omitempty"`
+	// WebhookActive is false once auto-disabled after repeated failures; nil
+	// without a webhook.
+	WebhookActive *bool `json:"webhook_active,omitempty"`
+	// WebhookSecret is the per-app webhook signing secret, returned exactly
+	// once (first set, or rotated).
+	WebhookSecret string `json:"webhook_secret,omitempty"`
 }
 
 // AtlasIDAppBranding is how the Sign in with Atlas page and consent screen look
@@ -468,7 +481,11 @@ type UpdateAtlasIDAppParams struct {
 	LogoURL                           *string                   `json:"logo_url,omitempty"`
 	HomepageURL                       *string                   `json:"homepage_url,omitempty"`
 	Branding                          *AtlasIDAppBrandingParams `json:"branding,omitempty"`
-	Clear                             []string                  `json:"-"`
+	// WebhookURL sets the per-app webhook (public https): user.updated,
+	// user.deleted and grant.revoked for this app's users. The first set
+	// returns WebhookSecret once. Put "webhook_url" in Clear to remove it.
+	WebhookURL *string  `json:"webhook_url,omitempty"`
+	Clear      []string `json:"-"`
 }
 
 // MarshalJSON omits a nil PostLogoutRedirectURIs (an empty slice clears) and

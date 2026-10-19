@@ -304,6 +304,29 @@ Organizations have their own override layered over the instance design
 `c.Instance.Preflight(ctx)` checks your setup in one call and returns typed
 findings (severity, code, message, fix, subject).
 
+## Domain moves, logout fan-out and managed email
+
+```go
+// Move every URL from the old origin to the new one. DryRun first shows the diff.
+preview, err := atlas.Instance.MoveOrigin(ctx, atlasauth.OriginMoveParams{From: "https://old.example.com", To: "https://example.com", DryRun: true})
+if err != nil {
+	return err
+}
+for _, c := range preview.Changes {
+	fmt.Println(c.Object, c.Field, c.Before, "->", c.After)
+}
+
+// Send the same logout_token your OIDC apps get to another service.
+_, err = atlas.LogoutNotifyEndpoints.Create(ctx, atlasauth.CreateLogoutNotifyEndpointParams{URL: "https://api.example.com/atlas/logout"})
+
+// Send email from your own domain through Atlas, then publish the returned DNS records.
+managed, err := atlas.Messaging.CreateManagedEmail(ctx, atlasauth.CreateManagedEmailParams{FromAddress: "Acme <no-reply@example.com>"})
+```
+
+With a platform key, `Platform.AtlasIDApps.FindUsers(ctx, id, email)` answers a privacy request for one app,
+`RevokeGrant` revokes one person's approval, and `Platform.AtlasIDPublisher` claims and verifies the publisher name
+shown on consent screens.
+
 ## Back-channel logout
 
 Verify the `logout_token` Atlas posts to your `backchannel_logout_uri`

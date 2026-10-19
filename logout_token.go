@@ -102,7 +102,8 @@ func (v *LogoutTokenVerifier) now() time.Time {
 
 // Verify checks a logout_token and returns its claims, or a
 // *VerificationError (ErrMalformed, ErrNoKeys, ErrInvalidToken,
-// ErrLogoutTokenReplayed).
+// ErrLogoutTokenReplayed). IsRetryable(err) is true for ErrNoKeys: answer 503
+// with Retry-After so Atlas retries; answer 400 otherwise.
 func (v *LogoutTokenVerifier) Verify(ctx context.Context, token string) (*LogoutTokenClaims, error) {
 	parts := strings.Split(token, ".")
 	if token == "" || len(parts) != 3 {
@@ -133,6 +134,13 @@ func (v *LogoutTokenVerifier) Verify(ctx context.Context, token string) (*Logout
 	}
 	pub := selectRSAKey(set, header.Kid)
 	if pub == nil {
+		// A key Atlas just rotated to, whose refetch failed: temporary.
+		v.jwks.mu.Lock()
+		failed := v.jwks.LastOutcome == OutcomeFailed
+		v.jwks.mu.Unlock()
+		if failed {
+			return nil, ErrNoKeys
+		}
 		return nil, ErrInvalidToken
 	}
 	sig, err := base64urlDecode(parts[2])

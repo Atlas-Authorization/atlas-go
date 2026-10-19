@@ -44,13 +44,19 @@ type WebhookDelivery struct {
 	AttemptNumber int     `json:"attempt_number"`
 	MaxAttempts   int     `json:"max_attempts,omitempty"`
 	// Payload is the event payload that was sent (nil once past retention).
-	Payload         interface{} `json:"payload,omitempty"`
-	Status          string      `json:"status"`
-	HTTPStatus      *int        `json:"http_status"`
-	ResponseSnippet *string     `json:"response_snippet"`
-	NextRetryAt     *int64      `json:"next_retry_at"`
-	DeliveredAt     *int64      `json:"delivered_at"`
-	CreatedAt       int64       `json:"created_at"`
+	Payload    interface{} `json:"payload,omitempty"`
+	Status     string      `json:"status"`
+	HTTPStatus *int        `json:"http_status"`
+	// Error is why the attempt failed: webhook_redirect_not_followed (see
+	// Location), webhook_http_error, webhook_timeout, webhook_network_error or
+	// webhook_url_blocked. Nil on success or while pending.
+	Error *string `json:"error,omitempty"`
+	// Location is the absolute Location of a 3xx answer. Not followed.
+	Location        *string `json:"location,omitempty"`
+	ResponseSnippet *string `json:"response_snippet"`
+	NextRetryAt     *int64  `json:"next_retry_at"`
+	DeliveredAt     *int64  `json:"delivered_at"`
+	CreatedAt       int64   `json:"created_at"`
 }
 
 // CreateWebhookEndpointParams is the body of POST /v1/webhook_endpoints. Each
@@ -97,10 +103,25 @@ type WebhookEndpointList struct {
 	HasMore bool              `json:"has_more"`
 	// AvailableEvents is every event type an endpoint can subscribe to.
 	AvailableEvents []string `json:"available_events"`
+	// EventCatalog describes the same events, in the same order.
+	EventCatalog []WebhookEventCatalogEntry `json:"event_catalog,omitempty"`
+	// EventAudiences is every value RelevantFor can hold.
+	EventAudiences []string `json:"event_audiences,omitempty"`
 	// RetryScheduleMS is the delay before each retry, in milliseconds.
 	RetryScheduleMS []int64 `json:"retry_schedule_ms"`
 	// MaxAttempts is the delivery attempts per event before it is marked failed.
 	MaxAttempts int `json:"max_attempts"`
+}
+
+// WebhookEventCatalogEntry describes one subscribable event.
+type WebhookEventCatalogEntry struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// RelevantFor is who should act on it (rp_sessions, rp_accounts, dsar, …).
+	RelevantFor []string `json:"relevant_for"`
+	// DeprecatedAliasOf is set on a superseded spelling: subscribe to this
+	// event instead.
+	DeprecatedAliasOf string `json:"deprecated_alias_of,omitempty"`
 }
 
 // UpdateWebhookEndpointParams is the body of PATCH /v1/webhook_endpoints/:id.

@@ -24,6 +24,10 @@ type User struct {
 	LastSignInAt *int64 `json:"last_sign_in_at"`
 	CreatedAt    int64  `json:"created_at"`
 	UpdatedAt    int64  `json:"updated_at"`
+	// Version strictly increases with every change to the user; webhook
+	// payloads carry the same value. Apply an update only if its version is
+	// higher than the one you hold.
+	Version int64 `json:"version,omitempty"`
 }
 
 // EmailAddress is a user's email address record.
@@ -187,11 +191,27 @@ func (s *UsersService) RevokeSessions(ctx context.Context, id string, opts ...Re
 	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/sessions/revoke", nil, out, opts...)
 }
 
+// RevokeSessionsParams are the options of RevokeSessionsWithParams.
+type RevokeSessionsParams struct {
+	// RevokeGrants also revokes every OAuth grant the user holds, so app
+	// refresh tokens stop minting access tokens.
+	RevokeGrants bool `json:"revoke_grants,omitempty"`
+}
+
+// RevokeSessionsWithParams is RevokeSessions with options.
+// POST /v1/users/:id/sessions/revoke.
+func (s *UsersService) RevokeSessionsWithParams(ctx context.Context, id string, params RevokeSessionsParams, opts ...RequestOption) (*RevokeSessionsResult, error) {
+	out := &RevokeSessionsResult{}
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/sessions/revoke", params, out, opts...)
+}
+
 // RevokeSessionsResult is the acknowledgement of a bulk session revoke.
 type RevokeSessionsResult struct {
 	Object          string `json:"object"`
 	ID              string `json:"id"`
 	SessionsRevoked int    `json:"sessions_revoked"`
+	// GrantsRevoked is how many OAuth grants were revoked (with RevokeGrants).
+	GrantsRevoked *int `json:"grants_revoked,omitempty"`
 }
 
 // AddEmail adds an email address to a user.

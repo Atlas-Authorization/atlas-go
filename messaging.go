@@ -35,6 +35,17 @@ type MessagingProviders struct {
 	Object string             `json:"object"`
 	Email  *MessagingProvider `json:"email"`
 	SMS    *MessagingProvider `json:"sms"`
+	// ManagedEmail summarises the Atlas-managed sending domain, when set.
+	ManagedEmail *ManagedEmailSummary `json:"managed_email,omitempty"`
+}
+
+// ManagedEmailSummary is the managed sending domain as the provider list shows it.
+type ManagedEmailSummary struct {
+	Object      string `json:"object"`
+	FromAddress string `json:"from_address"`
+	Domain      string `json:"domain"`
+	Status      string `json:"status"`
+	Verified    bool   `json:"verified"`
 }
 
 // MessagingProviderInput is the untyped body of a provider set. Config carries

@@ -229,13 +229,21 @@ type RequestInspectorParams struct {
 // per-section before/after diff when the change recorded one; otherwise Fields
 // names the changed fields.
 type ConfigChange struct {
-	ID      string             `json:"id"`
-	At      int64              `json:"at"`
-	Actor   AuditEventActor    `json:"actor"`
-	Action  string             `json:"action"`
-	IP      *string            `json:"ip"`
-	Changes []ConfigChangeDiff `json:"changes,omitempty"`
-	Fields  []string           `json:"fields,omitempty"`
+	ID     string          `json:"id"`
+	At     int64           `json:"at"`
+	Actor  AuditEventActor `json:"actor"`
+	Action string          `json:"action"`
+	IP     *string         `json:"ip"`
+	// Target is the object that changed, e.g. {Type: oauth_client, ID: ...}.
+	Target  *ConfigChangeTarget `json:"target,omitempty"`
+	Changes []ConfigChangeDiff  `json:"changes,omitempty"`
+	Fields  []string            `json:"fields,omitempty"`
+}
+
+// ConfigChangeTarget names the object a config change touched.
+type ConfigChangeTarget struct {
+	Type string  `json:"type"`
+	ID   *string `json:"id"`
 }
 
 // ConfigChangeDiff is the before/after of one config section.

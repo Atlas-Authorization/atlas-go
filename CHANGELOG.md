@@ -4,6 +4,39 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.6.0
+
+### Added
+
+- **Back-channel logout, retryable failures.** `(*VerificationError).Retryable()` and `IsRetryable(err)`
+  are true for `ErrNoKeys`: the issuer's keys could not be fetched (a network error, a JWKS outage, or a
+  just-rotated key whose refetch failed). Answer `503` with `Retry-After` then, so Atlas retries the
+  delivery, and `400` otherwise. A logout token whose `kid` is unknown after a failed JWKS refetch is now
+  `ErrNoKeys` (was `ErrInvalidToken`).
+- **Webhook verification.** `VerifyWebhook(body, header, secret, opts)` returns `*VerifiedWebhook`
+  (`Event`, `DeliveryID`, `Timestamp`) or one of `ErrWebhookMissingHeaders`, `ErrWebhookMalformedSignature`,
+  `ErrWebhookStaleTimestamp`, `ErrWebhookSignatureMismatch`. `DeliveryID` is the signed `atlas-id` header,
+  the same on every retry of one event: deduplicate on it.
+- **Domain moves.** `Instance.MoveOrigin(ctx, OriginMoveParams{From, To, DryRun})` rewrites every URL on one origin
+  to another across the instance, its OAuth clients, webhooks, redirect URLs and Sign in with Atlas apps
+  (`*OriginMove`: `Changes`, `Problems`, `Applied`); `Platform.AtlasIDApps.MoveOrigin(ctx, id, params)` does it for one app.
+- **Connections and integrations.** `Instance.Connections`, and `Instance.ChatlyIntegration / SetChatlyIntegration /
+  DeleteChatlyIntegration / ForumulateIntegration / SetForumulateIntegration / DeleteForumulateIntegration`.
+- **Logout fan-out.** New `LogoutNotifyEndpoints` service: `List`, `Create`, `Get`, `Update`, `Delete`, `Deliveries`.
+- **Managed email.** `Messaging.ManagedEmail / CreateManagedEmail / VerifyManagedEmail / DeleteManagedEmail`
+  (`ManagedEmail`, `ManagedEmailRecord`). `MessagingProviders` gains `ManagedEmail`.
+- **Back-channel logout logs.** `OAuthClients.ListBackchannelDeliveries` / `TestBackchannelLogout` and the same on
+  `Platform.AtlasIDApps` (`BackchannelLogoutDelivery`, `BackchannelLogoutTest`).
+- **Sign in with Atlas apps.** `Platform.AtlasIDApps.Preflight`, `FindUsers`, `RevokeGrant`, `RotateWebhookSecret`.
+  `AtlasIDApp` gains `WebhookURL`, `WebhookEvents`, `WebhookActive`, `WebhookSecret`; `UpdateAtlasIDAppParams`
+  gains `WebhookURL`.
+- **Publisher.** `Platform.AtlasIDPublisher`: `Get`, `Set`, `SetSkipConsent`, `Delete`, `Verify`; and
+  `Platform.ConfigChangelog(ctx, params)`.
+- **More fields.** `User.Version`; `CookieConsent.Culture` / `DeclaredCookies`; `SetCookieConsentParams.Culture`;
+  `Preflight.SDKVersionsSeen`; `WebhookDelivery.Error` / `Location`; `WebhookEndpointList.EventCatalog` /
+  `EventAudiences`; `CustomDomain.DNS` and `CreateDomainParams.DNS`; `ConfigChange.Target`.
+  `Users.RevokeSessionsWithParams(ctx, id, RevokeSessionsParams{RevokeGrants: true})` returns `GrantsRevoked`.
+
 ## 0.5.1
 
 ### Added

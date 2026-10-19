@@ -23,6 +23,25 @@ type CustomDomain struct {
 	FailureReason        *string `json:"failure_reason"`
 	CertificateExpiresAt *int64  `json:"certificate_expires_at"`
 	CookieDomain         *string `json:"cookie_domain"`
+	// DNS is the DNS automation provider for this host (the token is never
+	// returned), or nil.
+	DNS *CustomDomainDNS `json:"dns,omitempty"`
+}
+
+// CustomDomainDNS reports a domain's DNS automation.
+type CustomDomainDNS struct {
+	Provider string `json:"provider"`
+	TokenSet bool   `json:"token_set"`
+}
+
+// CustomDomainDNSParams lets Atlas write the domain's DNS record. APIToken is
+// write-only.
+type CustomDomainDNSParams struct {
+	// Provider is cloudflare.
+	Provider string `json:"provider"`
+	APIToken string `json:"api_token"`
+	// Overwrite replaces a conflicting existing record.
+	Overwrite bool `json:"overwrite,omitempty"`
 }
 
 // ListDomainsResponse is the enriched list envelope for custom domains.
@@ -43,6 +62,8 @@ type ListDomainsResponse struct {
 type CreateDomainParams struct {
 	Host string `json:"host"`
 	Role string `json:"role,omitempty"`
+	// DNS has Atlas write the record (optional).
+	DNS *CustomDomainDNSParams `json:"dns,omitempty"`
 }
 
 // CustomDomainWithInstructions is the create response, carrying DNS setup steps.

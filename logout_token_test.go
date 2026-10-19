@@ -179,3 +179,44 @@ func TestLogoutTokenReplayAndRequest(t *testing.T) {
 		t.Error("missing ClientID must be refused")
 	}
 }
+
+func TestLogoutTokenRetryable(t *testing.T) {
+	f := newLogoutFixture(t)
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(down.Close)
+	v, err := NewLogoutTokenVerifier(LogoutTokenVerifierOptions{
+		JWKSURL: down.URL, Issuer: ltIssuer, ClientID: ltClientID,
+		Now: func() time.Time { return f.now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = v.Verify(context.Background(), f.sign(t, f.key, f.header(), f.claims()))
+	if !errors.Is(err, ErrNoKeys) || !IsRetryable(err) {
+		t.Fatalf("unreachable JWKS: err = %v, want retryable ErrNoKeys", err)
+	}
+
+	unreachable, err := NewLogoutTokenVerifier(LogoutTokenVerifierOptions{
+		JWKSURL: "http://127.0.0.1:1/jwks", Issuer: ltIssuer, ClientID: ltClientID,
+		Now: func() time.Time { return f.now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := unreachable.Verify(context.Background(), f.sign(t, f.key, f.header(), f.claims())); !IsRetryable(err) {
+		t.Fatalf("connection refused: err = %v, want retryable", err)
+	}
+
+	ok := f.verifier(t, nil)
+	c := f.claims()
+	c["aud"] = "cid_other"
+	_, err = ok.Verify(context.Background(), f.sign(t, f.key, f.header(), c))
+	if !errors.Is(err, ErrInvalidToken) || IsRetryable(err) {
+		t.Fatalf("bad token: err = %v, want non-retryable ErrInvalidToken", err)
+	}
+	if IsRetryable(nil) || IsRetryable(errors.New("other")) {
+		t.Fatal("IsRetryable must be false for nil / foreign errors")
+	}
+}
