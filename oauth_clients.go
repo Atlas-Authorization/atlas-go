@@ -24,8 +24,12 @@ type OAuthClient struct {
 	GrantTypes              []string `json:"grant_types"`
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
 	SecretPrefix            *string  `json:"secret_prefix"`
-	IsPublic                bool     `json:"is_public"`
-	FirstParty              bool     `json:"first_party"`
+	// PreviousSecretExpiresAt is, after a rotation with overlap, when the
+	// previous secret stops working (epoch ms); nil when only the current secret
+	// is accepted.
+	PreviousSecretExpiresAt *int64 `json:"previous_secret_expires_at,omitempty"`
+	IsPublic                bool   `json:"is_public"`
+	FirstParty              bool   `json:"first_party"`
 	// SkipLogoutConfirmation is true when RP-initiated logout (/oauth2/logout)
 	// with this client_id and an exactly registered post_logout_redirect_uri
 	// ends the session and redirects straight back (with state) without the
@@ -41,6 +45,17 @@ type OAuthClientWithSecret struct {
 	OAuthClient
 	ClientSecret string `json:"client_secret,omitempty"`
 	Note         string `json:"note"`
+	// OverlapSeconds is, on a rotation, how long the previous secret keeps
+	// working (echoed).
+	OverlapSeconds int `json:"overlap_seconds,omitempty"`
+}
+
+// RotateOAuthClientSecretParams is the body of
+// POST /v1/oauth_clients/:id/rotate_secret.
+type RotateOAuthClientSecretParams struct {
+	// OverlapSeconds is how long the previous secret keeps working. nil uses the
+	// default, 86400 (24 hours); 0 revokes it now; at most 604800 (7 days).
+	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
 }
 
 // ClientGrant binds an OAuth client to a resource server with scopes.
@@ -114,11 +129,21 @@ func (s *OAuthClientsService) Update(ctx context.Context, id string, params Upda
 	return out, s.client.patch(ctx, "/v1/oauth_clients/"+url.PathEscape(id), params, out, opts...)
 }
 
-// RotateSecret rotates the client secret; the response carries it once.
-// POST /v1/oauth_clients/:id/rotate_secret.
+// RotateSecret rotates the client secret; the response carries it once. The
+// previous secret keeps working for the default overlap (24 hours); use
+// RotateSecretWithParams to choose it. POST /v1/oauth_clients/:id/rotate_secret.
 func (s *OAuthClientsService) RotateSecret(ctx context.Context, id string, opts ...RequestOption) (*OAuthClientWithSecret, error) {
 	out := &OAuthClientWithSecret{}
 	return out, s.client.post(ctx, "/v1/oauth_clients/"+url.PathEscape(id)+"/rotate_secret", nil, out, opts...)
+}
+
+// RotateSecretWithParams rotates the client secret with a chosen overlap: the
+// previous secret keeps working for OverlapSeconds (0 revokes it now, e.g.
+// after a leak). PreviousSecretExpiresAt in the response says when it stops.
+// POST /v1/oauth_clients/:id/rotate_secret.
+func (s *OAuthClientsService) RotateSecretWithParams(ctx context.Context, id string, params RotateOAuthClientSecretParams, opts ...RequestOption) (*OAuthClientWithSecret, error) {
+	out := &OAuthClientWithSecret{}
+	return out, s.client.post(ctx, "/v1/oauth_clients/"+url.PathEscape(id)+"/rotate_secret", params, out, opts...)
 }
 
 // Delete removes an OAuth client. DELETE /v1/oauth_clients/:id.

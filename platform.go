@@ -37,10 +37,23 @@ type PlatformApp struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	// Environment is production or development.
-	Environment    string   `json:"environment"`
-	PublishableKey string   `json:"publishable_key"`
+	Environment    string `json:"environment"`
+	PublishableKey string `json:"publishable_key"`
+	// FrontendAPIHost is the default per-app host, or the custom domain once it
+	// is active.
+	FrontendAPIHost *string `json:"frontend_api_host,omitempty"`
+	// Issuer is the iss the app's session tokens carry. It changes when a custom
+	// domain goes active, so read it rather than hard-coding it.
+	Issuer string `json:"issuer,omitempty"`
+	// DiscoveryURL is the OpenID discovery document whose issuer equals Issuer.
+	DiscoveryURL string `json:"discovery_url,omitempty"`
+	// JWKSURI is the JWKS holding the app's signing keys.
+	JWKSURI        string   `json:"jwks_uri,omitempty"`
 	AllowedOrigins []string `json:"allowed_origins"`
-	Tags           []string `json:"tags"`
+	// AllowedOriginIntegrations is the declared integration per allowed origin
+	// ("redirect" or "embedded").
+	AllowedOriginIntegrations map[string]string `json:"allowed_origin_integrations,omitempty"`
+	Tags                      []string          `json:"tags"`
 	// Archived hides the app from the default listing; it still serves auth.
 	Archived   bool   `json:"archived"`
 	ArchivedAt *int64 `json:"archived_at"`
@@ -74,6 +87,15 @@ type CreatePlatformAppParams struct {
 	// default for a production app); set false to skip it.
 	CreateDevelopmentSibling *bool    `json:"create_development_sibling,omitempty"`
 	Tags                     []string `json:"tags,omitempty"`
+	// AllowedOriginEntries, when set, is sent as allowed_origins instead of
+	// AllowedOrigins: each entry also says how the origin signs in.
+	AllowedOriginEntries []AllowedOriginEntry `json:"-"`
+}
+
+// MarshalJSON sends AllowedOriginEntries as allowed_origins when set.
+func (p CreatePlatformAppParams) MarshalJSON() ([]byte, error) {
+	type plain CreatePlatformAppParams
+	return marshalWithExtra(plain(p), originEntriesExtra(p.AllowedOriginEntries))
 }
 
 // UpdatePlatformAppParams is the body of PATCH /v1/platform/apps/:id.
@@ -81,6 +103,15 @@ type UpdatePlatformAppParams struct {
 	Name           string   `json:"name,omitempty"`
 	AllowedOrigins []string `json:"allowed_origins,omitempty"`
 	Tags           []string `json:"tags,omitempty"`
+	// AllowedOriginEntries, when set, is sent as allowed_origins instead of
+	// AllowedOrigins: each entry also says how the origin signs in.
+	AllowedOriginEntries []AllowedOriginEntry `json:"-"`
+}
+
+// MarshalJSON sends AllowedOriginEntries as allowed_origins when set.
+func (p UpdatePlatformAppParams) MarshalJSON() ([]byte, error) {
+	type plain UpdatePlatformAppParams
+	return marshalWithExtra(plain(p), originEntriesExtra(p.AllowedOriginEntries))
 }
 
 // ListPlatformAppsParams filters GET /v1/platform/apps. Archived apps are
@@ -159,6 +190,15 @@ type PlatformInstanceSecret struct {
 type CreatePlatformInstanceParams struct {
 	Environment    string   `json:"environment,omitempty"`
 	AllowedOrigins []string `json:"allowed_origins,omitempty"`
+	// AllowedOriginEntries, when set, is sent as allowed_origins instead of
+	// AllowedOrigins: each entry also says how the origin signs in.
+	AllowedOriginEntries []AllowedOriginEntry `json:"-"`
+}
+
+// MarshalJSON sends AllowedOriginEntries as allowed_origins when set.
+func (p CreatePlatformInstanceParams) MarshalJSON() ([]byte, error) {
+	type plain CreatePlatformInstanceParams
+	return marshalWithExtra(plain(p), originEntriesExtra(p.AllowedOriginEntries))
 }
 
 // CreateAccountlessAppParams is the body of POST /v1/platform/accountless_apps.
@@ -166,6 +206,15 @@ type CreateAccountlessAppParams struct {
 	Name           string   `json:"name,omitempty"`
 	Environment    string   `json:"environment,omitempty"`
 	AllowedOrigins []string `json:"allowed_origins,omitempty"`
+	// AllowedOriginEntries, when set, is sent as allowed_origins instead of
+	// AllowedOrigins: each entry also says how the origin signs in.
+	AllowedOriginEntries []AllowedOriginEntry `json:"-"`
+}
+
+// MarshalJSON sends AllowedOriginEntries as allowed_origins when set.
+func (p CreateAccountlessAppParams) MarshalJSON() ([]byte, error) {
+	type plain CreateAccountlessAppParams
+	return marshalWithExtra(plain(p), originEntriesExtra(p.AllowedOriginEntries))
 }
 
 // AccountlessApp is an app owned by no platform, with its one-time claim token.

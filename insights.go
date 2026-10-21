@@ -180,20 +180,37 @@ type DiagnosticsService struct{ client *Client }
 // LoginReadinessCheck is one hop of the login-readiness probe (cors,
 // session_cookie, email_provisioning, token_signing).
 type LoginReadinessCheck struct {
-	Name     string      `json:"name"`
-	Pass     bool        `json:"pass"`
+	Name string `json:"name"`
+	Pass bool   `json:"pass"`
+	// Applies is false when the check does not matter for the assumed
+	// integration (it then never makes Ready false); nil from older servers.
+	Applies  *bool       `json:"applies,omitempty"`
 	Observed interface{} `json:"observed"`
 	Detail   string      `json:"detail"`
 }
 
+// LoginReadinessIntegration is the integration the checks assumed for the
+// origin, and why.
+type LoginReadinessIntegration struct {
+	// Assumed is "redirect" (hosted-redirect OIDC: the cors and session_cookie
+	// checks do not apply) or "embedded".
+	Assumed string `json:"assumed"`
+	// Source is declared, embedded_traffic, redirect_clients or default.
+	Source string `json:"source"`
+	// Reason is a plain sentence saying why.
+	Reason string `json:"reason"`
+}
+
 // LoginReadiness is the GET /v1/diagnostics/login_readiness report.
 type LoginReadiness struct {
-	Object     string                `json:"object"`
-	Origin     string                `json:"origin"`
-	Live       bool                  `json:"live"`
-	DataRegion *string               `json:"data_region"`
-	Ready      bool                  `json:"ready"`
-	Checks     []LoginReadinessCheck `json:"checks"`
+	Object     string  `json:"object"`
+	Origin     string  `json:"origin"`
+	Live       bool    `json:"live"`
+	DataRegion *string `json:"data_region"`
+	Ready      bool    `json:"ready"`
+	// Integration is the integration the checks assumed (nil from older servers).
+	Integration *LoginReadinessIntegration `json:"integration,omitempty"`
+	Checks      []LoginReadinessCheck      `json:"checks"`
 }
 
 // RequestInspectionFinding is one check of the request inspector; Blocks says

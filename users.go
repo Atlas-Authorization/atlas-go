@@ -35,9 +35,24 @@ type EmailAddress struct {
 	Object       string `json:"object"`
 	ID           string `json:"id"`
 	EmailAddress string `json:"email_address"`
-	Verified     bool   `json:"verified"`
-	Primary      bool   `json:"primary"`
-	CreatedAt    int64  `json:"created_at"`
+	// Verified is true only when the address was proven. An address that signed
+	// up while requireEmailVerification was false is false.
+	Verified bool `json:"verified"`
+	// Verification says whether and how the address was proven (nil from older
+	// servers).
+	Verification *EmailAddressVerification `json:"verification,omitempty"`
+	Primary      bool                      `json:"primary"`
+	CreatedAt    int64                     `json:"created_at"`
+}
+
+// EmailAddressVerification is an address's proof state.
+type EmailAddressVerification struct {
+	// Status is "verified" or "unverified"; it mirrors Verified.
+	Status string `json:"status"`
+	// Strategy is email_code, email_link, oauth, admin, import, scim or lti;
+	// "skipped" for an address held for sign-in but never proven; nil when not
+	// verified.
+	Strategy *string `json:"strategy"`
 }
 
 // UserSession is a session as listed under a user.

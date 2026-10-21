@@ -203,7 +203,29 @@ func (AWSSNSConfig) smsTransport() string      { return "aws_sns" }
 type typedProviderBody struct {
 	Transport   string      `json:"transport"`
 	FromAddress string      `json:"from_address,omitempty"`
+	Mode        string      `json:"mode,omitempty"`
 	Config      interface{} `json:"config"`
+}
+
+// Email provider modes.
+const (
+	// ProviderModeStandard is a provider sending normally.
+	ProviderModeStandard = "standard"
+	// ProviderModeDevelopment lets a development instance send Atlas's sign-in
+	// emails without a verified domain ("[Atlas test] " subjects, capped).
+	ProviderModeDevelopment = "development"
+	// ProviderModeManagedDomain is the provider that holds managed email's key.
+	ProviderModeManagedDomain = "managed_domain"
+)
+
+// EmailProviderParams is the typed body of SetEmailProviderWithParams.
+type EmailProviderParams struct {
+	// FromAddress may be empty; otherwise the From address.
+	FromAddress string
+	// Mode is ProviderModeStandard or ProviderModeDevelopment; empty keeps the
+	// stored mode. Development is refused with 409 on a production instance.
+	Mode   string
+	Config EmailProviderConfig
 }
 
 // SetEmailProvider configures (or updates) the email provider from a typed
@@ -213,6 +235,14 @@ type typedProviderBody struct {
 func (s *MessagingService) SetEmailProvider(ctx context.Context, fromAddress string, cfg EmailProviderConfig, opts ...RequestOption) (*MessagingProvider, error) {
 	out := &MessagingProvider{}
 	body := typedProviderBody{Transport: cfg.emailTransport(), FromAddress: fromAddress, Config: cfg}
+	return out, s.client.put(ctx, "/v1/messaging_providers/email", body, out, opts...)
+}
+
+// SetEmailProviderWithParams is SetEmailProvider with a provider mode.
+// PUT /v1/messaging_providers/email.
+func (s *MessagingService) SetEmailProviderWithParams(ctx context.Context, params EmailProviderParams, opts ...RequestOption) (*MessagingProvider, error) {
+	out := &MessagingProvider{}
+	body := typedProviderBody{Transport: params.Config.emailTransport(), FromAddress: params.FromAddress, Mode: params.Mode, Config: params.Config}
 	return out, s.client.put(ctx, "/v1/messaging_providers/email", body, out, opts...)
 }
 

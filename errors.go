@@ -38,6 +38,22 @@ const (
 	// ErrCodeUnknownField: a strict write (Atlas-Strict: true) carried a body
 	// field the endpoint does not accept; Param names it.
 	ErrCodeUnknownField = "UNKNOWN_FIELD"
+	// ErrCodeReadOnlyField: the body set a field that is not writable on this
+	// endpoint; Param names it and the message names the call that changes it.
+	ErrCodeReadOnlyField = "READ_ONLY_FIELD"
+	// ErrCodeDevelopmentEmailNotAllowed: the development email sender is not
+	// available on a production instance (409).
+	ErrCodeDevelopmentEmailNotAllowed = "DEVELOPMENT_EMAIL_NOT_ALLOWED"
+	// ErrCodeDevelopmentEmailUnavailable: the development email sender is not
+	// available on this deployment (503).
+	ErrCodeDevelopmentEmailUnavailable = "DEVELOPMENT_EMAIL_UNAVAILABLE"
+	// ErrCodeDevelopmentEmailLimitReached: the development sender's daily or
+	// per-recipient hourly cap is spent (429; Meta["window"],
+	// Meta["retry_after_seconds"]).
+	ErrCodeDevelopmentEmailLimitReached = "DEVELOPMENT_EMAIL_LIMIT_REACHED"
+	// ErrCodeDevelopmentEmailTemplateNotAllowed: the development sender sends
+	// only Atlas's own sign-in emails (422).
+	ErrCodeDevelopmentEmailTemplateNotAllowed = "DEVELOPMENT_EMAIL_TEMPLATE_NOT_ALLOWED"
 	// ErrCodePlanInUse: a billing plan cannot be removed while subscriptions
 	// still use it.
 	ErrCodePlanInUse = "PLAN_IN_USE"

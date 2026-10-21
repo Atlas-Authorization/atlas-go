@@ -20,8 +20,13 @@ type MessagingService struct{ client *Client }
 
 // MessagingProvider is one configured channel provider, secrets omitted.
 type MessagingProvider struct {
-	Object      string                 `json:"object"`
-	Channel     string                 `json:"channel"`
+	Object string `json:"object"`
+	// ID is the provider id: pass it as ProviderID to managed email or the
+	// development sender.
+	ID      string `json:"id,omitempty"`
+	Channel string `json:"channel"`
+	// Mode is standard, development or managed_domain.
+	Mode        string                 `json:"mode,omitempty"`
 	Transport   string                 `json:"transport"`
 	FromAddress *string                `json:"from_address"`
 	Status      string                 `json:"status"`
@@ -37,6 +42,15 @@ type MessagingProviders struct {
 	SMS    *MessagingProvider `json:"sms"`
 	// ManagedEmail summarises the Atlas-managed sending domain, when set.
 	ManagedEmail *ManagedEmailSummary `json:"managed_email,omitempty"`
+	// DevelopmentEmail summarises the email provider in development mode, when it is.
+	DevelopmentEmail *DevelopmentEmailSummary `json:"development_email,omitempty"`
+}
+
+// DevelopmentEmailSummary is the development sender as the provider list shows it.
+type DevelopmentEmailSummary struct {
+	Object      string  `json:"object"`
+	Enabled     bool    `json:"enabled"`
+	FromAddress *string `json:"from_address"`
 }
 
 // ManagedEmailSummary is the managed sending domain as the provider list shows it.
@@ -53,9 +67,12 @@ type ManagedEmailSummary struct {
 // transport does not use; prefer SetEmailProvider / SetSMSProvider with a typed
 // config struct.
 type MessagingProviderInput struct {
-	Transport   string                 `json:"transport"`
-	FromAddress string                 `json:"from_address,omitempty"`
-	Config      map[string]interface{} `json:"config,omitempty"`
+	Transport   string `json:"transport"`
+	FromAddress string `json:"from_address,omitempty"`
+	// Mode is email only: "development" lets a development instance send
+	// without a verified domain; empty keeps the stored mode.
+	Mode   string                 `json:"mode,omitempty"`
+	Config map[string]interface{} `json:"config,omitempty"`
 }
 
 // MessagingTestResult acknowledges a test send.

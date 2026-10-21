@@ -55,9 +55,14 @@ type Branding struct {
 	SectionOrder      []string                 `json:"sectionOrder,omitempty"`
 	Legal             map[string]interface{}   `json:"legal,omitempty"`
 	SignUpFields      []map[string]interface{} `json:"signUpFields,omitempty"`
-	CustomCSS         string                   `json:"customCss,omitempty"`
-	CustomHTMLHeader  string                   `json:"customHtmlHeader,omitempty"`
-	CustomHTMLFooter  string                   `json:"customHtmlFooter,omitempty"`
+	// Audiences is per-audience hosted-page branding keyed by audience hint
+	// ([a-z0-9_-]{1,32}, at most 20). A sign-in started with
+	// audience_hint=<hint> uses that entry. An update merges per hint; a nil
+	// entry deletes that hint.
+	Audiences        map[string]*BrandingAudience `json:"audiences,omitempty"`
+	CustomCSS        string                       `json:"customCss,omitempty"`
+	CustomHTMLHeader string                       `json:"customHtmlHeader,omitempty"`
+	CustomHTMLFooter string                       `json:"customHtmlFooter,omitempty"`
 }
 
 // ResolvedBranding is what the renderers actually use — everything already
@@ -70,6 +75,21 @@ type ResolvedBranding struct {
 	ColorBackground string  `json:"colorBackground"`
 	ColorText       string  `json:"colorText"`
 	SupportEmail    *string `json:"supportEmail"`
+	// Audiences is every audience the hosted page can theme for, as it reads
+	// them (invalid values dropped).
+	Audiences map[string]BrandingAudience `json:"audiences,omitempty"`
+}
+
+// BrandingAudience is the hosted-page branding for one audience hint.
+type BrandingAudience struct {
+	// Heading replaces the card heading (up to 120 characters).
+	Heading string `json:"heading,omitempty"`
+	// Subheading replaces the line under the heading (up to 240 characters).
+	Subheading string `json:"subheading,omitempty"`
+	// LogoURL replaces the logo (https).
+	LogoURL string `json:"logoUrl,omitempty"`
+	// PrimaryColor replaces the primary colour (hex, rgb() or a CSS colour name).
+	PrimaryColor string `json:"primaryColor,omitempty"`
 }
 
 // BrandingResponse echoes the stored branding plus the sanitized Resolved shape.

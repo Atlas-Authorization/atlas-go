@@ -18,7 +18,9 @@ import (
 // HMAC-SHA256 over "<id>.<timestamp>.<raw body>" keyed with the endpoint
 // secret (whsec_...), sent with atlas-id and atlas-timestamp (epoch ms). A
 // delivery more than five minutes from now, in either direction, is refused.
-// Verify the RAW body, before any JSON decode. Matches verifyWebhook in
+// The header may carry several space-separated "v1,<base64>" entries (one per
+// secret while a secret rotates with an overlap); the delivery verifies when
+// any one matches. Verify the RAW body, before any JSON decode. Matches verifyWebhook in
 // @atlasauth/backend.
 
 // Webhook header names (matched case-insensitively).
@@ -80,8 +82,8 @@ func VerifyWebhook(body []byte, header http.Header, secret string, opts *Webhook
 	if id == "" || tsRaw == "" || sig == "" {
 		return nil, ErrWebhookMissingHeaders
 	}
-	version, provided, ok := strings.Cut(sig, ",")
-	if !ok || version != "v1" || provided == "" {
+	provided := webhookSignatures(sig)
+	if len(provided) == 0 {
 		return nil, ErrWebhookMalformedSignature
 	}
 	ts, err := strconv.ParseInt(strings.TrimSpace(tsRaw), 10, 64)
@@ -110,7 +112,14 @@ func VerifyWebhook(body []byte, header http.Header, secret string, opts *Webhook
 	mac.Write([]byte(id + "." + strconv.FormatInt(ts, 10) + "."))
 	mac.Write(body)
 	expected := base64.StdEncoding.EncodeToString(mac.Sum(nil))
-	if !hmac.Equal([]byte(expected), []byte(provided)) {
+	// Compare every entry (no early exit), each in constant time.
+	matched := false
+	for _, candidate := range provided {
+		if hmac.Equal([]byte(expected), []byte(candidate)) {
+			matched = true
+		}
+	}
+	if !matched {
 		return nil, ErrWebhookSignatureMismatch
 	}
 
@@ -120,4 +129,19 @@ func VerifyWebhook(body []byte, header http.Header, secret string, opts *Webhook
 		out.Event = &event
 	}
 	return out, nil
+}
+
+// webhookSignatures returns the v1 signatures in an atlas-signature header: one
+// "v1,<base64>" entry, or several separated by spaces (while an endpoint secret
+// rotates, Atlas signs with the old and the new secret). Entries of another
+// version are skipped.
+func webhookSignatures(header string) []string {
+	var out []string
+	for _, entry := range strings.Fields(header) {
+		version, value, ok := strings.Cut(entry, ",")
+		if ok && version == "v1" && value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }

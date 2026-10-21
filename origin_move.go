@@ -191,7 +191,7 @@ func (s *InstanceService) DeleteForumulateIntegration(ctx context.Context, opts 
 
 // ManagedEmailRecord is a DNS record to publish for the managed sending domain.
 type ManagedEmailRecord struct {
-	// Purpose is dkim, spf, return_path or other.
+	// Purpose is dkim, spf, return_path, ownership, dmarc or other.
 	Purpose string `json:"purpose"`
 	// Type is TXT, MX or CNAME.
 	Type     string `json:"type"`
@@ -201,20 +201,29 @@ type ManagedEmailRecord struct {
 	Status   string `json:"status,omitempty"`
 }
 
-// ManagedEmail is Atlas-managed email: your own sending domain on Atlas's
-// email account. Email sends only once Verified.
+// ManagedEmail is managed email: Atlas sets your sending domain up on your own
+// Resend or Brevo account and sends through your key. Email sends only once
+// Verified.
 type ManagedEmail struct {
-	Object      string  `json:"object"`
-	ID          string  `json:"id"`
-	FromAddress string  `json:"from_address"`
-	Domain      string  `json:"domain"`
-	Provider    string  `json:"provider"`
-	Region      *string `json:"region"`
+	Object      string `json:"object"`
+	ID          string `json:"id"`
+	FromAddress string `json:"from_address"`
+	Domain      string `json:"domain"`
+	Provider    string `json:"provider"`
+	// Backend is the email service the domain lives on: resend or brevo.
+	Backend string `json:"backend,omitempty"`
+	// ProviderID is your email provider (mode managed_domain) that holds the key.
+	ProviderID *string `json:"provider_id,omitempty"`
+	// FeedbackWebhook is, on a Brevo create, registered or not_registered.
+	FeedbackWebhook string  `json:"feedback_webhook,omitempty"`
+	Region          *string `json:"region"`
 	// Status is not_started, pending, verified, failed or temporary_failure.
 	Status   string               `json:"status"`
 	Verified bool                 `json:"verified"`
 	Records  []ManagedEmailRecord `json:"records"`
-	Limits   struct {
+	// Limits is null now (no Atlas sending limits apply; your provider
+	// account's do), so it reads as zero. Servers before 2026-10 sent it.
+	Limits struct {
 		Hourly int `json:"hourly"`
 		Daily  int `json:"daily"`
 	} `json:"limits"`
@@ -225,6 +234,7 @@ type ManagedEmail struct {
 		LastBounceAt    *int64 `json:"last_bounce_at"`
 		LastComplaintAt *int64 `json:"last_complaint_at"`
 	} `json:"usage"`
+	// Reputation is your_provider_account.
 	Reputation string `json:"reputation"`
 	// DNS is the DNS automation (the token is never returned), or nil.
 	DNS           *CustomDomainDNS `json:"dns"`
@@ -242,10 +252,25 @@ type ManagedEmail struct {
 type CreateManagedEmailParams struct {
 	// FromAddress is bare or "Name <address>"; its domain is the sending domain.
 	FromAddress string `json:"from_address"`
-	// Region is us-east-1, eu-west-1, sa-east-1 or ap-northeast-1.
+	// Transport is your own provider account Atlas sets the domain up on:
+	// resend or brevo. Send it with Config, unless ProviderID is given.
+	Transport string `json:"transport,omitempty"`
+	// Config carries your provider API key (write-only).
+	Config *ManagedEmailProviderKey `json:"config,omitempty"`
+	// ProviderID is, instead of Transport + Config, your configured Resend or
+	// Brevo email provider.
+	ProviderID string `json:"provider_id,omitempty"`
+	// Region is us-east-1, eu-west-1, sa-east-1 or ap-northeast-1 (Resend only).
 	Region string `json:"region,omitempty"`
 	// DNS has Atlas write the records itself (the token is write-only).
 	DNS *CustomDomainDNSParams `json:"dns,omitempty"`
+}
+
+// ManagedEmailProviderKey is the provider API key managed email uses.
+type ManagedEmailProviderKey struct {
+	// APIKey is your Resend (re_...) or Brevo (xkeysib-...) API key, with
+	// domain permissions. Write-only.
+	APIKey string `json:"api_key"`
 }
 
 // DeletedManagedEmail acknowledges removing managed email.
@@ -253,6 +278,80 @@ type DeletedManagedEmail struct {
 	Object  string `json:"object"`
 	Domain  string `json:"domain"`
 	Deleted bool   `json:"deleted"`
+	// ProviderRemoved says whether the email provider that held the key (mode
+	// managed_domain) was removed too.
+	ProviderRemoved bool `json:"provider_removed,omitempty"`
+}
+
+// DevelopmentEmail is your own email provider in development mode: a
+// development instance sends Atlas's sign-in emails without a verified domain.
+type DevelopmentEmail struct {
+	Object     string `json:"object"`
+	ProviderID string `json:"provider_id"`
+	Enabled    bool   `json:"enabled"`
+	// Active is whether mail goes out through it now; always false on a
+	// production instance.
+	Active      bool    `json:"active"`
+	Transport   string  `json:"transport"`
+	FromAddress *string `json:"from_address"`
+	// SubjectPrefix is added to every subject: "[Atlas test] ".
+	SubjectPrefix string `json:"subject_prefix"`
+	// Footer is the line added to the end of every message.
+	Footer string `json:"footer"`
+	// Templates are the only emails it sends: Atlas's own sign-in templates.
+	Templates []string `json:"templates"`
+	Limits    struct {
+		Daily              int `json:"daily"`
+		PerRecipientHourly int `json:"per_recipient_hourly"`
+	} `json:"limits"`
+	// Note is present for onboarding@resend.dev: Resend delivers it only to
+	// your Resend account address.
+	Note      string `json:"note,omitempty"`
+	NextStep  string `json:"next_step,omitempty"`
+	UpdatedAt int64  `json:"updated_at"`
+}
+
+// EnableDevelopmentEmailParams is the body of
+// POST /v1/messaging_providers/email/development: ProviderID, or Transport +
+// Config exactly as SetEmail takes them.
+type EnableDevelopmentEmailParams struct {
+	ProviderID string `json:"provider_id,omitempty"`
+	// Transport is resend, ses, smtp, brevo or mailgun.
+	Transport string `json:"transport,omitempty"`
+	// FromAddress is a sender your provider accepts without a verified domain
+	// (default for Resend: onboarding@resend.dev).
+	FromAddress string                 `json:"from_address,omitempty"`
+	Config      map[string]interface{} `json:"config,omitempty"`
+}
+
+// DisabledDevelopmentEmail acknowledges putting the provider back in standard mode.
+type DisabledDevelopmentEmail struct {
+	Object     string `json:"object"`
+	Deleted    bool   `json:"deleted"`
+	ProviderID string `json:"provider_id"`
+	Mode       string `json:"mode"`
+}
+
+// DevelopmentEmail reads the email provider in development mode (404 when it
+// is not). GET /v1/messaging_providers/email/development.
+func (s *MessagingService) DevelopmentEmail(ctx context.Context) (*DevelopmentEmail, error) {
+	out := &DevelopmentEmail{}
+	return out, s.client.get(ctx, "/v1/messaging_providers/email/development", nil, out)
+}
+
+// EnableDevelopmentEmail puts your email provider in development mode. 409
+// DEVELOPMENT_EMAIL_NOT_ALLOWED on a production instance.
+// POST /v1/messaging_providers/email/development.
+func (s *MessagingService) EnableDevelopmentEmail(ctx context.Context, params EnableDevelopmentEmailParams, opts ...RequestOption) (*DevelopmentEmail, error) {
+	out := &DevelopmentEmail{}
+	return out, s.client.post(ctx, "/v1/messaging_providers/email/development", params, out, opts...)
+}
+
+// DisableDevelopmentEmail puts the email provider back in standard mode (the
+// provider and its key stay). DELETE /v1/messaging_providers/email/development.
+func (s *MessagingService) DisableDevelopmentEmail(ctx context.Context, opts ...RequestOption) (*DisabledDevelopmentEmail, error) {
+	out := &DisabledDevelopmentEmail{}
+	return out, s.client.del(ctx, "/v1/messaging_providers/email/development", out, opts...)
 }
 
 // ManagedEmail reads the managed sending domain (404 when none).
@@ -262,8 +361,9 @@ func (s *MessagingService) ManagedEmail(ctx context.Context) (*ManagedEmail, err
 	return out, s.client.get(ctx, "/v1/messaging_providers/email/managed", nil, out)
 }
 
-// CreateManagedEmail registers your sending domain and returns the DNS records
-// to publish. POST /v1/messaging_providers/email/managed.
+// CreateManagedEmail sets your sending domain up on your own Resend or Brevo
+// account (Transport + Config, or ProviderID) and returns the DNS records to
+// publish. POST /v1/messaging_providers/email/managed.
 func (s *MessagingService) CreateManagedEmail(ctx context.Context, params CreateManagedEmailParams, opts ...RequestOption) (*ManagedEmail, error) {
 	out := &ManagedEmail{}
 	return out, s.client.post(ctx, "/v1/messaging_providers/email/managed", params, out, opts...)

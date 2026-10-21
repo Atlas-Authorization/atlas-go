@@ -4,6 +4,41 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.7.0
+
+### Added
+
+- **OAuth client secret rotation with overlap.** `OAuthClients.RotateSecretWithParams(ctx, id,
+  RotateOAuthClientSecretParams{OverlapSeconds: &n})` (default 86400, `0` revokes the old secret now, at most
+  604800). `OAuthClientWithSecret` gains `OverlapSeconds`; `OAuthClient` gains `PreviousSecretExpiresAt`.
+- **Development email sender.** `Messaging.DevelopmentEmail`, `EnableDevelopmentEmail`
+  (`EnableDevelopmentEmailParams`) and `DisableDevelopmentEmail` (`DevelopmentEmail`,
+  `DisabledDevelopmentEmail`). `MessagingProviders` gains `DevelopmentEmail`.
+- **Managed email on your own provider account.** `CreateManagedEmailParams` gains `Transport`, `Config`
+  (`ManagedEmailProviderKey`) and `ProviderID`. `ManagedEmail` gains `Backend`, `ProviderID` and
+  `FeedbackWebhook`; `Limits` is now always null (reads as zero) and `Reputation` is `your_provider_account`.
+  `DeletedManagedEmail` gains `ProviderRemoved`.
+- **Provider mode.** `MessagingProvider` gains `ID` and `Mode`; `MessagingProviderInput` gains `Mode`;
+  `SetEmailProviderWithParams(ctx, EmailProviderParams{FromAddress, Mode, Config})` sets it with a typed config
+  (`ProviderModeStandard`, `ProviderModeDevelopment`, `ProviderModeManagedDomain`).
+- **Allowed origins with an integration.** `AllowedOriginEntries []AllowedOriginEntry` on
+  `UpdateInstanceParams`, `CreatePlatformAppParams`, `UpdatePlatformAppParams`, `CreatePlatformInstanceParams`
+  and `CreateAccountlessAppParams` is sent as `allowed_origins` (a string, or `{origin, integration}` with
+  `OriginIntegrationRedirect`, `OriginIntegrationEmbedded` or `OriginIntegrationAuto`).
+- **Issuer and verification endpoints.** `Instance` gains `Issuer`, `DiscoveryURL`, `JWKSURI` and
+  `AllowedOriginIntegrations`; `InstanceUpdateResult` gains `AllowedOriginIntegrations`; `PlatformApp` gains
+  `FrontendAPIHost`, `Issuer`, `DiscoveryURL`, `JWKSURI` and `AllowedOriginIntegrations`.
+- **Login readiness.** `LoginReadiness` gains `Integration` (`LoginReadinessIntegration`); `LoginReadinessCheck`
+  gains `Applies`.
+- **Email verification.** `EmailAddress` gains `Verification` (`EmailAddressVerification`: `Status`, `Strategy`).
+- **Branding audiences.** `Branding` and `ResolvedBranding` gain `Audiences` (`BrandingAudience`).
+- **Error codes.** `ErrCodeReadOnlyField`, `ErrCodeDevelopmentEmailNotAllowed`,
+  `ErrCodeDevelopmentEmailUnavailable`, `ErrCodeDevelopmentEmailLimitReached`,
+  `ErrCodeDevelopmentEmailTemplateNotAllowed`.
+- **Webhooks, several signatures.** `VerifyWebhook` accepts an `atlas-signature` header with several
+  space-separated `v1,<signature>` entries and verifies when any one matches (each compared in constant time).
+  A single signature works as before.
+
 ## 0.6.0
 
 ### Added

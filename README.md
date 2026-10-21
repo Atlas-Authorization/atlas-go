@@ -319,9 +319,33 @@ for _, c := range preview.Changes {
 // Send the same logout_token your OIDC apps get to another service.
 _, err = atlas.LogoutNotifyEndpoints.Create(ctx, atlasauth.CreateLogoutNotifyEndpointParams{URL: "https://api.example.com/atlas/logout"})
 
-// Send email from your own domain through Atlas, then publish the returned DNS records.
-managed, err := atlas.Messaging.CreateManagedEmail(ctx, atlasauth.CreateManagedEmailParams{FromAddress: "Acme <no-reply@example.com>"})
+// Set your domain up on your own Resend or Brevo account, then publish the returned DNS records.
+managed, err := atlas.Messaging.CreateManagedEmail(ctx, atlasauth.CreateManagedEmailParams{
+	FromAddress: "Acme <no-reply@example.com>",
+	Transport:   "resend",
+	Config:      &atlasauth.ManagedEmailProviderKey{APIKey: os.Getenv("RESEND_API_KEY")},
+})
+
+// A development instance can send sign-in emails through your provider without a verified domain.
+_, err = atlas.Messaging.EnableDevelopmentEmail(ctx, atlasauth.EnableDevelopmentEmailParams{ProviderID: "mp_123"})
 ```
+
+## OAuth client secret rotation
+
+The previous secret keeps working for the overlap (default 24 hours, at most 7 days), so you can deploy the
+new one without downtime. Pass `0` to revoke it now, for example after a leak:
+
+```go
+overlap := 3600
+rotated, err := atlas.OAuthClients.RotateSecretWithParams(ctx, clientID, atlasauth.RotateOAuthClientSecretParams{OverlapSeconds: &overlap})
+// rotated.ClientSecret is shown once; rotated.PreviousSecretExpiresAt says when the old one stops.
+```
+
+## Webhooks
+
+`VerifyWebhook` accepts an `atlas-signature` header that carries several signatures separated by spaces
+(`v1,<sig> v1,<sig>`). While an endpoint secret rotates, Atlas may sign each delivery with the old and the
+new secret; the delivery verifies when any one signature matches.
 
 With a platform key, `Platform.AtlasIDApps.FindUsers(ctx, id, email)` answers a privacy request for one app,
 `RevokeGrant` revokes one person's approval, and `Platform.AtlasIDPublisher` claims and verifies the publisher name
