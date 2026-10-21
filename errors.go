@@ -54,6 +54,12 @@ const (
 	// ErrCodeDevelopmentEmailTemplateNotAllowed: the development sender sends
 	// only Atlas's own sign-in emails (422).
 	ErrCodeDevelopmentEmailTemplateNotAllowed = "DEVELOPMENT_EMAIL_TEMPLATE_NOT_ALLOWED"
+	// ErrCodeReferralsNotConfigured: referrals cannot be enabled until the
+	// provider's needs are set (422; meta names what is missing).
+	ErrCodeReferralsNotConfigured = "REFERRALS_NOT_CONFIGURED"
+	// ErrCodeReferralCodeTaken: another user on the instance already holds that
+	// referral code (409).
+	ErrCodeReferralCodeTaken = "REFERRAL_CODE_TAKEN"
 	// ErrCodePlanInUse: a billing plan cannot be removed while subscriptions
 	// still use it.
 	ErrCodePlanInUse = "PLAN_IN_USE"

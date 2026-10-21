@@ -2,6 +2,7 @@ package atlas
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 )
 
@@ -28,6 +29,69 @@ type User struct {
 	// payloads carry the same value. Apply an update only if its version is
 	// higher than the one you hold.
 	Version int64 `json:"version,omitempty"`
+	// Referral is how the user arrived through a referral program (referral
+	// attribution on), or nil when not referred, not answered yet, or
+	// referrals are off.
+	Referral *UserReferral `json:"referral,omitempty"`
+	// ReferralCode is the user's own referral code, when they are a referrer.
+	ReferralCode *string `json:"referral_code,omitempty"`
+	// ReferralLink is the user's own referral link, when they are a referrer.
+	ReferralLink *string `json:"referral_link,omitempty"`
+}
+
+// UserReferral is the inbound referral the referral platform matched for a user.
+type UserReferral struct {
+	// PartnerID is the platform's id for the referring partner.
+	PartnerID *string `json:"partner_id"`
+	// ReferrerExternalID is the referrer as the platform knows them (your
+	// external_id for that user, or their Atlas id).
+	ReferrerExternalID *string `json:"referrer_external_id"`
+	// ReferrerUserID is the referrer's Atlas user id, when they are a user of
+	// this instance.
+	ReferrerUserID *string `json:"referrer_user_id"`
+	// MatchedVia is how the platform matched the referral, e.g. code, click, coupon.
+	MatchedVia *string `json:"matched_via"`
+	// Status is the platform's own status for the referral.
+	Status *string `json:"status"`
+	// RiskLevel is low, medium or high when Atlas assessed the sign-up.
+	RiskLevel *string `json:"risk_level,omitempty"`
+	// Flagged is true once an admin marked the referral fraudulent.
+	Flagged bool `json:"flagged,omitempty"`
+}
+
+// CreateUserReferral is an imported referral on POST /v1/users. Each id is
+// 3-64 characters of A-Z a-z 0-9 _ -.
+type CreateUserReferral struct {
+	Code    string `json:"code,omitempty"`
+	ClickID string `json:"click_id,omitempty"`
+	AnonID  string `json:"anon_id,omitempty"`
+}
+
+// UserReferralFlag is the result of POST /v1/users/:id/referral/flag.
+type UserReferralFlag struct {
+	Object     string  `json:"object"`
+	UserID     string  `json:"user_id"`
+	Status     string  `json:"status"`
+	Flagged    bool    `json:"flagged"`
+	FlagReason *string `json:"flag_reason"`
+	// FlaggedAt is epoch ms.
+	FlaggedAt *int64  `json:"flagged_at"`
+	RiskLevel *string `json:"risk_level"`
+}
+
+// UserReferralAttributedEvent is the data of a user.referral_attributed
+// webhook: the referral platform answered after user.created was sent.
+type UserReferralAttributedEvent struct {
+	Object string `json:"object"`
+	UserID string `json:"user_id"`
+	// AttributionStatus is attributed, not_referred (no referrer found), failed, ...
+	AttributionStatus string        `json:"attribution_status"`
+	Referral          *UserReferral `json:"referral"`
+	ReferralCode      *string       `json:"referral_code"`
+	ReferralLink      *string       `json:"referral_link"`
+	// SignedUpAt is epoch ms.
+	SignedUpAt int64 `json:"signed_up_at"`
+	UpdatedAt  int64 `json:"updated_at"`
 }
 
 // EmailAddress is a user's email address record.
@@ -96,6 +160,12 @@ type CreateUserParams struct {
 	// Notify says whether the create may notify the user. Unset or false
 	// guarantees no email, SMS or push is sent as a consequence of the create.
 	Notify *bool `json:"notify,omitempty"`
+	// Referral imports how the user arrived; with referral attribution on, the
+	// user is reported to the referral platform.
+	Referral *CreateUserReferral `json:"referral,omitempty"`
+	// ReferralCode is the user's own referral code, unique per instance (409
+	// REFERRAL_CODE_TAKEN).
+	ReferralCode string `json:"referral_code,omitempty"`
 }
 
 // UpdateUserParams is the body of PATCH /v1/users/:id.
@@ -104,6 +174,26 @@ type UpdateUserParams struct {
 	LastName        string   `json:"last_name,omitempty"`
 	PublicMetadata  Metadata `json:"public_metadata,omitempty"`
 	PrivateMetadata Metadata `json:"private_metadata,omitempty"`
+	// ReferralCode sets the user's own referral code, unique per instance (409
+	// REFERRAL_CODE_TAKEN).
+	ReferralCode string `json:"referral_code,omitempty"`
+	// ClearReferralCode sends referral_code: null (removes the user's code).
+	ClearReferralCode bool `json:"-"`
+}
+
+// MarshalJSON sends referral_code: null when ClearReferralCode is set.
+func (p UpdateUserParams) MarshalJSON() ([]byte, error) {
+	type plain UpdateUserParams
+	if !p.ClearReferralCode {
+		return json.Marshal(plain(p))
+	}
+	return marshalWithExtra(plain(p), map[string]interface{}{"referral_code": nil})
+}
+
+// FlagReferralParams is the body of POST /v1/users/:id/referral/flag.
+type FlagReferralParams struct {
+	// Reason (at most 500 characters) is sent to the referral platform.
+	Reason string `json:"reason,omitempty"`
 }
 
 // ReplaceUserMetadataParams is the body of PUT /v1/users/:id/metadata; the named
@@ -172,6 +262,15 @@ func (s *UsersService) Lock(ctx context.Context, id string, durationInSeconds in
 func (s *UsersService) Unlock(ctx context.Context, id string, opts ...RequestOption) (*User, error) {
 	out := &User{}
 	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/unlock", nil, out, opts...)
+}
+
+// FlagReferral marks the user's referral fraudulent: it reads Flagged, the
+// referral platform is sent a fraud_confirmed signal (when referrals are on)
+// and the action is audited; the account is not changed. 404 when the user
+// has no referral. POST /v1/users/:id/referral/flag.
+func (s *UsersService) FlagReferral(ctx context.Context, id string, params FlagReferralParams, opts ...RequestOption) (*UserReferralFlag, error) {
+	out := &UserReferralFlag{}
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/referral/flag", params, out, opts...)
 }
 
 // Delete removes a user. DELETE /v1/users/:id.

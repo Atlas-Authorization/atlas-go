@@ -4,6 +4,39 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.9.0
+
+### Added
+
+- **Referral attribution settings.** New `Referrals` service: `Get(ctx)` and `Update(ctx,
+  UpdateReferralSettingsParams{...})` (`GET`/`PATCH /v1/instance/referrals`; `ReferralSettings`; nested
+  `Security` as `ReferralSecuritySettings` on read and `UpdateReferralSecurityParams` on write; `Clear` sends
+  nullable fields as null), `Test(ctx)` (`ReferralConnectionTest`), `ListCalls(ctx, ListReferralCallsParams{Limit,
+  Status, Kind, UserID})` (`ReferralCall`) and `RetryCall(ctx, id)`. Also `ReferralProvider`,
+  `ReferralProviderCapabilities`, `ReferralConnectionStatus`, `ReferralRisk`.
+- **Users.** `User` gains `Referral` (`UserReferral`: `PartnerID`, `ReferrerExternalID`, `ReferrerUserID`,
+  `MatchedVia`, `Status`, `RiskLevel`, `Flagged`), `ReferralCode` and `ReferralLink`. `CreateUserParams` gains
+  `Referral` (`CreateUserReferral`: `Code`, `ClickID`, `AnonID`) and `ReferralCode`; `UpdateUserParams` gains
+  `ReferralCode` and `ClearReferralCode` (sends null). New `Users.FlagReferral(ctx, id, FlagReferralParams{Reason})`
+  (`UserReferralFlag`).
+- **Webhooks.** `UserReferralAttributedEvent` types the `data` of the new `user.referral_attributed` event.
+- **Error codes.** `ErrCodeReferralsNotConfigured` (422) and `ErrCodeReferralCodeTaken` (409). Preflight can
+  report `referrals_enabled_unverified` and `referrals_without_bot_protection`.
+- **Referral protocol receiver.** `VerifyReferralRequest(body, header, secret, &ReferralVerifyOptions{Path,
+  ExpectedOp})` verifies a call from Atlas to a referral platform (the webhook signature scheme; every call is a
+  POST whose signed body carries `op` and `customerRef`) and returns `ReferralRequest` (`Op`: `ReferralOpSignup`,
+  `ReferralOpErase`, `ReferralOpExport`, `ReferralOpPartner`, `ReferralOpSignal`; typed `Signup`, `Erase`, `Export`,
+  `Partner`, `Signal` payloads; `CustomerRef`, `Test`, `DeliveryID`, `Timestamp`, `IdempotencyKey`). Besides the
+  webhook errors it returns `ErrReferralMalformedBody`, `ErrReferralMissingOp`, `ErrReferralUnknownOp`,
+  `ErrReferralUnknownEndpoint` and `ErrReferralOpMismatch` (the signed `op` does not match the path or
+  `ExpectedOp`). Also `ReferralOpForPath`, `ReferralOpEndpoints`, `ReferralSignupResponse`, `ReferralContext`, the
+  `ReferralSignal*` constants, `ReferralConnectionTestRef` and `ReferralProtocolUserAgent`.
+
+### Changed
+
+- `UpdateUserParams` now has a `MarshalJSON` method; the JSON it sends is unchanged unless you set
+  `ClearReferralCode`.
+
 ## 0.8.0
 
 ### Added

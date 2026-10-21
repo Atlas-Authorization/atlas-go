@@ -380,6 +380,56 @@ With a platform key, `Platform.AtlasIDApps.FindUsers(ctx, id, email)` answers a 
 `RevokeGrant` revokes one person's approval, and `Platform.AtlasIDPublisher` claims and verifies the publisher name
 shown on consent screens.
 
+## Referral attribution
+
+With referral attribution on, Atlas reports every interactive sign-up to your referral platform before
+`user.created` is sent. `User` gains `Referral` (who referred them, or nil), `ReferralCode` and `ReferralLink`.
+
+```go
+on := true
+_, err := c.Referrals.Update(ctx, atlas.UpdateReferralSettingsParams{
+	Enabled:       &on,
+	Provider:      "webhook", // the Atlas referral protocol; or a built-in vendor adapter
+	EndpointURL:   "https://referrals.example.com/atlas",
+	SigningSecret: os.Getenv("REFERRAL_SIGNING_SECRET"),
+	Clear:         []string{"link_template"}, // sent as null
+})
+test, err := c.Referrals.Test(ctx) // OK, HTTPStatus, LatencyMS, Error
+failed, err := c.Referrals.ListCalls(ctx, atlas.ListReferralCallsParams{Status: "failed"})
+_, err = c.Referrals.RetryCall(ctx, failed.Data[0].ID)
+
+_, err = c.Users.Update(ctx, "user_123", atlas.UpdateUserParams{ReferralCode: "ada-1"}) // 409 REFERRAL_CODE_TAKEN
+_, err = c.Users.FlagReferral(ctx, "user_123", atlas.FlagReferralParams{Reason: "self-referral"})
+```
+
+Enabling without what the provider needs is `422 REFERRALS_NOT_CONFIGURED`. A late answer from the platform
+arrives as the `user.referral_attributed` webhook (`UserReferralAttributedEvent`).
+
+A referral platform that implements the Atlas referral protocol verifies Atlas's calls with
+`VerifyReferralRequest`. Every call is a POST signed like a webhook, and its JSON body says which operation
+it is (`op`: `signup`, `erase`, `export`, `partner`, `signal`). Pass the path the call arrived on: a signed
+body whose `op` does not match the endpoint is `ErrReferralOpMismatch`.
+
+```go
+body, _ := io.ReadAll(r.Body)
+req, err := atlas.VerifyReferralRequest(body, r.Header, secret, &atlas.ReferralVerifyOptions{Path: r.URL.Path})
+if err != nil {
+	w.WriteHeader(http.StatusUnauthorized)
+	return
+}
+switch req.Op {
+case atlas.ReferralOpSignup:
+	_ = json.NewEncoder(w).Encode(atlas.ReferralSignupResponse{Referral: match(req.Signup)})
+case atlas.ReferralOpExport:
+	if req.Test {
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+```
+
+A retry of one call keeps its `DeliveryID`; sign-ups are idempotent on `customerRef`, so answer a retry the
+same way.
+
 ## Back-channel logout
 
 Verify the `logout_token` Atlas posts to your `backchannel_logout_uri`
@@ -498,6 +548,7 @@ covered:
 | LTI platforms | `c.LTIPlatforms` | CRUD (LTI 1.3) |
 | FGA | `c.FGA` | stores, models, tuples, check/batch-check/list-objects/expand; `.Store(id)` binding |
 | Instance | `c.Instance` / `c.InstanceSecurity` | config, security kill-switches, write-only secrets |
+| Referrals | `c.Referrals` | referral attribution settings, connection test, call log, retry |
 | Tokens | `c.Tokens` | authoritative online verify |
 | Platform | `c.Platform` | `.Apps`, `.AtlasIDApps` (Sign in with Atlas), `.DesignAssets` (platform key) |
 | Design | `c.Design` | instance + organization design, preview, catalog; `.Assets` image uploads |

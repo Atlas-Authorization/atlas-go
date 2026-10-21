@@ -102,6 +102,7 @@ type Client struct {
 	LTIPlatforms          *LTIPlatformsService
 	Instance              *InstanceService
 	InstanceSecurity      *InstanceSecurityService
+	Referrals             *ReferralsService
 	Tokens                *TokensService
 
 	EmailAddresses             *EmailAddressesService
@@ -249,6 +250,7 @@ func New(secretKey string, opts ...Option) *Client {
 	c.LTIPlatforms = &LTIPlatformsService{client: c}
 	c.Instance = &InstanceService{client: c}
 	c.InstanceSecurity = &InstanceSecurityService{client: c}
+	c.Referrals = &ReferralsService{client: c}
 	c.Tokens = &TokensService{client: c}
 
 	c.EmailAddresses = &EmailAddressesService{client: c}
