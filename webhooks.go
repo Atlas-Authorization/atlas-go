@@ -24,7 +24,11 @@ type WebhookEndpoint struct {
 	// nil when the last delivery succeeded.
 	FailingSince *int64 `json:"failing_since"`
 	DisabledAt   *int64 `json:"disabled_at"`
-	CreatedAt    int64  `json:"created_at"`
+	// PreviousSecretExpiresAt is, while a secret rotation overlap is open,
+	// when the previous secret stops signing deliveries (epoch ms); until then
+	// every delivery carries two signatures. nil otherwise.
+	PreviousSecretExpiresAt *int64 `json:"previous_secret_expires_at,omitempty"`
+	CreatedAt               int64  `json:"created_at"`
 }
 
 // WebhookEndpointWithSecret reveals the signing secret (whsec_...) once, on
@@ -136,9 +140,23 @@ type UpdateWebhookEndpointParams struct {
 type WebhookSecret struct {
 	Object string `json:"object"`
 	Secret string `json:"secret"`
-	// Warning is set on rotation: deliveries signed with the old secret are
-	// rejected immediately.
+	// Warning is set on rotation: what happens to the old secret.
 	Warning string `json:"warning,omitempty"`
+	// OverlapSeconds is, on a rotation, the overlap applied.
+	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
+	// PreviousSecretExpiresAt is, on a rotation, when the previous secret
+	// stops signing deliveries (epoch ms), or nil when it already has.
+	PreviousSecretExpiresAt *int64 `json:"previous_secret_expires_at,omitempty"`
+}
+
+// RotateWebhookSecretParams is the body of
+// POST /v1/webhook_endpoints/:id/rotate_secret.
+type RotateWebhookSecretParams struct {
+	// OverlapSeconds is how long the previous secret keeps signing deliveries
+	// (as a second atlas-signature entry). nil or 0: it stops at once (the
+	// default); at most 604800 (7 days). Set it only once every receiver
+	// verifies with a verifier that accepts several signatures (0.7.0+).
+	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
 }
 
 // WebhookDispatch acknowledges a test send or a redelivery.
@@ -185,8 +203,19 @@ func (s *WebhookEndpointsService) RevealSecret(ctx context.Context, id string, o
 // RotateSecret replaces the signing secret; the new one is revealed once.
 // POST /v1/webhook_endpoints/:id/rotate_secret.
 func (s *WebhookEndpointsService) RotateSecret(ctx context.Context, id string, opts ...RequestOption) (*WebhookSecret, error) {
+	return s.RotateSecretWithParams(ctx, id, RotateWebhookSecretParams{}, opts...)
+}
+
+// RotateSecretWithParams rotates the signing secret with a chosen overlap:
+// for OverlapSeconds every delivery is signed with both secrets, so a verifier
+// holding either passes. POST /v1/webhook_endpoints/:id/rotate_secret.
+func (s *WebhookEndpointsService) RotateSecretWithParams(ctx context.Context, id string, params RotateWebhookSecretParams, opts ...RequestOption) (*WebhookSecret, error) {
 	out := &WebhookSecret{}
-	return out, s.client.post(ctx, "/v1/webhook_endpoints/"+url.PathEscape(id)+"/rotate_secret", nil, out, opts...)
+	if params.OverlapSeconds == nil {
+		// No body, as before: the server default (no overlap).
+		return out, s.client.post(ctx, "/v1/webhook_endpoints/"+url.PathEscape(id)+"/rotate_secret", nil, out, opts...)
+	}
+	return out, s.client.post(ctx, "/v1/webhook_endpoints/"+url.PathEscape(id)+"/rotate_secret", params, out, opts...)
 }
 
 // Test sends a synthetic webhook.test event to this endpoint only.

@@ -347,6 +347,35 @@ rotated, err := atlas.OAuthClients.RotateSecretWithParams(ctx, clientID, atlasau
 (`v1,<sig> v1,<sig>`). While an endpoint secret rotates, Atlas may sign each delivery with the old and the
 new secret; the delivery verifies when any one signature matches.
 
+A rotation stops the old secret at once by default. Pass an overlap (at most 7 days) to keep it signing each
+delivery next to the new one while you deploy; choose an overlap only once every receiver accepts several
+signatures:
+
+```go
+overlap := 3600
+rotated, err := atlas.Webhooks.Endpoints.RotateSecretWithParams(ctx, endpointID, atlasauth.RotateWebhookSecretParams{OverlapSeconds: &overlap})
+// rotated.PreviousSecretExpiresAt says when the old secret stops signing.
+```
+
+## Trusted reverse proxy
+
+If a reverse proxy serves the Frontend API from your own origin, give it a proxy secret. It sends the secret in
+`X-Atlas-Proxy-Secret` and the browser's IP in `X-Atlas-Client-IP`; Atlas then uses that IP for rate limits,
+lockout, risk signals and audit logs.
+
+```go
+created, err := atlas.InstanceSecurity.CreateProxySecret(ctx, atlasauth.CreateProxySecretParams{})
+// created.Secret is shown once; store it in your proxy's environment.
+state, err := atlas.InstanceSecurity.ProxySecret(ctx) // Set, CreatedAt, PreviousExpiresAt (never the secret)
+overlap := 3600
+_, err = atlas.InstanceSecurity.CreateProxySecret(ctx, atlasauth.CreateProxySecretParams{OverlapSeconds: &overlap}) // rotate
+_, err = atlas.InstanceSecurity.DeleteProxySecret(ctx)
+```
+
+Platform rotations take an overlap too: `Platform.Apps.RotateInstanceSecretWithParams` (default 72 hours),
+`Platform.AtlasIDApps.RotateSecretWithParams` (default 24 hours) and
+`Platform.AtlasIDApps.RotateWebhookSecretWithParams` (default 0).
+
 With a platform key, `Platform.AtlasIDApps.FindUsers(ctx, id, email)` answers a privacy request for one app,
 `RevokeGrant` revokes one person's approval, and `Platform.AtlasIDPublisher` claims and verifies the publisher name
 shown on consent screens.

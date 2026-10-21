@@ -4,6 +4,31 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.8.0
+
+### Added
+
+- **Trusted reverse proxy secret.** `InstanceSecurity.ProxySecret(ctx)` (`ProxySecret`: `Set`, `CreatedAt`,
+  `PreviousExpiresAt`, `SecretHeader`, `ClientIPHeader`), `InstanceSecurity.CreateProxySecret(ctx,
+  CreateProxySecretParams{OverlapSeconds: &n})` (`ProxySecretCreated`: adds `Secret`, shown once, and `Rotated`;
+  on a rotation the old secret keeps working for the overlap, default 86400, `0` stops it now) and
+  `InstanceSecurity.DeleteProxySecret(ctx)` (`ProxySecretDeleted`).
+- **Webhook secret rotation with an overlap.** `Webhooks.Endpoints.RotateSecretWithParams(ctx, id,
+  RotateWebhookSecretParams{OverlapSeconds: &n})` (default 0, at most 604800). `WebhookSecret` gains
+  `OverlapSeconds` and `PreviousSecretExpiresAt`; `WebhookEndpoint` gains `PreviousSecretExpiresAt`.
+- **Per-instance platform rotation with an overlap.** `Platform.Apps.RotateInstanceSecretWithParams(ctx, id,
+  instanceID, RotatePlatformSecretParams{OverlapSeconds: &n})` (default 259200, `0` revokes the prior keys now).
+  `PlatformInstanceSecret` gains `AppID`, `InstanceID`, `OverlapSeconds` and `PreviousKeysExpireAt`.
+- **Sign in with Atlas apps.** `Platform.AtlasIDApps.RotateSecretWithParams` (default 24 hours) and
+  `RotateWebhookSecretWithParams` (default 0) take `RotateAtlasIDAppSecretParams`. `AtlasIDApp` gains
+  `PreviousSecretExpiresAt`, `SecretIssuedAt`, `WebhookPreviousSecretExpiresAt` and `OverlapSeconds`.
+
+### Changed
+
+- `PlatformInstanceSecret.ID` is deprecated: the API never sent it; read `InstanceID`.
+- `Platform.Apps.RotateInstanceSecret` without an overlap now keeps the prior keys valid for 72 hours (the
+  server's new default). Use `RotateInstanceSecretWithParams` with `OverlapSeconds: 0` for the old behaviour.
+
 ## 0.7.0
 
 ### Added

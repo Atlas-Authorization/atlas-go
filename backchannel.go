@@ -158,6 +158,14 @@ func (s *AtlasIDAppsService) RotateWebhookSecret(ctx context.Context, id string,
 	return out, s.client.platPost(ctx, "/v1/platform/atlas_id_apps/"+url.PathEscape(id)+"/webhook/rotate_secret", nil, out, opts...)
 }
 
+// RotateWebhookSecretWithParams rotates the webhook signing secret with a
+// chosen overlap: the previous secret signs each delivery too until
+// WebhookPreviousSecretExpiresAt. POST /v1/platform/atlas_id_apps/:id/webhook/rotate_secret.
+func (s *AtlasIDAppsService) RotateWebhookSecretWithParams(ctx context.Context, id string, params RotateAtlasIDAppSecretParams, opts ...RequestOption) (*AtlasIDApp, error) {
+	out := &AtlasIDApp{}
+	return out, s.client.platPost(ctx, "/v1/platform/atlas_id_apps/"+url.PathEscape(id)+"/webhook/rotate_secret", params, out, opts...)
+}
+
 // ── Sign in with Atlas publisher + platform config changelog ────────────────
 
 // AtlasIDPublisherService is /v1/platform/atlas_id_publisher.

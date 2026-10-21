@@ -76,6 +76,49 @@ type KerberosSecretResult struct {
 	Deleted bool   `json:"deleted,omitempty"`
 }
 
+// ProxySecret is the trusted reverse proxy secret's state (never the secret).
+// A proxy that serves the Frontend API from your own origin sends the secret
+// in X-Atlas-Proxy-Secret and the browser's IP in X-Atlas-Client-IP; Atlas
+// then uses that IP for rate limits, lockout, risk signals, geo, audit logs
+// and session metadata.
+type ProxySecret struct {
+	Object string `json:"object"`
+	// Set reports whether a proxy secret is set.
+	Set bool `json:"set"`
+	// CreatedAt is when the current secret was created (epoch ms), or nil.
+	CreatedAt *int64 `json:"created_at"`
+	// PreviousExpiresAt is, after a rotation, when the replaced secret stops
+	// working (epoch ms), or nil.
+	PreviousExpiresAt *int64 `json:"previous_expires_at"`
+	// SecretHeader is X-Atlas-Proxy-Secret.
+	SecretHeader string `json:"secret_header"`
+	// ClientIPHeader is X-Atlas-Client-IP.
+	ClientIPHeader string `json:"client_ip_header"`
+}
+
+// ProxySecretCreated is the create / rotate result: the secret, shown only here.
+type ProxySecretCreated struct {
+	ProxySecret
+	// Secret (aps_...) is returned once; Atlas keeps only a hash.
+	Secret string `json:"secret"`
+	// Rotated is true when an existing secret was replaced.
+	Rotated bool `json:"rotated"`
+}
+
+// CreateProxySecretParams is the body of POST /v1/instance/proxy_secret.
+type CreateProxySecretParams struct {
+	// OverlapSeconds is, on a rotation, how long the replaced secret keeps
+	// working. nil uses the default, 86400 (24 hours); 0 stops it now; at most
+	// 604800 (7 days).
+	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
+}
+
+// ProxySecretDeleted acknowledges DELETE /v1/instance/proxy_secret.
+type ProxySecretDeleted struct {
+	Object  string `json:"object"`
+	Deleted bool   `json:"deleted"`
+}
+
 // LDAPBindPasswordResult acknowledges an LDAP bind-password set/delete.
 type LDAPBindPasswordResult struct {
 	Object       string `json:"object"`
@@ -148,6 +191,28 @@ func (s *InstanceSecurityService) SetKerberosSecret(ctx context.Context, secret 
 func (s *InstanceSecurityService) DeleteKerberosSecret(ctx context.Context, opts ...RequestOption) (*KerberosSecretResult, error) {
 	out := &KerberosSecretResult{}
 	return out, s.client.del(ctx, "/v1/instance/kerberos_secret", out, opts...)
+}
+
+// ProxySecret reports whether a trusted reverse proxy secret is set, and since
+// when. GET /v1/instance/proxy_secret.
+func (s *InstanceSecurityService) ProxySecret(ctx context.Context) (*ProxySecret, error) {
+	out := &ProxySecret{}
+	return out, s.client.get(ctx, "/v1/instance/proxy_secret", nil, out)
+}
+
+// CreateProxySecret creates, or rotates, the trusted reverse proxy secret; the
+// secret is returned once. On a rotation the replaced secret keeps working for
+// params.OverlapSeconds (default 24 hours). POST /v1/instance/proxy_secret.
+func (s *InstanceSecurityService) CreateProxySecret(ctx context.Context, params CreateProxySecretParams, opts ...RequestOption) (*ProxySecretCreated, error) {
+	out := &ProxySecretCreated{}
+	return out, s.client.post(ctx, "/v1/instance/proxy_secret", params, out, opts...)
+}
+
+// DeleteProxySecret removes the proxy secret: X-Atlas-Client-IP is ignored
+// again. DELETE /v1/instance/proxy_secret.
+func (s *InstanceSecurityService) DeleteProxySecret(ctx context.Context, opts ...RequestOption) (*ProxySecretDeleted, error) {
+	out := &ProxySecretDeleted{}
+	return out, s.client.del(ctx, "/v1/instance/proxy_secret", out, opts...)
 }
 
 // SetLDAPBindPassword stores an LDAP connection's bind password.

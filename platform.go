@@ -179,10 +179,36 @@ type PlatformSecretKey struct {
 
 // PlatformInstanceSecret is the result of rotating one instance's secret.
 type PlatformInstanceSecret struct {
-	Object string `json:"object"`
-	ID     string `json:"id"`
+	Object     string `json:"object"`
+	AppID      string `json:"app_id"`
+	InstanceID string `json:"instance_id"`
+	// Deprecated: never sent by the API; read InstanceID.
+	ID string `json:"id,omitempty"`
+	// Secret is the new secret key, revealed exactly once.
 	Secret string `json:"secret"`
-	Note   string `json:"note"`
+	// OverlapSeconds is the overlap applied.
+	OverlapSeconds int `json:"overlap_seconds"`
+	// PreviousKeysExpireAt is when the prior keys stop working (epoch ms); nil
+	// on a hard cut.
+	PreviousKeysExpireAt *int64 `json:"previous_keys_expire_at"`
+	Note                 string `json:"note"`
+}
+
+// RotatePlatformSecretParams is the body of
+// POST /v1/platform/apps/:id/instances/:instanceId/rotate_secret.
+type RotatePlatformSecretParams struct {
+	// OverlapSeconds is how long the prior keys keep working. nil uses the
+	// default, 259200 (72 hours); 0 revokes them now; at most 604800 (7 days).
+	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
+}
+
+// RotateAtlasIDAppSecretParams is the body of the Sign in with Atlas app
+// rotate calls (client secret and webhook secret).
+type RotateAtlasIDAppSecretParams struct {
+	// OverlapSeconds is how long the previous secret keeps working, at most
+	// 604800 (7 days). nil uses the default: 86400 (24 hours) for the client
+	// secret, 0 (stops at once) for the webhook secret. 0 stops it now.
+	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
 }
 
 // CreatePlatformInstanceParams is the body of
@@ -323,11 +349,21 @@ func (s *PlatformAppsService) ListInstances(ctx context.Context, id string) (*Li
 	return out, s.client.platGet(ctx, "/v1/platform/apps/"+url.PathEscape(id)+"/instances", nil, out)
 }
 
-// RotateInstanceSecret revokes one instance's keys and mints a new secret.
+// RotateInstanceSecret mints a new secret key for one instance, revealed once;
+// the prior keys stay valid for the default overlap (72 hours). Use
+// RotateInstanceSecretWithParams to choose it (0 revokes them at once).
 // POST /v1/platform/apps/:id/instances/:instanceId/rotate_secret.
 func (s *PlatformAppsService) RotateInstanceSecret(ctx context.Context, id, instanceID string, opts ...RequestOption) (*PlatformInstanceSecret, error) {
 	out := &PlatformInstanceSecret{}
 	return out, s.client.platPost(ctx, "/v1/platform/apps/"+url.PathEscape(id)+"/instances/"+url.PathEscape(instanceID)+"/rotate_secret", nil, out, opts...)
+}
+
+// RotateInstanceSecretWithParams is RotateInstanceSecret with a chosen overlap.
+// PreviousKeysExpireAt in the response says when the prior keys stop.
+// POST /v1/platform/apps/:id/instances/:instanceId/rotate_secret.
+func (s *PlatformAppsService) RotateInstanceSecretWithParams(ctx context.Context, id, instanceID string, params RotatePlatformSecretParams, opts ...RequestOption) (*PlatformInstanceSecret, error) {
+	out := &PlatformInstanceSecret{}
+	return out, s.client.platPost(ctx, "/v1/platform/apps/"+url.PathEscape(id)+"/instances/"+url.PathEscape(instanceID)+"/rotate_secret", params, out, opts...)
 }
 
 // CreateAccountless mints an app owned by no platform and returns its one-time
@@ -405,6 +441,17 @@ type AtlasIDApp struct {
 	// WebhookSecret is the per-app webhook signing secret, returned exactly
 	// once (first set, or rotated).
 	WebhookSecret string `json:"webhook_secret,omitempty"`
+	// WebhookPreviousSecretExpiresAt is, while a webhook secret rotation
+	// overlap is open, when the previous secret stops signing (epoch ms).
+	WebhookPreviousSecretExpiresAt *int64 `json:"webhook_previous_secret_expires_at,omitempty"`
+	// PreviousSecretExpiresAt is, after a client secret rotation with an
+	// overlap, when the previous secret stops working (epoch ms).
+	PreviousSecretExpiresAt *int64 `json:"previous_secret_expires_at,omitempty"`
+	// SecretIssuedAt is when the current client secret was issued (epoch ms);
+	// nil for a public app.
+	SecretIssuedAt *int64 `json:"secret_issued_at,omitempty"`
+	// OverlapSeconds is, on a rotation, the overlap applied.
+	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
 }
 
 // AtlasIDAppBranding is how the Sign in with Atlas page and consent screen look
@@ -612,6 +659,13 @@ func (s *AtlasIDAppsService) Delete(ctx context.Context, id string, opts ...Requ
 func (s *AtlasIDAppsService) RotateSecret(ctx context.Context, id string, opts ...RequestOption) (*AtlasIDApp, error) {
 	out := &AtlasIDApp{}
 	return out, s.client.platPost(ctx, "/v1/platform/atlas_id_apps/"+url.PathEscape(id)+"/rotate_secret", nil, out, opts...)
+}
+
+// RotateSecretWithParams rotates the client secret with a chosen overlap (0
+// revokes the previous one now). POST /v1/platform/atlas_id_apps/:id/rotate_secret.
+func (s *AtlasIDAppsService) RotateSecretWithParams(ctx context.Context, id string, params RotateAtlasIDAppSecretParams, opts ...RequestOption) (*AtlasIDApp, error) {
+	out := &AtlasIDApp{}
+	return out, s.client.platPost(ctx, "/v1/platform/atlas_id_apps/"+url.PathEscape(id)+"/rotate_secret", params, out, opts...)
 }
 
 // PreviewDesign compiles a Sign in with Atlas page design without saving it.
