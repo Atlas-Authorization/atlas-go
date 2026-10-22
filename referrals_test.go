@@ -237,3 +237,179 @@ func TestReferralOpForPath(t *testing.T) {
 		}
 	}
 }
+
+// TestReferralsV2 covers the v2 settings fields, the ping test, call-log
+// paging, retry_failed, simulate, backfill and the per-user result.
+func TestReferralsV2(t *testing.T) {
+	ctx := context.Background()
+	settings := `{"object":"referral_settings","enabled":true,"provider":"referally","signing_secret_set":true,"api_key_set":false,"url_params":["ref"],"tracking_token":"tt_public_1","code_lookup_url":"https://referrals.example.com/lookup/{code}","signup_code_field":true,"forward_lifecycle":true,"mirror_to_public_metadata":false,"include_referral_claims":true,"connection":{"last_test":null,"last_ping":{"ok":true,"at":7,"http_status":200,"org_name":"Acme","server_time":"2026-10-21T12:00:00.000Z","clock_skew_ms":90000,"clock_skew_warning":true},"alert":{"code":"signature_rejected","message":"401","at":9,"call_id":"rfc_9"},"failed_calls_7d":1,"retrying_calls":0,"last_success_at":null},"providers":[{"id":"referally","name":"Referally","capabilities":{"signup":true,"erase":true,"export":true,"partner":true,"auto_enroll":true,"signal":true,"alias":true,"user":true,"ping":true},"needs":["endpoint_url","connection_id","signing_secret"],"default_context_cookie":"referally_ctx","docs_url":null}]}`
+	c, rec := recordingClient(t, settings)
+	view, err := c.Referrals.Get(ctx)
+	if err != nil || *view.TrackingToken != "tt_public_1" || !view.SignupCodeField || !view.IncludeReferralClaims || view.Connection.Alert == nil || view.Connection.Alert.Code != "signature_rejected" || !view.Connection.LastPing.ClockSkewWarning || *view.Connection.LastPing.ClockSkewMS != 90000 || !view.Providers[0].Capabilities.Ping {
+		t.Fatalf("get = %+v, %v", view, err)
+	}
+	off, on := false, true
+	_, _ = c.Referrals.Update(ctx, UpdateReferralSettingsParams{Provider: "referally", TrackingToken: "tt_public_1", ForwardLifecycle: &off, IncludeReferralClaims: &on, Clear: []string{"code_lookup_url"}})
+	if rec.RawBody != `{"code_lookup_url":null,"forward_lifecycle":false,"include_referral_claims":true,"provider":"referally","tracking_token":"tt_public_1"}` {
+		t.Errorf("update body = %s", rec.RawBody)
+	}
+
+	c, rec = recordingClient(t, `{"ok":true,"http_status":200,"latency_ms":31,"method":"ping","ping":{"ok":true,"org_name":"Acme","program_name":"Acme partners"},"warnings":["clock skew"]}`)
+	tested, err := c.Referrals.Test(ctx)
+	if err != nil || tested.Method != "ping" || *tested.Ping.OrgName != "Acme" || len(tested.Warnings) != 1 {
+		t.Fatalf("test = %+v, %v", tested, err)
+	}
+
+	call := `{"object":"referral_call","id":"rfc_2","kind":"alias","status":"failed","customer_ref":"cust_1","attempts":1,"error_code":"signature_rejected","latency_ms":44,"request_id":"req_1","response":{"ok":false},"highlights":{"matched_via":"code","partner_external_ref":"cust_9","notes":["n"]},"batch_id":"rbf_1","created_at":1,"updated_at":2}`
+	c, rec = recordingClient(t, `{"object":"list","data":[`+call+`],"has_more":true}`)
+	page, err := c.Referrals.ListCalls(ctx, ListReferralCallsParams{Limit: 1000, ErrorCode: "signature_rejected", StartingAfter: "rfc_0"})
+	if err != nil || !page.HasMore || *page.Data[0].ErrorCode != "signature_rejected" || *page.Data[0].BatchID != "rbf_1" || page.Data[0].Highlights.Notes[0] != "n" || *page.Data[0].LatencyMS != 44 {
+		t.Fatalf("list = %+v, %v", page, err)
+	}
+	q, _ := url.ParseQuery(rec.Query)
+	if q.Get("limit") != "1000" || q.Get("error_code") != "signature_rejected" || q.Get("starting_after") != "rfc_0" {
+		t.Errorf("query = %s", rec.Query)
+	}
+
+	c, rec = recordingClient(t, `{"object":"referral_retry","requeued":4}`)
+	retried, err := c.Referrals.RetryFailed(ctx, RetryFailedReferralCallsParams{ErrorCode: "signature_rejected"}, WithIdempotencyKey("k1"))
+	if err != nil || retried.Requeued != 4 || rec.RawBody != `{"error_code":"signature_rejected"}` {
+		t.Fatalf("retry_failed = %+v, %v, %s", retried, err, rec.RawBody)
+	}
+	rec.expect(t, "POST", "/v1/instance/referrals/calls/retry_failed")
+
+	c, rec = recordingClient(t, `{"object":"referral_simulation","ok":true,"call_id":"rfc_5","customer_ref":"atlas_test_abc","http_status":200,"latency_ms":20,"result":{"referral":{"partner_id":"pn_1","partner_external_ref":"cust_9","matched_via":"code","status":"active"},"partner":null,"notes":["matched code"]},"response":{"referral":{}},"error":null}`)
+	sim, err := c.Referrals.Simulate(ctx, ReferralSimulateParams{Code: "ACME10"})
+	if err != nil || !sim.OK || sim.CustomerRef != "atlas_test_abc" || *sim.Result.Referral.PartnerExternalRef != "cust_9" || sim.Result.Notes[0] != "matched code" || rec.RawBody != `{"code":"ACME10"}` {
+		t.Fatalf("simulate = %+v, %v, %s", sim, err, rec.RawBody)
+	}
+	rec.expect(t, "POST", "/v1/instance/referrals/simulate")
+	_, _ = c.Referrals.Simulate(ctx, ReferralSimulateParams{})
+	if rec.RawBody != `{}` {
+		t.Errorf("empty simulate body = %s", rec.RawBody)
+	}
+
+	job := `{"object":"referral_backfill","id":"rbf_1","status":"running","since":1790000000000,"code_metadata_path":null,"codes_given":1,"users_scanned":12,"users_skipped":2,"calls_queued":10,"truncated":false,"next_since":null,"calls":{"pending":10,"succeeded":0,"failed":0,"skipped":0,"held":0},"created_at":1,"finished_at":null}`
+	c, rec = recordingClient(t, job)
+	bf, err := c.Referrals.Backfill(ctx, ReferralBackfillParams{Since: "2026-01-01", Codes: map[string]string{"cust_1": "ACME10"}}, WithIdempotencyKey("k2"))
+	if err != nil || bf.ID != "rbf_1" || bf.Calls.Pending != 10 || rec.RawBody != `{"since":"2026-01-01","codes":{"cust_1":"ACME10"}}` {
+		t.Fatalf("backfill = %+v, %v, %s", bf, err, rec.RawBody)
+	}
+	rec.expect(t, "POST", "/v1/instance/referrals/backfill")
+	if _, err := c.Referrals.GetBackfill(ctx, "rbf_1"); err != nil {
+		t.Fatal(err)
+	}
+	rec.expect(t, "GET", "/v1/instance/referrals/backfill/rbf_1")
+
+	c, rec = recordingClient(t, `{"object":"user_referral","user_id":"user_1","status":"attributed","customer_ref":"cust_1","partner_id":"pn_1","partner_external_ref":"cust_9","referrer_user_id":"user_9","matched_via":"code","referral_status":"active","notes":["matched code"],"referral_code":"ada-1","referral_link":null,"context":{"code":"ACME10"},"risk_level":"low","flagged":false,"hold_reason":null,"signed_up_at":1,"updated_at":2}`)
+	res, err := c.Referrals.GetForUser(ctx, "user_1")
+	if err != nil || res.Status != "attributed" || *res.ReferralStatus != "active" || res.CustomerRef != "cust_1" || res.Context["code"] != "ACME10" {
+		t.Fatalf("get_for_user = %+v, %v", res, err)
+	}
+	rec.expect(t, "GET", "/v1/users/user_1/referral")
+}
+
+// TestUserReferralV2 covers SetExternalID, ClearExternalID and the v2 user referral fields.
+func TestUserReferralV2(t *testing.T) {
+	ctx := context.Background()
+	c, rec := recordingClient(t, `{"object":"user","id":"user_1","external_id":"cust_1","referral":{"status":"pending","partner_id":null,"partner_external_ref":"cust_9","referrer_external_id":"cust_9","referrer_user_id":null,"matched_via":null,"referral_status":"active","notes":["n"],"risk_level":null,"flagged":false}}`)
+	u, err := c.Users.SetExternalID(ctx, "user_1", "cust_1")
+	if err != nil || *u.ExternalID != "cust_1" || *u.Referral.Status != "pending" || *u.Referral.ReferralStatus != "active" || *u.Referral.PartnerExternalRef != "cust_9" || u.Referral.Notes[0] != "n" {
+		t.Fatalf("set external id = %+v, %v", u, err)
+	}
+	rec.expect(t, "PATCH", "/v1/users/user_1")
+	if rec.RawBody != `{"external_id":"cust_1"}` {
+		t.Errorf("body = %s", rec.RawBody)
+	}
+	_, _ = c.Users.SetExternalID(ctx, "user_1", "")
+	if rec.RawBody != `{"external_id":null}` {
+		t.Errorf("clear body = %s", rec.RawBody)
+	}
+	_, _ = c.Users.Update(ctx, "user_1", UpdateUserParams{ClearExternalID: true, ClearReferralCode: true})
+	if rec.RawBody != `{"external_id":null,"referral_code":null}` {
+		t.Errorf("update clear body = %s", rec.RawBody)
+	}
+	_, _ = c.Users.Update(ctx, "user_1", UpdateUserParams{ExternalID: "cust_2"})
+	if rec.RawBody != `{"external_id":"cust_2"}` {
+		t.Errorf("update body = %s", rec.RawBody)
+	}
+	var resolved UserReferralResolvedEvent = *u
+	if resolved.ID != "user_1" {
+		t.Errorf("resolved event = %+v", resolved)
+	}
+}
+
+// TestBeforeUserCreateHook covers get / update / test of the hook.
+func TestBeforeUserCreateHook(t *testing.T) {
+	ctx := context.Background()
+	c, rec := recordingClient(t, `{"object":"before_user_create_hook","enabled":true,"url":"https://app.example.com/hooks/before-create","signing_secret_set":true,"timeout_ms":3000,"last_call":{"at":3,"status":"ok","error":null},"updated_at":3}`)
+	hook, err := c.UserHooks.GetBeforeUserCreate(ctx)
+	if err != nil || !hook.Enabled || !hook.SigningSecretSet || *hook.LastCall.Status != "ok" {
+		t.Fatalf("get = %+v, %v", hook, err)
+	}
+	rec.expect(t, "GET", "/v1/instance/hooks/before_user_create")
+	on := true
+	_, _ = c.UserHooks.UpdateBeforeUserCreate(ctx, UpdateBeforeUserCreateHookParams{Enabled: &on, URL: "https://app.example.com/hooks/before-create", SigningSecret: strings.Repeat("s", 32), TimeoutMS: 2000})
+	rec.expect(t, "PATCH", "/v1/instance/hooks/before_user_create")
+	if rec.RawBody != `{"enabled":true,"url":"https://app.example.com/hooks/before-create","signing_secret":"`+strings.Repeat("s", 32)+`","timeout_ms":2000}` {
+		t.Errorf("update body = %s", rec.RawBody)
+	}
+	_, _ = c.UserHooks.UpdateBeforeUserCreate(ctx, UpdateBeforeUserCreateHookParams{Clear: []string{"url"}})
+	if rec.RawBody != `{"url":null}` {
+		t.Errorf("clear body = %s", rec.RawBody)
+	}
+
+	c, rec = recordingClient(t, `{"ok":true,"latency_ms":12,"answer":{"external_id":"cust_1","public_metadata":null,"private_metadata_set":true,"unsafe_metadata":null}}`)
+	tested, err := c.UserHooks.TestBeforeUserCreate(ctx)
+	if err != nil || !tested.OK || *tested.Answer.ExternalID != "cust_1" || !tested.Answer.PrivateMetadataSet {
+		t.Fatalf("test = %+v, %v", tested, err)
+	}
+	rec.expect(t, "POST", "/v1/instance/hooks/before_user_create/test")
+}
+
+// TestVerifyReferralRequestV2 covers the alias, user and ping operations and
+// the protocol version header.
+func TestVerifyReferralRequestV2(t *testing.T) {
+	alias := `{"op":"alias","customerRef":"cust_1","fromCustomerRef":"user_1","toCustomerRef":"cust_1"}`
+	req, err := verifyRef(t, alias, ReferralVerifyOptions{Path: "/atlas/aliases"})
+	if err != nil || req.Op != ReferralOpAlias || req.Alias == nil || req.Alias.FromCustomerRef != "user_1" || req.CustomerRef != "cust_1" {
+		t.Fatalf("alias = %+v, %v", req, err)
+	}
+	user := `{"op":"user","customerRef":"cust_1","email":"a@example.com","status":"suspended"}`
+	req, err = verifyRef(t, user, ReferralVerifyOptions{Path: "/atlas/users"})
+	if err != nil || req.Op != ReferralOpUser || req.User == nil || req.User.Status != "suspended" || *req.User.Email != "a@example.com" || req.User.Name != nil {
+		t.Fatalf("user = %+v, %v", req, err)
+	}
+	ping := `{"op":"ping","customerRef":"` + ReferralConnectionTestRef + `"}`
+	req, err = verifyRef(t, ping, ReferralVerifyOptions{Path: "/atlas/ping"})
+	if err != nil || req.Op != ReferralOpPing || req.Ping == nil || req.Test || req.CustomerRef != ReferralConnectionTestRef || req.ProtocolVersion != "" {
+		t.Fatalf("ping = %+v, %v", req, err)
+	}
+	if req, err = verifyRef(t, ping, ReferralVerifyOptions{ExpectedOp: ReferralOpPing}); err != nil || req.Op != ReferralOpPing {
+		t.Fatalf("ping expected op = %+v, %v", req, err)
+	}
+	for _, tc := range []struct {
+		body string
+		opts ReferralVerifyOptions
+	}{
+		{alias, ReferralVerifyOptions{Path: "/atlas/users"}},
+		{ping, ReferralVerifyOptions{Path: "/atlas/export"}},
+		{user, ReferralVerifyOptions{ExpectedOp: ReferralOpAlias}},
+	} {
+		if _, err := verifyRef(t, tc.body, tc.opts); !errors.Is(err, ErrReferralOpMismatch) {
+			t.Errorf("%s with %+v: err = %v", tc.body, tc.opts, err)
+		}
+	}
+
+	h := referralHeaders("rfc_3", ping, referralSecret, referralNow.UnixMilli())
+	h.Set(ReferralProtocolVersionHeader, ReferralProtocolVersion)
+	req, err = VerifyReferralRequest([]byte(ping), h, referralSecret, &ReferralVerifyOptions{WebhookVerifyOptions: WebhookVerifyOptions{Now: referralNow}, Path: "/ping"})
+	if err != nil || req.ProtocolVersion != "2026-10-21" {
+		t.Fatalf("version = %+v, %v", req, err)
+	}
+	for in, want := range map[string]string{"/a/aliases": ReferralOpAlias, "/a/users/": ReferralOpUser, "/a/ping?x=1": ReferralOpPing} {
+		if got := ReferralOpForPath(in); got != want {
+			t.Errorf("ReferralOpForPath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

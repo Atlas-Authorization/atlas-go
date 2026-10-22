@@ -30,16 +30,23 @@ type ReferralProviderCapabilities struct {
 	Partner    bool `json:"partner"`
 	AutoEnroll bool `json:"auto_enroll"`
 	Signal     bool `json:"signal"`
+	// Alias re-keys a customer whose external_id changed after sign-up.
+	Alias bool `json:"alias,omitempty"`
+	// User takes user lifecycle updates (email, name, suspension).
+	User bool `json:"user,omitempty"`
+	// Ping answers a ping for the connection test (org, program, clock).
+	Ping bool `json:"ping,omitempty"`
 }
 
 // ReferralProvider is a referral provider Atlas supports.
 type ReferralProvider struct {
-	// ID is "webhook" (the Atlas referral protocol) or a vendor adapter id.
+	// ID is "webhook" (the Atlas referral protocol), "referally" or another
+	// vendor adapter id.
 	ID           string                       `json:"id"`
 	Name         string                       `json:"name"`
 	Capabilities ReferralProviderCapabilities `json:"capabilities"`
 	// Needs lists what must be set before Enabled can be true: endpoint_url,
-	// signing_secret, api_key, connection_id.
+	// signing_secret, api_key, connection_id, tracking_token.
 	Needs                []string `json:"needs"`
 	DefaultContextCookie *string  `json:"default_context_cookie"`
 	DocsURL              *string  `json:"docs_url"`
@@ -77,9 +84,52 @@ type ReferralLastTest struct {
 	Error      *string `json:"error"`
 }
 
+// ReferralPing is what a platform answered to a ping (the connection test,
+// where the provider supports it).
+type ReferralPing struct {
+	OK bool `json:"ok"`
+	// At is epoch ms.
+	At         *int64 `json:"at,omitempty"`
+	HTTPStatus *int   `json:"http_status,omitempty"`
+	// ErrorCode is e.g. signature_rejected, connection_paused, timeout,
+	// network_error, ping_not_ok.
+	ErrorCode    *string `json:"error_code,omitempty"`
+	Error        *string `json:"error,omitempty"`
+	LatencyMS    *int    `json:"latency_ms,omitempty"`
+	ConnectionID *string `json:"connection_id,omitempty"`
+	ProgramID    *string `json:"program_id,omitempty"`
+	ProgramName  *string `json:"program_name,omitempty"`
+	OrgName      *string `json:"org_name,omitempty"`
+	// AutoEnrollUsers is the platform connection's own auto-enrol setting.
+	AutoEnrollUsers *bool `json:"auto_enroll_users,omitempty"`
+	// ServerTime is the platform's clock, as it reported it.
+	ServerTime *string `json:"server_time,omitempty"`
+	// ClockSkewMS is the platform's clock minus Atlas's, in ms. Signed calls
+	// fail past 5 minutes.
+	ClockSkewMS *int64 `json:"clock_skew_ms,omitempty"`
+	// ClockSkewWarning is true when the skew is over 60 seconds.
+	ClockSkewWarning bool `json:"clock_skew_warning,omitempty"`
+}
+
+// ReferralAlert is set while delivery is blocked on something only a person
+// can fix. Show it as a banner.
+type ReferralAlert struct {
+	// Code is signature_rejected (the platform answered 401: a rotated secret
+	// or clock skew) or connection_paused.
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	// At is epoch ms.
+	At     int64   `json:"at"`
+	CallID *string `json:"call_id,omitempty"`
+}
+
 // ReferralConnectionStatus is the connection's health.
 type ReferralConnectionStatus struct {
 	LastTest *ReferralLastTest `json:"last_test"`
+	// LastPing is the last ping, when the provider answers one.
+	LastPing *ReferralPing `json:"last_ping,omitempty"`
+	// Alert is set while delivery is blocked on something only a person can fix.
+	Alert *ReferralAlert `json:"alert,omitempty"`
 	// FailedCalls7d counts calls that failed permanently in the last 7 days.
 	FailedCalls7d int `json:"failed_calls_7d"`
 	// RetryingCalls counts calls waiting for a retry.
@@ -108,6 +158,22 @@ type ReferralSettings struct {
 	LinkTemplate *string                  `json:"link_template"`
 	TimeoutMS    int                      `json:"timeout_ms"`
 	Security     ReferralSecuritySettings `json:"security"`
+	// TrackingToken is the public tracking token (the referally provider
+	// derives the code lookup from it). Not a secret.
+	TrackingToken *string `json:"tracking_token,omitempty"`
+	// CodeLookupURL is a public, CORS-enabled URL template with {code} for
+	// "X invited you" on hosted sign-up.
+	CodeLookupURL *string `json:"code_lookup_url,omitempty"`
+	// SignupCodeField shows an optional "Referral code" field on hosted sign-up.
+	SignupCodeField bool `json:"signup_code_field,omitempty"`
+	// ForwardLifecycle forwards email, name and suspension changes to the
+	// platform (default true).
+	ForwardLifecycle bool `json:"forward_lifecycle,omitempty"`
+	// MirrorToPublicMetadata mirrors the result into public_metadata.referral.
+	MirrorToPublicMetadata bool `json:"mirror_to_public_metadata,omitempty"`
+	// IncludeReferralClaims adds the user's own code as a referral_code claim
+	// to session tokens and ID tokens.
+	IncludeReferralClaims bool `json:"include_referral_claims,omitempty"`
 	// Missing lists what the chosen provider still needs before referrals can be enabled.
 	Missing    []string                  `json:"missing"`
 	Connection *ReferralConnectionStatus `json:"connection"`
@@ -118,7 +184,8 @@ type ReferralSettings struct {
 // UpdateReferralSettingsParams is the body of PATCH /v1/instance/referrals:
 // only the fields set change. Clear names nullable fields to clear (sent as
 // null): endpoint_url, program_id, connection_id, signing_secret, api_key,
-// context_cookie, consent_fallback_category, link_template. Enabling without
+// context_cookie, consent_fallback_category, link_template, tracking_token,
+// code_lookup_url. Enabling without
 // what the provider needs is 422 REFERRALS_NOT_CONFIGURED.
 type UpdateReferralSettingsParams struct {
 	Enabled  *bool  `json:"enabled,omitempty"`
@@ -139,7 +206,15 @@ type UpdateReferralSettingsParams struct {
 	LinkTemplate            string                        `json:"link_template,omitempty"`
 	TimeoutMS               int                           `json:"timeout_ms,omitempty"`
 	Security                *UpdateReferralSecurityParams `json:"security,omitempty"`
-	Clear                   []string                      `json:"-"`
+	// TrackingToken is 1-128 of A-Z a-z 0-9 _ -.
+	TrackingToken string `json:"tracking_token,omitempty"`
+	// CodeLookupURL is an https URL template containing {code}.
+	CodeLookupURL          string   `json:"code_lookup_url,omitempty"`
+	SignupCodeField        *bool    `json:"signup_code_field,omitempty"`
+	ForwardLifecycle       *bool    `json:"forward_lifecycle,omitempty"`
+	MirrorToPublicMetadata *bool    `json:"mirror_to_public_metadata,omitempty"`
+	IncludeReferralClaims  *bool    `json:"include_referral_claims,omitempty"`
+	Clear                  []string `json:"-"`
 }
 
 // MarshalJSON sends the Clear keys as null.
@@ -169,6 +244,162 @@ type ReferralConnectionTest struct {
 	HTTPStatus *int               `json:"http_status"`
 	LatencyMS  *int               `json:"latency_ms"`
 	Error      *ReferralTestError `json:"error,omitempty"`
+	// Method is ping when the platform answered a ping, probe for the signed
+	// export probe.
+	Method string `json:"method,omitempty"`
+	// Ping is the ping answer, when the provider supports ping.
+	Ping *ReferralPing `json:"ping,omitempty"`
+	// Warnings are e.g. a clock more than 60 seconds off.
+	Warnings []string `json:"warnings,omitempty"`
+}
+
+// ReferralSimulateParams is the body of POST /v1/instance/referrals/simulate.
+type ReferralSimulateParams struct {
+	// Code is the referral code to try; empty sends a sign-up with no code.
+	Code string `json:"code,omitempty"`
+}
+
+// ReferralSimulationMatch is the matched referral in a simulation.
+type ReferralSimulationMatch struct {
+	PartnerID          *string `json:"partner_id"`
+	PartnerExternalRef *string `json:"partner_external_ref"`
+	MatchedVia         *string `json:"matched_via"`
+	Status             *string `json:"status"`
+}
+
+// ReferralSimulationPartner is the partner record a simulation returned.
+type ReferralSimulationPartner struct {
+	ID   *string `json:"id"`
+	Code *string `json:"code"`
+	Link *string `json:"link"`
+}
+
+// ReferralSimulationResult is the platform's answer to a simulation, normalised.
+type ReferralSimulationResult struct {
+	Referral *ReferralSimulationMatch   `json:"referral"`
+	Partner  *ReferralSimulationPartner `json:"partner"`
+	Notes    []string                   `json:"notes"`
+}
+
+// ReferralSimulateResult is POST /v1/instance/referrals/simulate: a sign-up
+// call for a made-up user. No user is created.
+type ReferralSimulateResult struct {
+	Object string `json:"object"`
+	OK     bool   `json:"ok"`
+	// CallID is the logged call, in the delivery log.
+	CallID *string `json:"call_id"`
+	// CustomerRef is atlas_test_<random>.
+	CustomerRef string `json:"customer_ref"`
+	HTTPStatus  *int   `json:"http_status"`
+	LatencyMS   *int   `json:"latency_ms"`
+	// Result is nil when the call failed.
+	Result *ReferralSimulationResult `json:"result"`
+	// Response is the platform's raw answer, personal fields removed.
+	Response map[string]interface{} `json:"response"`
+	Error    *ReferralTestError     `json:"error"`
+}
+
+// RetryFailedReferralCallsParams is the body of
+// POST /v1/instance/referrals/calls/retry_failed. Zero values are omitted.
+type RetryFailedReferralCallsParams struct {
+	// Kind is signup, erase, partner, signal, alias or user.
+	Kind string `json:"kind,omitempty"`
+	// ErrorCode is e.g. signature_rejected after replacing the secret.
+	ErrorCode string `json:"error_code,omitempty"`
+}
+
+// ReferralRetryFailedResult is POST /v1/instance/referrals/calls/retry_failed.
+type ReferralRetryFailedResult struct {
+	Object string `json:"object"`
+	// Requeued counts the failed calls queued to send now.
+	Requeued int `json:"requeued"`
+}
+
+// ReferralBackfillParams is the body of POST /v1/instance/referrals/backfill.
+type ReferralBackfillParams struct {
+	// Since is an ISO 8601 date or date-time: users created at or after it.
+	Since string `json:"since"`
+	// Codes maps customerRef (external_id or user id) to a referral code, up
+	// to 10,000. It wins over CodeMetadataPath.
+	Codes map[string]string `json:"codes,omitempty"`
+	// CodeMetadataPath is where each user keeps the code they arrived with,
+	// e.g. public_metadata.referral_code.
+	CodeMetadataPath string `json:"code_metadata_path,omitempty"`
+}
+
+// ReferralBackfillCalls says where a backfill's queued calls stand.
+type ReferralBackfillCalls struct {
+	Pending   int `json:"pending"`
+	Succeeded int `json:"succeeded"`
+	Failed    int `json:"failed"`
+	Skipped   int `json:"skipped"`
+	Held      int `json:"held"`
+}
+
+// ReferralBackfillJob is a backfill job. Users already reported are skipped.
+type ReferralBackfillJob struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// Status is running while any queued call is still to be sent, then completed.
+	Status string `json:"status"`
+	// Since is epoch ms.
+	Since            int64   `json:"since"`
+	CodeMetadataPath *string `json:"code_metadata_path"`
+	// CodesGiven counts the codes given in Codes.
+	CodesGiven   int `json:"codes_given"`
+	UsersScanned int `json:"users_scanned"`
+	// UsersSkipped counts users already reported, or with no code while
+	// auto-enrol is off.
+	UsersSkipped int `json:"users_skipped"`
+	CallsQueued  int `json:"calls_queued"`
+	// Truncated is true when more users matched than one backfill takes: run
+	// again from NextSince.
+	Truncated bool `json:"truncated"`
+	// NextSince is epoch ms, when Truncated.
+	NextSince  *int64                `json:"next_since"`
+	Calls      ReferralBackfillCalls `json:"calls"`
+	CreatedAt  int64                 `json:"created_at"`
+	FinishedAt *int64                `json:"finished_at"`
+}
+
+// UserReferralResult is GET /v1/users/:id/referral: the stored result of a
+// user's referral calls, with no call to the platform.
+type UserReferralResult struct {
+	Object string `json:"object"`
+	UserID string `json:"user_id"`
+	// Status is pending, attributed, none, failed, held or flagged.
+	Status string `json:"status"`
+	// CustomerRef is the id the platform knows the user by: their
+	// external_id, else the Atlas user id.
+	CustomerRef string  `json:"customer_ref"`
+	PartnerID   *string `json:"partner_id"`
+	// PartnerExternalRef is the referrer as the platform knows them.
+	PartnerExternalRef *string `json:"partner_external_ref"`
+	ReferrerUserID     *string `json:"referrer_user_id"`
+	MatchedVia         *string `json:"matched_via"`
+	// ReferralStatus is the platform's own status for the referral.
+	ReferralStatus *string `json:"referral_status"`
+	// Notes are the platform's reasoning notes.
+	Notes        []string `json:"notes"`
+	ReferralCode *string  `json:"referral_code"`
+	ReferralLink *string  `json:"referral_link"`
+	// Context is the referral captured at sign-up, as sent (camelCase).
+	Context   map[string]interface{} `json:"context"`
+	RiskLevel *string                `json:"risk_level"`
+	Flagged   bool                   `json:"flagged"`
+	// HoldReason says why the sign-up report is held, while Status is held.
+	HoldReason *string `json:"hold_reason"`
+	// SignedUpAt and UpdatedAt are epoch ms.
+	SignedUpAt int64 `json:"signed_up_at"`
+	UpdatedAt  int64 `json:"updated_at"`
+}
+
+// ReferralCallHighlights says, for a sign-up call, how the platform matched
+// the referral and why.
+type ReferralCallHighlights struct {
+	MatchedVia         *string  `json:"matched_via"`
+	PartnerExternalRef *string  `json:"partner_external_ref"`
+	Notes              []string `json:"notes"`
 }
 
 // ReferralRisk is the risk verdict sent with a sign-up (camelCase, as on the
@@ -192,7 +423,7 @@ type ReferralCall struct {
 	Object string `json:"object"`
 	// ID is also the signed atlas-id header of every attempt.
 	ID string `json:"id"`
-	// Kind is signup, erase, export, partner, signal or test.
+	// Kind is signup, erase, export, partner, signal, alias, user, ping or test.
 	Kind string `json:"kind"`
 	// Status is pending, succeeded, retrying, failed, held or skipped.
 	Status string `json:"status"`
@@ -207,18 +438,38 @@ type ReferralCall struct {
 	NextAttemptAt *int64        `json:"next_attempt_at"`
 	Risk          *ReferralRisk `json:"risk"`
 	// Payload is what was sent (never secrets).
-	Payload   map[string]interface{} `json:"payload"`
-	CreatedAt int64                  `json:"created_at"`
-	UpdatedAt int64                  `json:"updated_at"`
+	Payload map[string]interface{} `json:"payload"`
+	// LatencyMS is the round trip of the last attempt.
+	LatencyMS *int `json:"latency_ms,omitempty"`
+	// ErrorCode says why the last attempt failed, e.g. signature_rejected
+	// (401, not retried), connection_paused (not retried), rate_limited,
+	// timeout, network_error, alias_conflict, http_<status>.
+	ErrorCode *string `json:"error_code,omitempty"`
+	// Response is the platform's last answer, personal fields removed.
+	Response map[string]interface{} `json:"response,omitempty"`
+	// Highlights (sign-up calls) say how the platform matched and why.
+	Highlights *ReferralCallHighlights `json:"highlights,omitempty"`
+	// RequestID is the platform's request id for its last answer.
+	RequestID *string `json:"request_id,omitempty"`
+	// BatchID is the backfill job that queued the call.
+	BatchID   *string `json:"batch_id,omitempty"`
+	CreatedAt int64   `json:"created_at"`
+	UpdatedAt int64   `json:"updated_at"`
 }
 
 // ListReferralCallsParams filters the call log. Zero values are omitted.
 type ListReferralCallsParams struct {
-	// Limit is 1-200 (default 50), newest first.
+	// Limit is 1-1000 (default 50; servers before referral attribution v2
+	// take at most 200), newest first.
 	Limit  int
 	Status string
 	Kind   string
 	UserID string
+	// ErrorCode keeps only calls whose last failure had this code, e.g.
+	// signature_rejected.
+	ErrorCode string
+	// StartingAfter is the id of the last call of the previous page.
+	StartingAfter string
 }
 
 func (p ListReferralCallsParams) values() url.Values {
@@ -234,6 +485,12 @@ func (p ListReferralCallsParams) values() url.Values {
 	}
 	if p.UserID != "" {
 		q.Set("user_id", p.UserID)
+	}
+	if p.ErrorCode != "" {
+		q.Set("error_code", p.ErrorCode)
+	}
+	if p.StartingAfter != "" {
+		q.Set("starting_after", p.StartingAfter)
 	}
 	return q
 }
@@ -251,8 +508,10 @@ func (s *ReferralsService) Update(ctx context.Context, params UpdateReferralSett
 	return out, s.client.patch(ctx, "/v1/instance/referrals", params, out, opts...)
 }
 
-// Test sends a signed probe to the platform: OK on 2xx or 404; Error.Code
-// signature_rejected on 401/403. POST /v1/instance/referrals/test.
+// Test tests the connection: a ping where the provider answers one (Method
+// ping, with Ping and Warnings such as clock skew), else a signed probe
+// (Method probe: OK on 2xx or 404). Error.Code is signature_rejected on
+// 401/403. POST /v1/instance/referrals/test.
 func (s *ReferralsService) Test(ctx context.Context) (*ReferralConnectionTest, error) {
 	out := &ReferralConnectionTest{}
 	return out, s.client.post(ctx, "/v1/instance/referrals/test", nil, out)
@@ -271,11 +530,49 @@ func (s *ReferralsService) RetryCall(ctx context.Context, id string, opts ...Req
 	return out, s.client.post(ctx, "/v1/instance/referrals/calls/"+url.PathEscape(id)+"/retry", nil, out, opts...)
 }
 
+// RetryFailed re-queues every failed call (not tests) to send now, optionally
+// only one kind or one error code. POST /v1/instance/referrals/calls/retry_failed.
+func (s *ReferralsService) RetryFailed(ctx context.Context, params RetryFailedReferralCallsParams, opts ...RequestOption) (*ReferralRetryFailedResult, error) {
+	out := &ReferralRetryFailedResult{}
+	return out, s.client.post(ctx, "/v1/instance/referrals/calls/retry_failed", params, out, opts...)
+}
+
+// Simulate sends a sign-up call for a made-up user (atlas_test_<random>; no
+// user is created) with an optional code, and returns what the platform
+// answered. POST /v1/instance/referrals/simulate.
+func (s *ReferralsService) Simulate(ctx context.Context, params ReferralSimulateParams) (*ReferralSimulateResult, error) {
+	out := &ReferralSimulateResult{}
+	return out, s.client.post(ctx, "/v1/instance/referrals/simulate", params, out)
+}
+
+// Backfill queues sign-up calls for existing users created at or after Since,
+// with their real sign-up time. Users already reported are skipped. Referrals
+// must be on (422 REFERRALS_NOT_CONFIGURED otherwise). Poll GetBackfill.
+// POST /v1/instance/referrals/backfill.
+func (s *ReferralsService) Backfill(ctx context.Context, params ReferralBackfillParams, opts ...RequestOption) (*ReferralBackfillJob, error) {
+	out := &ReferralBackfillJob{}
+	return out, s.client.post(ctx, "/v1/instance/referrals/backfill", params, out, opts...)
+}
+
+// GetBackfill reads a backfill job. GET /v1/instance/referrals/backfill/:id.
+func (s *ReferralsService) GetBackfill(ctx context.Context, id string) (*ReferralBackfillJob, error) {
+	out := &ReferralBackfillJob{}
+	return out, s.client.get(ctx, "/v1/instance/referrals/backfill/"+url.PathEscape(id), nil, out)
+}
+
+// GetForUser returns the stored referral result for one user (who referred
+// them, how, their own code), with no call to the platform. 404 when the user
+// was never reported. GET /v1/users/:id/referral.
+func (s *ReferralsService) GetForUser(ctx context.Context, userID string) (*UserReferralResult, error) {
+	out := &UserReferralResult{}
+	return out, s.client.get(ctx, "/v1/users/"+url.PathEscape(userID)+"/referral", nil, out)
+}
+
 // ---------------------------------------------------------------------------
 // The Atlas referral protocol, for a referral platform receiving Atlas's calls
 // ---------------------------------------------------------------------------
 
-// The Atlas referral protocol (v1). An Atlas instance with referral
+// The Atlas referral protocol. An Atlas instance with referral
 // attribution on (provider "webhook") calls the platform's base URL. Every
 // call is a signed POST whose JSON body says which operation it is (op) and
 // which customer it is about:
@@ -285,13 +582,16 @@ func (s *ReferralsService) RetryCall(ctx context.Context, id string, opts ...Req
 //	POST {base}/export    {op: export, customerRef, test}                   → 200 JSON (any shape) | 404
 //	POST {base}/partners  {op: partner, customerRef, code, emailHash}       → 2xx | 409 taken | 404/405/501 unsupported
 //	POST {base}/signals   {op: signal, customerRef, type, occurredAt, data} → 2xx | 404/405/501 unsupported
+//	POST {base}/aliases   {op: alias, customerRef, fromCustomerRef, toCustomerRef} → 2xx | 409 (permanent)
+//	POST {base}/users     {op: user, customerRef, email?, name?, status?}  → 2xx
+//	POST {base}/ping      {op: ping, customerRef: atlas_connection_test}    → 200 ReferralPingResponse
 //
 // The connection test is POST {base}/export with {op: export, customerRef:
 // atlas_connection_test, test: true} (answer 2xx or 404). Every call is signed
 // exactly like an Atlas webhook (atlas-id, atlas-timestamp, atlas-signature
-// over "<id>.<timestamp>.<raw body>"), with Idempotency-Key and
-// User-Agent: Atlas-Referrals/1. atlas-id is the call id, the same on every
-// retry.
+// over "<id>.<timestamp>.<raw body>"), with Idempotency-Key,
+// User-Agent: Atlas-Referrals/1 and Atlas-Referrals-Version: 2026-10-21.
+// atlas-id is the call id, the same on every retry.
 //
 // The signature covers the body, not the URL. Pass the path the call arrived
 // on (or the operation you expect): a signed body whose op does not match it
@@ -302,6 +602,11 @@ const (
 	ReferralConnectionTestRef = "atlas_connection_test"
 	// ReferralProtocolUserAgent is the User-Agent Atlas sends on every referral call.
 	ReferralProtocolUserAgent = "Atlas-Referrals/1"
+	// ReferralProtocolVersion is the Atlas-Referrals-Version Atlas sends on
+	// every call; shapes only grow, additively, under it.
+	ReferralProtocolVersion = "2026-10-21"
+	// ReferralProtocolVersionHeader is the name of the version header.
+	ReferralProtocolVersionHeader = "Atlas-Referrals-Version"
 )
 
 // Referral protocol operations (the op of every call, ReferralRequest.Op).
@@ -311,6 +616,9 @@ const (
 	ReferralOpExport  = "export"
 	ReferralOpPartner = "partner"
 	ReferralOpSignal  = "signal"
+	ReferralOpAlias   = "alias"
+	ReferralOpUser    = "user"
+	ReferralOpPing    = "ping"
 )
 
 // ReferralOpEndpoints maps each operation to the endpoint (last path segment)
@@ -321,6 +629,9 @@ var ReferralOpEndpoints = map[string]string{
 	ReferralOpExport:  "export",
 	ReferralOpPartner: "partners",
 	ReferralOpSignal:  "signals",
+	ReferralOpAlias:   "aliases",
+	ReferralOpUser:    "users",
+	ReferralOpPing:    "ping",
 }
 
 // Errors returned by VerifyReferralRequest besides the VerifyWebhook ones.
@@ -405,6 +716,9 @@ type ReferralPartner struct {
 type ReferralSignupResponse struct {
 	Referral *ReferralSignupMatch `json:"referral"`
 	Partner  *ReferralPartner     `json:"partner,omitempty"`
+	// Notes say why you matched or did not (shown in the Atlas delivery log
+	// and on the user).
+	Notes []string `json:"notes,omitempty"`
 }
 
 // ReferralErasePayload is the body of POST {base}/erase.
@@ -441,6 +755,47 @@ type ReferralSignalPayload struct {
 	Data       map[string]interface{} `json:"data"`
 }
 
+// ReferralAliasPayload is the body of POST {base}/aliases: the user's
+// external_id was set or changed after the sign-up call. Re-key the customer
+// from FromCustomerRef (the old value, or the Atlas user id) to
+// ToCustomerRef. CustomerRef equals ToCustomerRef. A 409 is treated as
+// permanent.
+type ReferralAliasPayload struct {
+	Op              string `json:"op"`
+	CustomerRef     string `json:"customerRef"`
+	FromCustomerRef string `json:"fromCustomerRef"`
+	ToCustomerRef   string `json:"toCustomerRef"`
+}
+
+// ReferralUserPayload is the body of POST {base}/users: a lifecycle change.
+// Email / Name are set when they changed; Status is suspended on a ban, active
+// on an unban, deleted on deletion (deletion is also sent to /erase).
+type ReferralUserPayload struct {
+	Op          string  `json:"op"`
+	CustomerRef string  `json:"customerRef"`
+	Email       *string `json:"email,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Status      string  `json:"status,omitempty"`
+}
+
+// ReferralPingPayload is the body of POST {base}/ping: the connection test
+// where the platform supports it.
+type ReferralPingPayload struct {
+	Op          string `json:"op"`
+	CustomerRef string `json:"customerRef"`
+}
+
+// ReferralPingResponse is the answer to a ping. Every field but OK is
+// optional and shown on the Atlas dashboard.
+type ReferralPingResponse struct {
+	OK              bool   `json:"ok"`
+	ProgramName     string `json:"programName,omitempty"`
+	OrgName         string `json:"orgName,omitempty"`
+	AutoEnrollUsers *bool  `json:"autoEnrollUsers,omitempty"`
+	// ServerTime is ISO 8601. Atlas warns when it is more than 60 seconds off.
+	ServerTime string `json:"serverTime,omitempty"`
+}
+
 // ReferralRequest is a verified call from Atlas. Exactly one payload field is
 // set, matching Op.
 type ReferralRequest struct {
@@ -455,6 +810,9 @@ type ReferralRequest struct {
 	Export  *ReferralExportPayload
 	Partner *ReferralPartnerPayload
 	Signal  *ReferralSignalPayload
+	Alias   *ReferralAliasPayload
+	User    *ReferralUserPayload
+	Ping    *ReferralPingPayload
 	// Raw is the verified body.
 	Raw []byte
 	// DeliveryID is the signed atlas-id (the call id), the same on every retry.
@@ -463,6 +821,8 @@ type ReferralRequest struct {
 	Timestamp int64
 	// IdempotencyKey is the Idempotency-Key header (not signed).
 	IdempotencyKey string
+	// ProtocolVersion is the Atlas-Referrals-Version header, when sent (not signed).
+	ProtocolVersion string
 }
 
 // ReferralVerifyOptions tunes VerifyReferralRequest. The zero value checks
@@ -470,7 +830,8 @@ type ReferralRequest struct {
 type ReferralVerifyOptions struct {
 	WebhookVerifyOptions
 	// Path is the path (or URL) the call arrived on, e.g. r.URL.Path. Its last
-	// segment (signups, erase, export, partners, signals) must match the signed op.
+	// segment (signups, erase, export, partners, signals, aliases, users, ping)
+	// must match the signed op.
 	Path string
 	// ExpectedOp is the operation this handler serves; the signed op must equal it.
 	ExpectedOp string
@@ -511,6 +872,8 @@ func ReferralOpForPath(path string) string {
 //		_ = json.NewEncoder(w).Encode(attribute(req.Signup)) // a ReferralSignupResponse
 //	case atlas.ReferralOpExport:
 //		if req.Test { w.WriteHeader(404); return }
+//	case atlas.ReferralOpPing:
+//		_ = json.NewEncoder(w).Encode(atlas.ReferralPingResponse{OK: true, ServerTime: time.Now().UTC().Format(time.RFC3339)})
 //	}
 func VerifyReferralRequest(body []byte, header http.Header, secret string, opts *ReferralVerifyOptions) (*ReferralRequest, error) {
 	var hookOpts *WebhookVerifyOptions
@@ -549,11 +912,12 @@ func VerifyReferralRequest(body []byte, header http.Header, secret string, opts 
 		return nil, ErrReferralOpMismatch
 	}
 	out := &ReferralRequest{
-		Op:             op,
-		Raw:            body,
-		DeliveryID:     hook.DeliveryID,
-		Timestamp:      hook.Timestamp,
-		IdempotencyKey: header.Get("Idempotency-Key"),
+		Op:              op,
+		Raw:             body,
+		DeliveryID:      hook.DeliveryID,
+		Timestamp:       hook.Timestamp,
+		IdempotencyKey:  header.Get("Idempotency-Key"),
+		ProtocolVersion: header.Get(ReferralProtocolVersionHeader),
 	}
 	decode := func(v interface{}) error {
 		if err := json.Unmarshal(body, v); err != nil {
@@ -592,6 +956,24 @@ func VerifyReferralRequest(body []byte, header http.Header, secret string, opts 
 			return nil, err
 		}
 		out.Signal, out.CustomerRef = p, p.CustomerRef
+	case ReferralOpAlias:
+		p := &ReferralAliasPayload{}
+		if err := decode(p); err != nil {
+			return nil, err
+		}
+		out.Alias, out.CustomerRef = p, p.CustomerRef
+	case ReferralOpUser:
+		p := &ReferralUserPayload{}
+		if err := decode(p); err != nil {
+			return nil, err
+		}
+		out.User, out.CustomerRef = p, p.CustomerRef
+	case ReferralOpPing:
+		p := &ReferralPingPayload{}
+		if err := decode(p); err != nil {
+			return nil, err
+		}
+		out.Ping, out.CustomerRef = p, p.CustomerRef
 	}
 	return out, nil
 }

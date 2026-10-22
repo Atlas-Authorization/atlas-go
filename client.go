@@ -103,6 +103,7 @@ type Client struct {
 	Instance              *InstanceService
 	InstanceSecurity      *InstanceSecurityService
 	Referrals             *ReferralsService
+	UserHooks             *UserHooksService
 	Tokens                *TokensService
 
 	EmailAddresses             *EmailAddressesService
@@ -251,6 +252,7 @@ func New(secretKey string, opts ...Option) *Client {
 	c.Instance = &InstanceService{client: c}
 	c.InstanceSecurity = &InstanceSecurityService{client: c}
 	c.Referrals = &ReferralsService{client: c}
+	c.UserHooks = &UserHooksService{client: c}
 	c.Tokens = &TokensService{client: c}
 
 	c.EmailAddresses = &EmailAddressesService{client: c}

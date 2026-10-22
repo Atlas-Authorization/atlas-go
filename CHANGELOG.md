@@ -4,6 +4,52 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.10.0
+
+### Added
+
+- **Referral attribution v2.** `Referrals.RetryFailed(ctx, RetryFailedReferralCallsParams{Kind, ErrorCode})`
+  (`POST /v1/instance/referrals/calls/retry_failed`, `ReferralRetryFailedResult` with `Requeued`),
+  `Referrals.Simulate(ctx, ReferralSimulateParams{Code})` (`POST /v1/instance/referrals/simulate`,
+  `ReferralSimulateResult`: `CallID`, `CustomerRef`, `Result`, `Response`), `Referrals.Backfill(ctx,
+  ReferralBackfillParams{Since, Codes, CodeMetadataPath})` and `Referrals.GetBackfill(ctx, id)`
+  (`POST /v1/instance/referrals/backfill`, `GET /v1/instance/referrals/backfill/{id}`; `ReferralBackfillJob`:
+  `UsersScanned`, `UsersSkipped`, `CallsQueued`, `Truncated`, `NextSince`, `Calls`), and
+  `Referrals.GetForUser(ctx, userID)` (`GET /v1/users/{id}/referral`, `UserReferralResult`).
+- **Settings.** `ReferralSettings` gains `TrackingToken`, `CodeLookupURL`, `SignupCodeField`, `ForwardLifecycle`,
+  `MirrorToPublicMetadata` and `IncludeReferralClaims`; `UpdateReferralSettingsParams` gains the same (the
+  booleans as `*bool`; `Clear` takes `tracking_token` and `code_lookup_url`). `Provider` can be `referally`.
+  `ReferralProviderCapabilities` gains `Alias`, `User` and `Ping`. `ReferralConnectionStatus` gains `LastPing`
+  (`ReferralPing`) and `Alert` (`ReferralAlert`: `signature_rejected` or `connection_paused`).
+  `ReferralConnectionTest` gains `Method` (`ping` or `probe`), `Ping` and `Warnings`.
+- **Call log.** `ListReferralCallsParams` gains `ErrorCode` and `StartingAfter`; `Limit` goes up to 1000.
+  `ReferralCall.Kind` adds `alias`, `user` and `ping`; calls gain `LatencyMS`, `ErrorCode`, `Response`,
+  `Highlights` (`ReferralCallHighlights`), `RequestID` and `BatchID`.
+- **Users.** `Users.SetExternalID(ctx, id, externalID)` (`PATCH /v1/users/{id}`; `""` clears; with referrals on,
+  the change is forwarded to the platform as an alias). `UpdateUserParams` gains `ExternalID` and
+  `ClearExternalID`; `User` gains `ExternalID`. `UserReferral` gains `PartnerExternalRef`, `ReferralStatus` and
+  `Notes`. `UserReferralResolvedEvent` (the full `User`) types the `data` of the new `user.referral_resolved`
+  webhook.
+- **before_user_create hook.** New `UserHooks` service: `GetBeforeUserCreate(ctx)`,
+  `UpdateBeforeUserCreate(ctx, UpdateBeforeUserCreateHookParams{Enabled, URL, SigningSecret, TimeoutMS, Clear})`
+  and `TestBeforeUserCreate(ctx)` (`/v1/instance/hooks/before_user_create`; `BeforeUserCreateHook`,
+  `BeforeUserCreateHookTest`). The hook call is signed like a webhook with type `user.before_create`; verify it
+  with `VerifyWebhook`.
+- **Preflight** can report `referrals_secret_invalid`, `referrals_program_inactive`, `referrals_unreachable`,
+  `referrals_clock_skew` and `referrals_external_id_unset`.
+- **Referral protocol receiver.** `VerifyReferralRequest` accepts the operations `ReferralOpAlias` (`/aliases`,
+  `ReferralAliasPayload`), `ReferralOpUser` (`/users`, `ReferralUserPayload`) and `ReferralOpPing` (`/ping`,
+  `ReferralPingPayload`; answer `ReferralPingResponse`), set on `ReferralRequest.Alias`, `.User` and `.Ping`, and
+  returns `ProtocolVersion` (the `Atlas-Referrals-Version` header). `ReferralSignupResponse` gains `Notes`. New
+  constants `ReferralProtocolVersion` (`2026-10-21`) and `ReferralProtocolVersionHeader`.
+
+### Changed
+
+- On the server, `User.Referral.Status` is now where attribution stands (`pending`, `attributed`, `none`, `failed`,
+  `held`, `flagged`); the platform's own status moved to `ReferralStatus`. The user `Referral` is present for every
+  user reported to the platform, and `user.created` carries `status: "pending"` while the platform has not
+  answered.
+
 ## 0.9.0
 
 ### Added

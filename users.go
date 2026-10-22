@@ -11,12 +11,14 @@ type UsersService struct{ client *Client }
 
 // User is a user as the BAPI serves it. private_metadata is never returned.
 type User struct {
-	Object         string   `json:"object"`
-	ID             string   `json:"id"`
-	Username       *string  `json:"username"`
-	FirstName      *string  `json:"first_name"`
-	LastName       *string  `json:"last_name"`
-	ImageURL       *string  `json:"image_url"`
+	Object    string  `json:"object"`
+	ID        string  `json:"id"`
+	Username  *string `json:"username"`
+	FirstName *string `json:"first_name"`
+	LastName  *string `json:"last_name"`
+	ImageURL  *string `json:"image_url"`
+	// ExternalID is your own id for the user, if set (UsersService.SetExternalID).
+	ExternalID     *string  `json:"external_id,omitempty"`
 	PublicMetadata Metadata `json:"public_metadata"`
 	MFAEnabled     bool     `json:"mfa_enabled"`
 	Banned         bool     `json:"banned"`
@@ -29,9 +31,8 @@ type User struct {
 	// payloads carry the same value. Apply an update only if its version is
 	// higher than the one you hold.
 	Version int64 `json:"version,omitempty"`
-	// Referral is how the user arrived through a referral program (referral
-	// attribution on), or nil when not referred, not answered yet, or
-	// referrals are off.
+	// Referral is where the user's referral stands (referral attribution on),
+	// or nil when the user was never reported to the referral platform.
 	Referral *UserReferral `json:"referral,omitempty"`
 	// ReferralCode is the user's own referral code, when they are a referrer.
 	ReferralCode *string `json:"referral_code,omitempty"`
@@ -39,7 +40,8 @@ type User struct {
 	ReferralLink *string `json:"referral_link,omitempty"`
 }
 
-// UserReferral is the inbound referral the referral platform matched for a user.
+// UserReferral is where a user's inbound referral stands and, once
+// attributed, who referred them.
 type UserReferral struct {
 	// PartnerID is the platform's id for the referring partner.
 	PartnerID *string `json:"partner_id"`
@@ -51,8 +53,18 @@ type UserReferral struct {
 	ReferrerUserID *string `json:"referrer_user_id"`
 	// MatchedVia is how the platform matched the referral, e.g. code, click, coupon.
 	MatchedVia *string `json:"matched_via"`
-	// Status is the platform's own status for the referral.
+	// Status is where attribution stands: pending (the platform has not
+	// answered yet), attributed, none, failed, held or flagged. Servers before
+	// referral attribution v2 sent the platform's own status here; that is now
+	// ReferralStatus.
 	Status *string `json:"status"`
+	// PartnerExternalRef is the referrer as the platform knows them (same
+	// value as ReferrerExternalID).
+	PartnerExternalRef *string `json:"partner_external_ref,omitempty"`
+	// ReferralStatus is the platform's own status for the referral, e.g. active.
+	ReferralStatus *string `json:"referral_status,omitempty"`
+	// Notes are the platform's reasoning notes (why it matched, or why not).
+	Notes []string `json:"notes,omitempty"`
 	// RiskLevel is low, medium or high when Atlas assessed the sign-up.
 	RiskLevel *string `json:"risk_level,omitempty"`
 	// Flagged is true once an admin marked the referral fraudulent.
@@ -93,6 +105,11 @@ type UserReferralAttributedEvent struct {
 	SignedUpAt int64 `json:"signed_up_at"`
 	UpdatedAt  int64 `json:"updated_at"`
 }
+
+// UserReferralResolvedEvent is the data of a user.referral_resolved webhook:
+// the full user, sent when a referral that was still pending at user.created
+// reaches its final state (Referral.Status attributed, none or failed).
+type UserReferralResolvedEvent = User
 
 // EmailAddress is a user's email address record.
 type EmailAddress struct {
@@ -179,15 +196,28 @@ type UpdateUserParams struct {
 	ReferralCode string `json:"referral_code,omitempty"`
 	// ClearReferralCode sends referral_code: null (removes the user's code).
 	ClearReferralCode bool `json:"-"`
+	// ExternalID is your own id for the user. With referral attribution on, a
+	// change after sign-up is forwarded to the platform as an alias.
+	ExternalID string `json:"external_id,omitempty"`
+	// ClearExternalID sends external_id: null.
+	ClearExternalID bool `json:"-"`
 }
 
-// MarshalJSON sends referral_code: null when ClearReferralCode is set.
+// MarshalJSON sends referral_code / external_id: null when ClearReferralCode /
+// ClearExternalID is set.
 func (p UpdateUserParams) MarshalJSON() ([]byte, error) {
 	type plain UpdateUserParams
-	if !p.ClearReferralCode {
+	extra := map[string]interface{}{}
+	if p.ClearReferralCode {
+		extra["referral_code"] = nil
+	}
+	if p.ClearExternalID {
+		extra["external_id"] = nil
+	}
+	if len(extra) == 0 {
 		return json.Marshal(plain(p))
 	}
-	return marshalWithExtra(plain(p), map[string]interface{}{"referral_code": nil})
+	return marshalWithExtra(plain(p), extra)
 }
 
 // FlagReferralParams is the body of POST /v1/users/:id/referral/flag.
@@ -227,6 +257,21 @@ func (s *UsersService) Create(ctx context.Context, params CreateUserParams, opts
 func (s *UsersService) Update(ctx context.Context, id string, params UpdateUserParams, opts ...RequestOption) (*User, error) {
 	out := &User{}
 	return out, s.client.patch(ctx, "/v1/users/"+url.PathEscape(id), params, out, opts...)
+}
+
+// SetExternalID sets the user's external_id, or clears it when externalID is
+// "". With referral attribution on, Atlas forwards the change to the referral
+// platform as an alias (old id, or the Atlas user id, to the new one), so
+// later events under your id still match. PATCH /v1/users/:id.
+func (s *UsersService) SetExternalID(ctx context.Context, id string, externalID string, opts ...RequestOption) (*User, error) {
+	var body map[string]interface{}
+	if externalID == "" {
+		body = map[string]interface{}{"external_id": nil}
+	} else {
+		body = map[string]interface{}{"external_id": externalID}
+	}
+	out := &User{}
+	return out, s.client.patch(ctx, "/v1/users/"+url.PathEscape(id), body, out, opts...)
 }
 
 // ReplaceMetadata replaces the named metadata bags wholesale.

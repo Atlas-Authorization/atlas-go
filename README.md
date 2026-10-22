@@ -383,13 +383,15 @@ shown on consent screens.
 ## Referral attribution
 
 With referral attribution on, Atlas reports every interactive sign-up to your referral platform before
-`user.created` is sent. `User` gains `Referral` (who referred them, or nil), `ReferralCode` and `ReferralLink`.
+`user.created` is sent. `User` gains `Referral` (where attribution stands and, once attributed, who referred
+them; nil when the user was never reported), `ReferralCode` and `ReferralLink`. `Referral.Status` is `pending`,
+`attributed`, `none`, `failed`, `held` or `flagged`; the platform's own status is `Referral.ReferralStatus`.
 
 ```go
 on := true
 _, err := c.Referrals.Update(ctx, atlas.UpdateReferralSettingsParams{
 	Enabled:       &on,
-	Provider:      "webhook", // the Atlas referral protocol; or a built-in vendor adapter
+	Provider:      "webhook", // the Atlas referral protocol; or "referally" or another built-in adapter
 	EndpointURL:   "https://referrals.example.com/atlas",
 	SigningSecret: os.Getenv("REFERRAL_SIGNING_SECRET"),
 	Clear:         []string{"link_template"}, // sent as null
@@ -402,12 +404,44 @@ _, err = c.Users.Update(ctx, "user_123", atlas.UpdateUserParams{ReferralCode: "a
 _, err = c.Users.FlagReferral(ctx, "user_123", atlas.FlagReferralParams{Reason: "self-referral"})
 ```
 
-Enabling without what the provider needs is `422 REFERRALS_NOT_CONFIGURED`. A late answer from the platform
-arrives as the `user.referral_attributed` webhook (`UserReferralAttributedEvent`).
+More tools for the connection:
+
+```go
+sim, err := c.Referrals.Simulate(ctx, atlas.ReferralSimulateParams{Code: "ACME10"}) // made-up user, nothing stored
+_, err = c.Referrals.RetryFailed(ctx, atlas.RetryFailedReferralCallsParams{ErrorCode: "signature_rejected"})
+page, err := c.Referrals.ListCalls(ctx, atlas.ListReferralCallsParams{Limit: 1000, ErrorCode: "timeout"})
+for err == nil && page.HasMore {
+	page, err = c.Referrals.ListCalls(ctx, atlas.ListReferralCallsParams{Limit: 1000, StartingAfter: page.Data[len(page.Data)-1].ID})
+}
+job, err := c.Referrals.Backfill(ctx, atlas.ReferralBackfillParams{Since: "2026-01-01", CodeMetadataPath: "public_metadata.referral_code"})
+job, err = c.Referrals.GetBackfill(ctx, job.ID) // running, then completed
+result, err := c.Referrals.GetForUser(ctx, "user_123") // the stored result, no call to the platform
+
+_, err = c.Users.SetExternalID(ctx, "user_123", "cust_42") // forwarded to the platform as an alias
+```
+
+To give each user your own id before the first referral call, turn on the `before_user_create` hook. Atlas then
+sends your endpoint a signed `POST` (verify it with `VerifyWebhook`) of type `user.before_create` for every
+self-service sign-up, and stamps the `external_id` and metadata you answer:
+
+```go
+_, err = c.UserHooks.UpdateBeforeUserCreate(ctx, atlas.UpdateBeforeUserCreateHookParams{
+	Enabled:       &on,
+	URL:           "https://app.example.com/hooks/before-create",
+	SigningSecret: os.Getenv("BEFORE_CREATE_SECRET"),
+})
+tested, err := c.UserHooks.TestBeforeUserCreate(ctx) // OK, Answer, Error
+```
+
+Enabling without what the provider needs is `422 REFERRALS_NOT_CONFIGURED`. When the platform has not answered
+by the time `user.created` is sent, `Referral.Status` is `pending` and the `user.referral_resolved` webhook
+(`UserReferralResolvedEvent`, the full user) follows with `attributed`, `none` or `failed`.
+`user.referral_attributed` (`UserReferralAttributedEvent`) still fires for a late attribution.
 
 A referral platform that implements the Atlas referral protocol verifies Atlas's calls with
 `VerifyReferralRequest`. Every call is a POST signed like a webhook, and its JSON body says which operation
-it is (`op`: `signup`, `erase`, `export`, `partner`, `signal`). Pass the path the call arrived on: a signed
+it is (`op`: `signup`, `erase`, `export`, `partner`, `signal`, `alias`, `user`, `ping`). Pass the path the call
+arrived on: a signed
 body whose `op` does not match the endpoint is `ErrReferralOpMismatch`.
 
 ```go
@@ -424,8 +458,14 @@ case atlas.ReferralOpExport:
 	if req.Test {
 		w.WriteHeader(http.StatusNotFound)
 	}
+case atlas.ReferralOpAlias: // the user's external_id changed: re-key the customer
+	rekey(req.Alias.FromCustomerRef, req.Alias.ToCustomerRef)
+case atlas.ReferralOpPing:
+	_ = json.NewEncoder(w).Encode(atlas.ReferralPingResponse{OK: true, ServerTime: time.Now().UTC().Format(time.RFC3339)})
 }
 ```
+
+`req.ProtocolVersion` is the `Atlas-Referrals-Version` header (`2026-10-21`).
 
 A retry of one call keeps its `DeliveryID`; sign-ups are idempotent on `customerRef`, so answer a retry the
 same way.
@@ -548,7 +588,8 @@ covered:
 | LTI platforms | `c.LTIPlatforms` | CRUD (LTI 1.3) |
 | FGA | `c.FGA` | stores, models, tuples, check/batch-check/list-objects/expand; `.Store(id)` binding |
 | Instance | `c.Instance` / `c.InstanceSecurity` | config, security kill-switches, write-only secrets |
-| Referrals | `c.Referrals` | referral attribution settings, connection test, call log, retry |
+| Referrals | `c.Referrals` | referral attribution settings, connection test, call log, retry, simulate, backfill, per-user result |
+| User hooks | `c.UserHooks` | the `before_user_create` hook: settings and test |
 | Tokens | `c.Tokens` | authoritative online verify |
 | Platform | `c.Platform` | `.Apps`, `.AtlasIDApps` (Sign in with Atlas), `.DesignAssets` (platform key) |
 | Design | `c.Design` | instance + organization design, preview, catalog; `.Assets` image uploads |
