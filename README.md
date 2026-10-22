@@ -470,6 +470,26 @@ case atlas.ReferralOpPing:
 A retry of one call keeps its `DeliveryID`; sign-ups are idempotent on `customerRef`, so answer a retry the
 same way.
 
+### Two-way sync
+
+A provider with the `Inbound` capability can send referral changes made after sign-up back to Atlas. The
+settings report `Inbound.URL` (give it to the platform), `Inbound.SecretSet`, `Inbound.EndpointID` and
+`Inbound.LastEvent` (`At`, `Type`, `Outcome`). Store the platform's event secret with `InboundSecret`
+(write-only, 16-512 characters) and its subscription id with `InboundEndpointID`; clear either through `Clear`.
+
+A platform on the Atlas referral protocol sends a `referral.updated` event to `Inbound.URL`, signed like an Atlas
+webhook with the inbound secret (or the connection's signing secret when none is set):
+
+```go
+e, err := atlas.SignReferralUpdatedEvent(inboundURL, secret, atlas.ReferralUpdatedEvent{
+	CustomerRef: "user_123",
+	ReferralID:  "ref_1",
+	Status:      "qualified",
+}, nil)
+req, err := e.Request(ctx)
+resp, err := http.DefaultClient.Do(req)
+```
+
 ## Back-channel logout
 
 Verify the `logout_token` Atlas posts to your `backchannel_logout_uri`

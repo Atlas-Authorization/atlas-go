@@ -4,6 +4,13 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.11.0
+
+### Added
+
+- **Two-way referral sync.** Referral settings carry two-way sync: `inbound` (`url`, `secret_set`, `endpoint_id`, `last_event`) on reads, write-only `inbound_secret` and `inbound_endpoint_id` on updates (null clears), and provider capability `inbound`. Clear the secret with `Clear: []string{"inbound_secret"}`.
+- `SignReferralUpdatedEvent(...)`: builds and signs a `referral.updated` event for a referral platform reporting changes to `POST /v1/webhooks/referrals/{instance_id}`.
+
 ## 0.10.0
 
 ### Added

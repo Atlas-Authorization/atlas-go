@@ -413,3 +413,54 @@ func TestVerifyReferralRequestV2(t *testing.T) {
 		}
 	}
 }
+
+// TestReferralsInbound covers the two-way sync fields and the referral.updated signer.
+func TestReferralsInbound(t *testing.T) {
+	ctx := context.Background()
+	settings := `{"object":"referral_settings","enabled":true,"provider":"webhook","signing_secret_set":true,"api_key_set":false,"url_params":["ref"],"inbound":{"url":"https://api.example.test/v1/webhooks/referrals/ins_1","secret_set":true,"endpoint_id":"we_1","last_event":{"at":1700000000000,"type":"referral.updated","outcome":"applied"}},"providers":[{"id":"webhook","name":"Atlas referral protocol","capabilities":{"signup":true,"erase":true,"export":true,"partner":true,"auto_enroll":true,"signal":true,"inbound":true},"needs":["endpoint_url","signing_secret"],"default_context_cookie":null,"docs_url":null}]}`
+	c, rec := recordingClient(t, settings)
+	view, err := c.Referrals.Get(ctx)
+	if err != nil || view.Inbound == nil || *view.Inbound.URL != "https://api.example.test/v1/webhooks/referrals/ins_1" || !view.Inbound.SecretSet || *view.Inbound.EndpointID != "we_1" || view.Inbound.LastEvent.Outcome != "applied" || view.Inbound.LastEvent.At != 1700000000000 || !view.Providers[0].Capabilities.Inbound {
+		t.Fatalf("get = %+v, %v", view, err)
+	}
+	_, _ = c.Referrals.Update(ctx, UpdateReferralSettingsParams{InboundSecret: "whsec_" + strings.Repeat("y", 32), InboundEndpointID: "we_1"})
+	if rec.RawBody != `{"inbound_secret":"whsec_`+strings.Repeat("y", 32)+`","inbound_endpoint_id":"we_1"}` {
+		t.Errorf("update body = %s", rec.RawBody)
+	}
+	_, _ = c.Referrals.Update(ctx, UpdateReferralSettingsParams{Clear: []string{"inbound_secret", "inbound_endpoint_id"}})
+	if rec.RawBody != `{"inbound_endpoint_id":null,"inbound_secret":null}` {
+		t.Errorf("clear body = %s", rec.RawBody)
+	}
+
+	inbound := "https://api.example.test/v1/webhooks/referrals/ins_1"
+	e, err := SignReferralUpdatedEvent(inbound, referralSecret, ReferralUpdatedEvent{CustomerRef: "user_1", ReferralID: "ref_1", Status: "qualified", PartnerID: "pn_2"}, &ReferralEventOptions{EventID: "rfe_1", Now: referralNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"type":"referral.updated","occurredAt":"` + referralNow.UTC().Format("2006-01-02T15:04:05.000Z07:00") + `","customerRef":"user_1","referralId":"ref_1","status":"qualified","partnerId":"pn_2"}`
+	if e.URL != inbound || string(e.Body) != want || e.Header.Get("Atlas-Id") != "rfe_1" || e.Header.Get("Atlas-Timestamp") != strconv.FormatInt(referralNow.UnixMilli(), 10) {
+		t.Fatalf("event = %s %s %v", e.URL, e.Body, e.Header)
+	}
+	if e.Header.Get("Atlas-Signature") != referralHeaders("rfe_1", want, referralSecret, referralNow.UnixMilli()).Get("Atlas-Signature") {
+		t.Errorf("signature = %s", e.Header.Get("Atlas-Signature"))
+	}
+	hook, err := VerifyWebhook(e.Body, e.Header, referralSecret, &WebhookVerifyOptions{Now: referralNow})
+	if err != nil || hook.DeliveryID != "rfe_1" {
+		t.Fatalf("verify = %+v, %v", hook, err)
+	}
+	if _, err := VerifyWebhook(e.Body, e.Header, "wrong_secret_wrong_secret", &WebhookVerifyOptions{Now: referralNow}); err == nil {
+		t.Error("wrong secret verified")
+	}
+	req, err := e.Request(ctx)
+	if err != nil || req.Method != http.MethodPost || req.URL.String() != inbound || req.Header.Get("Atlas-Id") != "rfe_1" {
+		t.Fatalf("request = %+v, %v", req, err)
+	}
+
+	e, err = SignReferralUpdatedEvent(inbound, referralSecret, ReferralUpdatedEvent{ReferralID: "ref_1", OccurredAt: "2026-10-20T00:00:00Z"}, nil)
+	if err != nil || !strings.Contains(string(e.Body), `"occurredAt":"2026-10-20T00:00:00Z"`) || !strings.HasPrefix(e.Header.Get("Atlas-Id"), "rfe_") {
+		t.Fatalf("defaults = %s %v, %v", e.Body, e.Header, err)
+	}
+	if _, err := SignReferralUpdatedEvent(inbound, referralSecret, ReferralUpdatedEvent{Status: "qualified"}, nil); !errors.Is(err, ErrReferralEventNoReference) {
+		t.Errorf("no reference err = %v", err)
+	}
+}

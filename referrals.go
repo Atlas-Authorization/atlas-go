@@ -1,13 +1,20 @@
 package atlas
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ReferralsService is the /v1/instance/referrals namespace: the instance's
@@ -17,8 +24,13 @@ import (
 // before user.created is sent and before the session is issued; the answer
 // lands on the user (Referral, ReferralCode, ReferralLink). A slow or failing
 // platform never fails a sign-up: the call is retried, and
-// user.referral_attributed is sent when it resolves. SigningSecret and APIKey
-// are write-only: reads return SigningSecretSet / APIKeySet.
+// user.referral_attributed is sent when it resolves. SigningSecret, APIKey and
+// InboundSecret are write-only: reads return SigningSecretSet / APIKeySet /
+// Inbound.SecretSet.
+//
+// Two-way sync: a provider with the Inbound capability sends referral changes
+// made after sign-up to Inbound.URL; Atlas applies them to the user's referral
+// and reports the latest one in Inbound.LastEvent.
 type ReferralsService struct{ client *Client }
 
 // ReferralProviderCapabilities says what a provider can do. An operation it
@@ -36,6 +48,8 @@ type ReferralProviderCapabilities struct {
 	User bool `json:"user,omitempty"`
 	// Ping answers a ping for the connection test (org, program, clock).
 	Ping bool `json:"ping,omitempty"`
+	// Inbound sends referral changes made after sign-up to Atlas (two-way sync).
+	Inbound bool `json:"inbound,omitempty"`
 }
 
 // ReferralProvider is a referral provider Atlas supports.
@@ -137,6 +151,28 @@ type ReferralConnectionStatus struct {
 	LastSuccessAt *int64 `json:"last_success_at"`
 }
 
+// ReferralInboundEvent is the latest event a platform sent to the inbound URL.
+type ReferralInboundEvent struct {
+	// At is epoch ms (when Atlas received it).
+	At   int64  `json:"at"`
+	Type string `json:"type"`
+	// Outcome is applied, unchanged, stale, unknown_customer, other_program or ignored.
+	Outcome string `json:"outcome"`
+}
+
+// ReferralInboundStatus is two-way sync: where the platform sends referral
+// changes made after sign-up, and the latest one received.
+type ReferralInboundStatus struct {
+	// URL is the URL to give the platform; nil when the provider sends no events.
+	URL *string `json:"url"`
+	// SecretSet says whether an inbound secret is stored (the value is never returned).
+	SecretSet bool `json:"secret_set"`
+	// EndpointID is the platform's id for Atlas's event subscription.
+	EndpointID *string `json:"endpoint_id"`
+	// LastEvent is the latest event received, or nil.
+	LastEvent *ReferralInboundEvent `json:"last_event"`
+}
+
 // ReferralSettings is GET /v1/instance/referrals. Secrets are never returned.
 type ReferralSettings struct {
 	Object   string `json:"object"`
@@ -177,15 +213,18 @@ type ReferralSettings struct {
 	// Missing lists what the chosen provider still needs before referrals can be enabled.
 	Missing    []string                  `json:"missing"`
 	Connection *ReferralConnectionStatus `json:"connection"`
-	Providers  []ReferralProvider        `json:"providers"`
-	UpdatedAt  *int64                    `json:"updated_at"`
+	// Inbound is two-way sync: the URL the platform sends referral changes to
+	// and the latest one received.
+	Inbound   *ReferralInboundStatus `json:"inbound,omitempty"`
+	Providers []ReferralProvider     `json:"providers"`
+	UpdatedAt *int64                 `json:"updated_at"`
 }
 
 // UpdateReferralSettingsParams is the body of PATCH /v1/instance/referrals:
 // only the fields set change. Clear names nullable fields to clear (sent as
 // null): endpoint_url, program_id, connection_id, signing_secret, api_key,
-// context_cookie, consent_fallback_category, link_template, tracking_token,
-// code_lookup_url. Enabling without
+// inbound_secret, inbound_endpoint_id, context_cookie,
+// consent_fallback_category, link_template, tracking_token, code_lookup_url. Enabling without
 // what the provider needs is 422 REFERRALS_NOT_CONFIGURED.
 type UpdateReferralSettingsParams struct {
 	Enabled  *bool  `json:"enabled,omitempty"`
@@ -197,7 +236,14 @@ type UpdateReferralSettingsParams struct {
 	// SigningSecret is write-only, 16-512 characters.
 	SigningSecret string `json:"signing_secret,omitempty"`
 	// APIKey is the write-only vendor API key.
-	APIKey                  string                        `json:"api_key,omitempty"`
+	APIKey string `json:"api_key,omitempty"`
+	// InboundSecret is write-only, 16-512 characters: it verifies the
+	// platform's events to Inbound.URL. Optional for the Atlas referral
+	// protocol (the signing secret is used when unset).
+	InboundSecret string `json:"inbound_secret,omitempty"`
+	// InboundEndpointID is the platform's id for Atlas's event subscription,
+	// kept for reference.
+	InboundEndpointID       string                        `json:"inbound_endpoint_id,omitempty"`
 	URLParams               []string                      `json:"url_params,omitempty"`
 	ContextCookie           string                        `json:"context_cookie,omitempty"`
 	ConsentCategory         string                        `json:"consent_category,omitempty"`
@@ -976,4 +1022,108 @@ func VerifyReferralRequest(body []byte, header http.Header, secret string, opts 
 		out.Ping, out.CustomerRef = p, p.CustomerRef
 	}
 	return out, nil
+}
+
+// ReferralEventUpdated is the type of the event a platform sends to an Atlas
+// instance's inbound URL when a referral changed after sign-up.
+const ReferralEventUpdated = "referral.updated"
+
+// ReferralUpdatedEvent is the body of a referral.updated event (two-way sync).
+// CustomerRef or ReferralID names the referral; empty fields are omitted and
+// stay unchanged on the Atlas side.
+type ReferralUpdatedEvent struct {
+	// Type is always referral.updated (set by SignReferralUpdatedEvent).
+	Type string `json:"type"`
+	// OccurredAt is ISO 8601: when the change happened. Atlas ignores an event
+	// older than the last one applied. Default: the signing time.
+	OccurredAt string `json:"occurredAt"`
+	// CustomerRef is the user's customerRef, as Atlas sent it on sign-up.
+	CustomerRef string `json:"customerRef,omitempty"`
+	// ReferralID is the platform's referral id.
+	ReferralID string `json:"referralId,omitempty"`
+	ProgramID  string `json:"programId,omitempty"`
+	// Status is the referral's status on the platform (e.g. qualified).
+	Status    string `json:"status,omitempty"`
+	PartnerID string `json:"partnerId,omitempty"`
+	// ReferrerExternalRef is the referrer's customerRef, when the referrer is an Atlas user.
+	ReferrerExternalRef string `json:"referrerExternalRef,omitempty"`
+	MatchedVia          string `json:"matchedVia,omitempty"`
+}
+
+// ReferralEventOptions tunes SignReferralUpdatedEvent. The zero value uses a
+// random event id and the current time.
+type ReferralEventOptions struct {
+	// EventID is the atlas-id, the same on every retry of one event.
+	EventID string
+	// Now is the signing time (atlas-timestamp).
+	Now time.Time
+}
+
+// SignedReferralEvent is a ready-to-send signed event.
+type SignedReferralEvent struct {
+	URL    string
+	Header http.Header
+	// Body is the exact signed body.
+	Body []byte
+}
+
+// Request builds the POST to send.
+func (e *SignedReferralEvent) Request(ctx context.Context) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, e.URL, bytes.NewReader(e.Body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header = e.Header.Clone()
+	return req, nil
+}
+
+// ErrReferralEventNoReference: the event has neither CustomerRef nor ReferralID.
+var ErrReferralEventNoReference = errors.New("atlas referral: the event needs CustomerRef or ReferralID")
+
+// SignReferralUpdatedEvent builds a referral.updated event for an Atlas
+// instance's inbound URL (Inbound.URL on the referral settings), signed like
+// an Atlas webhook: atlas-id, atlas-timestamp (ms) and atlas-signature
+// "v1,<base64 HMAC-SHA256 of {id}.{timestamp}.{body}>". secret is the inbound
+// secret, or the connection's signing secret when no inbound secret is set.
+//
+//	e, err := atlas.SignReferralUpdatedEvent(inboundURL, secret, atlas.ReferralUpdatedEvent{CustomerRef: "user_1", Status: "qualified"}, nil)
+//	req, _ := e.Request(ctx)
+//	resp, err := http.DefaultClient.Do(req)
+func SignReferralUpdatedEvent(inboundURL, secret string, event ReferralUpdatedEvent, opts *ReferralEventOptions) (*SignedReferralEvent, error) {
+	if event.CustomerRef == "" && event.ReferralID == "" {
+		return nil, ErrReferralEventNoReference
+	}
+	var o ReferralEventOptions
+	if opts != nil {
+		o = *opts
+	}
+	if o.Now.IsZero() {
+		o.Now = time.Now()
+	}
+	if o.EventID == "" {
+		b := make([]byte, 8)
+		if _, err := rand.Read(b); err != nil {
+			return nil, err
+		}
+		o.EventID = "rfe_" + hex.EncodeToString(b)
+	}
+	event.Type = ReferralEventUpdated
+	if event.OccurredAt == "" {
+		event.OccurredAt = o.Now.UTC().Format("2006-01-02T15:04:05.000Z07:00")
+	}
+	body, err := json.Marshal(event)
+	if err != nil {
+		return nil, err
+	}
+	ts := strconv.FormatInt(o.Now.UnixMilli(), 10)
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(o.EventID + "." + ts + "." + string(body)))
+	h := http.Header{}
+	h.Set("Content-Type", "application/json")
+	h.Set("Atlas-Id", o.EventID)
+	h.Set("Atlas-Timestamp", ts)
+	h.Set("Atlas-Signature", "v1,"+base64.StdEncoding.EncodeToString(mac.Sum(nil)))
+	h.Set("User-Agent", ReferralProtocolUserAgent)
+	h.Set(ReferralProtocolVersionHeader, ReferralProtocolVersion)
+	return &SignedReferralEvent{URL: inboundURL, Header: h, Body: body}, nil
 }
