@@ -202,6 +202,17 @@ type ReferralSettings struct {
 	CodeLookupURL *string `json:"code_lookup_url,omitempty"`
 	// SignupCodeField shows an optional "Referral code" field on hosted sign-up.
 	SignupCodeField bool `json:"signup_code_field,omitempty"`
+	// BrowserSources are the referral programs whose script or cookie the
+	// browser reads, in order (referally, rewardful, tolt, promotekit,
+	// firstpromoter, partnerstack, dub); the provider's default unless set.
+	BrowserSources []string `json:"browser_sources,omitempty"`
+	// BrowserSourcesDefault is true when BrowserSources is the provider's default.
+	BrowserSourcesDefault bool `json:"browser_sources_default,omitempty"`
+	// ConsentProvider is the consent manager that decides on the tracking
+	// cookie's ids: auto (any common one), one manager (cookiemunch, onetrust,
+	// cookiebot, didomi, usercentrics, osano, cookieyes, complianz, klaro, tcf,
+	// consent_mode), or app (only the app's own decision).
+	ConsentProvider string `json:"consent_provider,omitempty"`
 	// ForwardLifecycle forwards email, name and suspension changes to the
 	// platform (default true).
 	ForwardLifecycle bool `json:"forward_lifecycle,omitempty"`
@@ -224,7 +235,8 @@ type ReferralSettings struct {
 // only the fields set change. Clear names nullable fields to clear (sent as
 // null): endpoint_url, program_id, connection_id, signing_secret, api_key,
 // inbound_secret, inbound_endpoint_id, context_cookie,
-// consent_fallback_category, link_template, tracking_token, code_lookup_url. Enabling without
+// consent_fallback_category, link_template, tracking_token, code_lookup_url,
+// browser_sources (null goes back to the provider's default). Enabling without
 // what the provider needs is 422 REFERRALS_NOT_CONFIGURED.
 type UpdateReferralSettingsParams struct {
 	Enabled  *bool  `json:"enabled,omitempty"`
@@ -255,8 +267,13 @@ type UpdateReferralSettingsParams struct {
 	// TrackingToken is 1-128 of A-Z a-z 0-9 _ -.
 	TrackingToken string `json:"tracking_token,omitempty"`
 	// CodeLookupURL is an https URL template containing {code}.
-	CodeLookupURL          string   `json:"code_lookup_url,omitempty"`
-	SignupCodeField        *bool    `json:"signup_code_field,omitempty"`
+	CodeLookupURL   string `json:"code_lookup_url,omitempty"`
+	SignupCodeField *bool  `json:"signup_code_field,omitempty"`
+	// BrowserSources are the programs to read, in order; clear
+	// browser_sources to go back to the provider's default.
+	BrowserSources []string `json:"browser_sources,omitempty"`
+	// ConsentProvider is auto, one consent manager, or app.
+	ConsentProvider        string   `json:"consent_provider,omitempty"`
 	ForwardLifecycle       *bool    `json:"forward_lifecycle,omitempty"`
 	MirrorToPublicMetadata *bool    `json:"mirror_to_public_metadata,omitempty"`
 	IncludeReferralClaims  *bool    `json:"include_referral_claims,omitempty"`

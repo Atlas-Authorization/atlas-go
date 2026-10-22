@@ -414,6 +414,25 @@ func TestVerifyReferralRequestV2(t *testing.T) {
 	}
 }
 
+// TestReferralsBrowserCapture covers browser_sources and consent_provider.
+func TestReferralsBrowserCapture(t *testing.T) {
+	ctx := context.Background()
+	settings := `{"object":"referral_settings","enabled":true,"provider":"dub","signing_secret_set":false,"api_key_set":true,"url_params":["ref"],"browser_sources":["dub"],"browser_sources_default":true,"consent_provider":"onetrust","providers":[]}`
+	c, rec := recordingClient(t, settings)
+	view, err := c.Referrals.Get(ctx)
+	if err != nil || len(view.BrowserSources) != 1 || view.BrowserSources[0] != "dub" || !view.BrowserSourcesDefault || view.ConsentProvider != "onetrust" {
+		t.Fatalf("get = %+v, %v", view, err)
+	}
+	_, _ = c.Referrals.Update(ctx, UpdateReferralSettingsParams{BrowserSources: []string{"rewardful", "dub"}, ConsentProvider: "app"})
+	if rec.RawBody != `{"browser_sources":["rewardful","dub"],"consent_provider":"app"}` {
+		t.Errorf("update body = %s", rec.RawBody)
+	}
+	_, _ = c.Referrals.Update(ctx, UpdateReferralSettingsParams{Clear: []string{"browser_sources"}})
+	if rec.RawBody != `{"browser_sources":null}` {
+		t.Errorf("clear body = %s", rec.RawBody)
+	}
+}
+
 // TestReferralsInbound covers the two-way sync fields and the referral.updated signer.
 func TestReferralsInbound(t *testing.T) {
 	ctx := context.Background()

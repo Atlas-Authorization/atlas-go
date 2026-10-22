@@ -470,6 +470,11 @@ case atlas.ReferralOpPing:
 A retry of one call keeps its `DeliveryID`; sign-ups are idempotent on `customerRef`, so answer a retry the
 same way.
 
+Browser capture: `BrowserSources` lists the referral programs whose script or cookie the browser reads
+(`Clear: []string{"browser_sources"}` goes back to the provider's default, reported by
+`BrowserSourcesDefault`), and `ConsentProvider` picks the consent manager that decides (`auto`, one manager,
+or `app`).
+
 ### Two-way sync
 
 A provider with the `Inbound` capability can send referral changes made after sign-up back to Atlas. The
