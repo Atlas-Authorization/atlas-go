@@ -113,3 +113,9 @@ func RequireAccessToken(v *atlas.AccessTokenVerifier, extraScopes ...string) fun
 		})
 	}
 }
+
+// BetterAuthBridge returns net/http middleware for a Better Auth cutover (see
+// atlas.BetterAuthBridge.Middleware). Put it before RequireAuth / Optional.
+func BetterAuthBridge(b *atlas.BetterAuthBridge) func(http.Handler) http.Handler {
+	return b.Middleware
+}

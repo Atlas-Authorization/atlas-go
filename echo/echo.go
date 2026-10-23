@@ -45,3 +45,19 @@ func FromEcho(c echo.Context) (*atlas.SessionClaims, bool) {
 	claims, ok := c.Get(ContextKey).(*atlas.SessionClaims)
 	return claims, ok
 }
+
+// BetterAuthBridge returns an Echo middleware for a Better Auth cutover: a
+// GET/HEAD carrying a Better Auth session cookie and no Atlas session is
+// exchanged once for an Atlas session and redirected to the same URL signed in
+// (or to the bridge's SignInURL when a second factor is owed). Put it before
+// Auth. Build the bridge with atlas.NewBetterAuthBridge.
+func BetterAuthBridge(b *atlas.BetterAuthBridge) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if b.Handle(c.Response(), c.Request()) {
+				return nil
+			}
+			return next(c)
+		}
+	}
+}

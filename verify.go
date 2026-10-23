@@ -324,13 +324,25 @@ type AtlasBackendOptions struct {
 	// TTLMS / RefetchIntervalMS override the JWKS cache tuning.
 	TTLMS             int64
 	RefetchIntervalMS int64
+	// LegacyIssuers: cutover from another auth provider (Better Auth). Tokens
+	// from these issuers are ALSO accepted until each one's Until, verified
+	// against that issuer's own key set, with sub mapped to the Atlas user id
+	// (the old id is the user's external_id). The claims then carry Sub = the
+	// Atlas id and Raw["external_id"] / Raw["legacy"] ({kind, issuer, sub}).
+	// Atlas tokens are unaffected.
+	LegacyIssuers []LegacyIssuer
+	// SecretKey and APIURL (default DefaultAPIURL) drive the default
+	// LegacyIssuers subject lookup (GET /v1/users?external_id=).
+	SecretKey string
+	APIURL    string
 }
 
 // AtlasBackend verifies Atlas session JWTs locally against the instance JWKS,
 // with caching. Construct it with NewAtlasBackend.
 type AtlasBackend struct {
-	opts AtlasBackendOptions
-	jwks *JWKSCache
+	opts   AtlasBackendOptions
+	jwks   *JWKSCache
+	legacy *legacyVerifier
 }
 
 // NewAtlasBackend builds a verifier. JWKSURL and Issuer are required.
@@ -341,7 +353,7 @@ func NewAtlasBackend(opts AtlasBackendOptions) (*AtlasBackend, error) {
 	if opts.Issuer == "" {
 		return nil, errors.New("atlas: NewAtlasBackend requires Issuer")
 	}
-	return &AtlasBackend{
+	b := &AtlasBackend{
 		opts: opts,
 		jwks: NewJWKSCache(JWKSCacheOptions{
 			URL:               opts.JWKSURL,
@@ -350,7 +362,15 @@ func NewAtlasBackend(opts AtlasBackendOptions) (*AtlasBackend, error) {
 			TTLMS:             opts.TTLMS,
 			RefetchIntervalMS: opts.RefetchIntervalMS,
 		}),
-	}, nil
+	}
+	if len(opts.LegacyIssuers) > 0 {
+		legacy, err := newLegacyVerifier(opts, b.now)
+		if err != nil {
+			return nil, err
+		}
+		b.legacy = legacy
+	}
+	return b, nil
 }
 
 // JWKS exposes the underlying cache (for LastOutcome / Snapshot assertions).
@@ -386,6 +406,22 @@ func (b *AtlasBackend) Verify(ctx context.Context, token string) (*SessionClaims
 	parts := strings.Split(token, ".")
 	if token == "" || len(parts) != 3 {
 		return nil, ErrMalformed
+	}
+
+	// A token from a configured legacy issuer (inside its window) is verified
+	// against THAT issuer's keys only, never the Atlas keys: the iss routes, the
+	// signature decides.
+	if b.legacy != nil {
+		if entry := b.legacy.match(peekIssuer(token)); entry != nil {
+			claims, err := b.legacy.verify(ctx, token, entry)
+			if err != nil {
+				return nil, err
+			}
+			if len(b.opts.AuthorizedParties) > 0 && claims.Azp != "" && !contains(b.opts.AuthorizedParties, claims.Azp) {
+				return nil, ErrUnauthorizedParty
+			}
+			return claims, nil
+		}
 	}
 
 	set := b.jwks.get(ctx, readKID(token))

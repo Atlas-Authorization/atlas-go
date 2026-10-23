@@ -4,6 +4,14 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.15.0 — 2026-10-24
+
+### Added
+
+- **Migrate from Better Auth: sealed-bundle imports.** `Client.BetterAuthImports`: `GetPublicKey`, `RotatePublicKey`, `Create`, `List`, `Get`, `UploadPart` (text/plain), `Finalize`, `DryRun`, `Apply` (resumes a failed import), `Delete`, `ListJWKS`, `DeleteJWK`. Helpers: `Upload(ctx, bundle, UploadBetterAuthBundleOptions{Options, PartBytes, OnPart})` creates the import, uploads the bundle in line-aligned parts of at most 8 MiB (`SplitBundleParts`, `BetterAuthImportPartBytes`) and finalizes it; `WaitFor(ctx, id, WaitForBetterAuthImportOptions{Interval, Timeout, OnProgress})` polls until the import leaves `analyzing` / `queued` / `applying` (honours the context). Typed `BetterAuthImport`, `BetterAuthImportKey`, `BetterAuthImportOptions`, `BetterAuthImportReport`, `ImportedJWK`, status constants.
+- **Better Auth session bridge.** `Client.BetterAuthBridge`: `Get` / `Update` (`UpdateBetterAuthBridgeParams`, merged; `ClearEndsAt`, live-fallback `ClearSecret` / `ClearBaseURL` send nulls; the secret is write-only) / `Delete`, and `Exchange` on the secret-key Backend API route, forwarding the end user's IP and user agent (`X-Atlas-Client-IP`, `X-Atlas-Client-User-Agent`). `Client.ExchangeBetterAuthSession` classifies the outcome (`session`, `needs_mfa`, `refused` with `meta.bridge_outcome`; never errors). `NewBetterAuthBridge(BetterAuthBridgeOptions{Client, CookiePrefix, CookieName, BetterAuthCookieDomain, Insecure, SignInURL, ClientIP})`: `Decide` returns a `BridgeDecision` (Atlas cookies to set, Better Auth cookies cleared only on a final refusal, `ContinuationURL` for a second factor); `Handle` / `Middleware` exchange a GET/HEAD's Better Auth cookie and redirect to the same URL signed in. `middleware.BetterAuthBridge`, `gin.BetterAuthBridge` and `echo.BetterAuthBridge` adapters. `ReadBetterAuthSessionCookie`, `BetterAuthCookieNames`, `ClientIPFromRequest`.
+- **Better Auth JWTs during the cutover.** `AtlasBackendOptions.LegacyIssuers` (`LegacyIssuer{Issuer, JWKS | JWKSURL, Audience, Until, Algorithms, ResolveSubject}`) with `SecretKey` / `APIURL`: a token from that issuer, inside its window, is verified against that issuer's keys only (EdDSA, ES256, ES512, RS256, PS256; `exp` required) and its `sub` is mapped to the Atlas user id through `external_id` (Backend API lookup cached 5 minutes, at most 10 000 entries; failures are not cached). The claims carry `Raw["external_id"]` and `Raw["legacy"]`.
+
 ## 0.14.0 — 2026-10-24
 
 ### Added

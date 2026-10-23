@@ -132,10 +132,14 @@ type Client struct {
 	Testing                    *TestingService
 	MCP                        *MCPService
 	LegacyAuth                 *LegacyAuthService
-	OrgLDAPConnections         *OrgLDAPConnectionsService
-	PCA                        *PCAService
-	Design                     *DesignService
-	EntitlementOverrides       *EntitlementOverridesService
+	// BetterAuthImports imports a sealed Better Auth bundle (/v1/better_auth_imports).
+	BetterAuthImports *BetterAuthImportsService
+	// BetterAuthBridge manages the Better Auth session bridge (/v1/migrations/better_auth/*).
+	BetterAuthBridge     *BetterAuthBridgeService
+	OrgLDAPConnections   *OrgLDAPConnectionsService
+	PCA                  *PCAService
+	Design               *DesignService
+	EntitlementOverrides *EntitlementOverridesService
 	// Platform is the platform-key surface (/v1/platform/*); see WithPlatformKey.
 	Platform *PlatformService
 }
@@ -292,6 +296,8 @@ func New(secretKey string, opts ...Option) *Client {
 	c.Testing = &TestingService{client: c}
 	c.MCP = &MCPService{client: c}
 	c.LegacyAuth = &LegacyAuthService{client: c}
+	c.BetterAuthImports = &BetterAuthImportsService{client: c}
+	c.BetterAuthBridge = &BetterAuthBridgeService{client: c}
 	c.OrgLDAPConnections = &OrgLDAPConnectionsService{client: c}
 	c.PCA = &PCAService{client: c}
 	c.Design = &DesignService{client: c, Assets: &DesignAssetsService{client: c}}

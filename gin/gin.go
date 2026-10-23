@@ -47,3 +47,18 @@ func FromGin(c *gin.Context) (*atlas.SessionClaims, bool) {
 	claims, ok := v.(*atlas.SessionClaims)
 	return claims, ok
 }
+
+// BetterAuthBridge returns a Gin middleware for a Better Auth cutover: a
+// GET/HEAD carrying a Better Auth session cookie and no Atlas session is
+// exchanged once for an Atlas session and redirected to the same URL signed in
+// (or to the bridge's SignInURL when a second factor is owed). Put it before
+// Auth. Build the bridge with atlas.NewBetterAuthBridge.
+func BetterAuthBridge(b *atlas.BetterAuthBridge) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if b.Handle(c.Writer, c.Request) {
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
