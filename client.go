@@ -55,27 +55,31 @@ type Client struct {
 	onUnknownFields UnknownFieldsHandler
 
 	// Namespaces — one per BAPI area, mirroring the TypeScript SDK.
-	Users            *UsersService
-	Sessions         *SessionsService
-	Organizations    *OrganizationsService
-	Invitations      *InvitationsService
-	Roles            *RolesService
-	Permissions      *PermissionsService
-	OAuthClients     *OAuthClientsService
-	ResourceServers  *ResourceServersService
-	SSOConnections   *SSOConnectionsService
-	SCIMTokens       *SCIMTokensService
-	Domains          *DomainsService
-	Webhooks         *WebhooksService
-	Waitlist         *WaitlistService
-	Allowlist        *AllowlistService
-	Blocklist        *BlocklistService
-	AttackProtection *AttackProtectionService
-	ActorTokens      *ActorTokensService
-	SignInTokens     *SignInTokensService
-	AuditLogs        *AuditLogsService
-	JWTTemplates     *JWTTemplatesService
-	APIKeys          *APIKeysService
+	Users           *UsersService
+	Sessions        *SessionsService
+	Organizations   *OrganizationsService
+	Invitations     *InvitationsService
+	Roles           *RolesService
+	Permissions     *PermissionsService
+	OAuthClients    *OAuthClientsService
+	ResourceServers *ResourceServersService
+	// AppRoles is /v1/app_roles: instance-wide user roles.
+	AppRoles *AppRolesService
+	// OAuthInitialAccessTokens is /v1/oauth_initial_access_tokens (DCR gating).
+	OAuthInitialAccessTokens *OAuthInitialAccessTokensService
+	SSOConnections           *SSOConnectionsService
+	SCIMTokens               *SCIMTokensService
+	Domains                  *DomainsService
+	Webhooks                 *WebhooksService
+	Waitlist                 *WaitlistService
+	Allowlist                *AllowlistService
+	Blocklist                *BlocklistService
+	AttackProtection         *AttackProtectionService
+	ActorTokens              *ActorTokensService
+	SignInTokens             *SignInTokensService
+	AuditLogs                *AuditLogsService
+	JWTTemplates             *JWTTemplatesService
+	APIKeys                  *APIKeysService
 
 	OAuthProviders   *OAuthProvidersService
 	SSOOnboarding    *SSOOnboardingService
@@ -203,12 +207,16 @@ func New(secretKey string, opts ...Option) *Client {
 		Invitations: &OrgInvitationsService{client: c},
 		Domains:     &OrgDomainsService{client: c},
 		GroupRoles:  &OrgGroupRolesService{client: c},
+		Teams:       &OrgTeamsService{client: c},
+		Roles:       &OrgRolesService{client: c},
 	}
 	c.Invitations = &InvitationsService{client: c}
 	c.Roles = &RolesService{client: c}
 	c.Permissions = &PermissionsService{client: c}
 	c.OAuthClients = &OAuthClientsService{client: c, Grants: &OAuthClientGrantsService{client: c}}
 	c.ResourceServers = &ResourceServersService{client: c}
+	c.AppRoles = &AppRolesService{client: c}
+	c.OAuthInitialAccessTokens = &OAuthInitialAccessTokensService{client: c}
 	c.SSOConnections = &SSOConnectionsService{client: c}
 	c.SCIMTokens = &SCIMTokensService{client: c}
 	c.Domains = &DomainsService{client: c}

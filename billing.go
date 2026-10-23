@@ -22,8 +22,15 @@ type BillingPlan struct {
 	Features      []string `json:"features"`
 	Audience      string   `json:"audience"`
 	Active        bool     `json:"active"`
-	CreatedAt     int64    `json:"created_at"`
-	UpdatedAt     int64    `json:"updated_at"`
+	// Provider is the billing provider the plan sells through (stripe, polar,
+	// dodo or creem); ProviderPriceID its price there (= StripePriceID).
+	Provider        string  `json:"provider,omitempty"`
+	ProviderPriceID *string `json:"provider_price_id,omitempty"`
+	// AnnualPriceID / AnnualAmount offer the plan yearly too.
+	AnnualPriceID *string `json:"annual_price_id,omitempty"`
+	AnnualAmount  *string `json:"annual_amount,omitempty"`
+	CreatedAt     int64   `json:"created_at"`
+	UpdatedAt     int64   `json:"updated_at"`
 }
 
 // BillingSubscription is a read view of who is subscribed. Status is written only
@@ -38,21 +45,47 @@ type BillingSubscription struct {
 	StripeSubscriptionID *string `json:"stripe_subscription_id"`
 	StripeCustomerID     *string `json:"stripe_customer_id"`
 	CurrentPeriodEnd     *int64  `json:"current_period_end"`
-	CreatedAt            int64   `json:"created_at"`
-	UpdatedAt            int64   `json:"updated_at"`
+	// Provider is the billing provider the subscription lives on.
+	Provider               string  `json:"provider,omitempty"`
+	ProviderSubscriptionID *string `json:"provider_subscription_id,omitempty"`
+	ProviderCustomerID     *string `json:"provider_customer_id,omitempty"`
+	// Account is "instance" (your own provider account) or "platform" (a
+	// legacy subscription on the shared account: mirrored, not manageable).
+	Account  string `json:"account,omitempty"`
+	Interval string `json:"interval,omitempty"`
+	Quantity *int64 `json:"quantity,omitempty"`
+	// CancelAtPeriodEnd is true while a cancellation is scheduled.
+	CancelAtPeriodEnd bool    `json:"cancel_at_period_end,omitempty"`
+	ScheduledPlanID   *string `json:"scheduled_plan_id,omitempty"`
+	ScheduledInterval *string `json:"scheduled_interval,omitempty"`
+	ScheduledChangeAt *int64  `json:"scheduled_change_at,omitempty"`
+	TrialEnd          *int64  `json:"trial_end,omitempty"`
+	CanceledAt        *int64  `json:"canceled_at,omitempty"`
+	// Scheduled is set on a change response: true when the switch waits for
+	// the period end.
+	Scheduled bool  `json:"scheduled,omitempty"`
+	CreatedAt int64 `json:"created_at"`
+	UpdatedAt int64 `json:"updated_at"`
 }
 
 // CreateBillingPlanParams is the body of POST /v1/billing/plans.
 type CreateBillingPlanParams struct {
 	Name          string   `json:"name"`
 	Slug          string   `json:"slug"`
-	StripePriceID string   `json:"stripe_price_id"`
+	StripePriceID string   `json:"stripe_price_id,omitempty"`
 	Interval      string   `json:"interval,omitempty"`
 	Amount        string   `json:"amount,omitempty"`
 	Currency      string   `json:"currency,omitempty"`
 	Features      []string `json:"features,omitempty"`
 	Audience      string   `json:"audience,omitempty"`
 	Active        *bool    `json:"active,omitempty"`
+	// Provider is stripe (default), polar, dodo or creem; ProviderPriceID is
+	// the neutral alias of StripePriceID (send one).
+	Provider        string `json:"provider,omitempty"`
+	ProviderPriceID string `json:"provider_price_id,omitempty"`
+	// AnnualPriceID / AnnualAmount offer the plan yearly too.
+	AnnualPriceID string `json:"annual_price_id,omitempty"`
+	AnnualAmount  string `json:"annual_amount,omitempty"`
 }
 
 // UpdateBillingPlanParams is the body of PATCH /v1/billing/plans/:id.
@@ -66,6 +99,13 @@ type UpdateBillingPlanParams struct {
 	Features      []string `json:"features,omitempty"`
 	Audience      string   `json:"audience,omitempty"`
 	Active        *bool    `json:"active,omitempty"`
+	// Provider is stripe (default), polar, dodo or creem; ProviderPriceID is
+	// the neutral alias of StripePriceID (send one).
+	Provider        string `json:"provider,omitempty"`
+	ProviderPriceID string `json:"provider_price_id,omitempty"`
+	// AnnualPriceID / AnnualAmount offer the plan yearly too.
+	AnnualPriceID string `json:"annual_price_id,omitempty"`
+	AnnualAmount  string `json:"annual_amount,omitempty"`
 }
 
 // ListSubscriptionsParams filters the subscription read view to one subject.

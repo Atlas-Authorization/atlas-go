@@ -34,9 +34,20 @@ type OAuthClient struct {
 	// with this client_id and an exactly registered post_logout_redirect_uri
 	// ends the session and redirects straight back (with state) without the
 	// confirmation page. First-party clients only.
-	SkipLogoutConfirmation bool  `json:"skip_logout_confirmation"`
-	CreatedAt              int64 `json:"created_at"`
-	UpdatedAt              int64 `json:"updated_at"`
+	SkipLogoutConfirmation bool `json:"skip_logout_confirmation"`
+	// Disabled refuses every OAuth flow for the client without deleting it.
+	Disabled bool `json:"disabled"`
+	// RequirePKCE forces PKCE for this confidential client too.
+	RequirePKCE bool `json:"require_pkce"`
+	// SubjectType is "public" (sub = user id) or "pairwise" (a per-sector sub).
+	SubjectType string `json:"subject_type,omitempty"`
+	// SectorIdentifierURI is the pairwise sector document, if registered.
+	SectorIdentifierURI *string `json:"sector_identifier_uri,omitempty"`
+	// ClientSecretExpiresAt is when the current secret stops authenticating
+	// (epoch ms); nil means it never expires.
+	ClientSecretExpiresAt *int64 `json:"client_secret_expires_at,omitempty"`
+	CreatedAt             int64  `json:"created_at"`
+	UpdatedAt             int64  `json:"updated_at"`
 }
 
 // OAuthClientWithSecret carries the client_secret, revealed once on create and
@@ -56,6 +67,9 @@ type RotateOAuthClientSecretParams struct {
 	// OverlapSeconds is how long the previous secret keeps working. nil uses the
 	// default, 86400 (24 hours); 0 revokes it now; at most 604800 (7 days).
 	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
+	// SecretExpiresInSeconds gives the new secret a lifetime (reported as
+	// client_secret_expires_at); nil issues one that does not expire.
+	SecretExpiresInSeconds *int64 `json:"secret_expires_in_seconds,omitempty"`
 }
 
 // ClientGrant binds an OAuth client to a resource server with scopes.
@@ -85,6 +99,14 @@ type CreateOAuthClientParams struct {
 	// third-party client the API answers 422 VALIDATION_FAILED (param
 	// skip_logout_confirmation).
 	SkipLogoutConfirmation *bool `json:"skip_logout_confirmation,omitempty"`
+	// SecretExpiresInSeconds gives the issued secret a lifetime (reported as
+	// client_secret_expires_at); nil issues one that does not expire.
+	SecretExpiresInSeconds *int64 `json:"secret_expires_in_seconds,omitempty"`
+	// SubjectType is "public" (default) or "pairwise" (a per-sector sub).
+	SubjectType string `json:"subject_type,omitempty"`
+	// SectorIdentifierURI is an https URL listing every redirect_uri; required
+	// for a pairwise client whose redirect_uris span more than one host.
+	SectorIdentifierURI string `json:"sector_identifier_uri,omitempty"`
 }
 
 // UpdateOAuthClientParams is the body of PATCH /v1/oauth_clients/:id.
@@ -102,6 +124,18 @@ type UpdateOAuthClientParams struct {
 	// third-party client the API answers 422 VALIDATION_FAILED (param
 	// skip_logout_confirmation).
 	SkipLogoutConfirmation *bool `json:"skip_logout_confirmation,omitempty"`
+	// SecretExpiresInSeconds gives the issued secret a lifetime (reported as
+	// client_secret_expires_at); nil issues one that does not expire.
+	SecretExpiresInSeconds *int64 `json:"secret_expires_in_seconds,omitempty"`
+	// SubjectType is "public" (default) or "pairwise" (a per-sector sub).
+	SubjectType string `json:"subject_type,omitempty"`
+	// SectorIdentifierURI is an https URL listing every redirect_uri; required
+	// for a pairwise client whose redirect_uris span more than one host.
+	SectorIdentifierURI string `json:"sector_identifier_uri,omitempty"`
+	// Disabled refuses (true) or re-allows (false) every OAuth flow.
+	Disabled *bool `json:"disabled,omitempty"`
+	// RequirePKCE forces PKCE for this confidential client too.
+	RequirePKCE *bool `json:"require_pkce,omitempty"`
 }
 
 // List returns all OAuth clients. GET /v1/oauth_clients.

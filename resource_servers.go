@@ -23,8 +23,11 @@ type ResourceServer struct {
 	Scopes          []ResourceServerScope `json:"scopes"`
 	TokenTTLSeconds int                   `json:"token_ttl_seconds"`
 	SigningAlg      string                `json:"signing_alg"`
-	CreatedAt       int64                 `json:"created_at"`
-	UpdatedAt       int64                 `json:"updated_at"`
+	// PublishResourceMetadata is true when Atlas serves the API's RFC 9728
+	// protected-resource metadata document.
+	PublishResourceMetadata bool  `json:"publish_resource_metadata"`
+	CreatedAt               int64 `json:"created_at"`
+	UpdatedAt               int64 `json:"updated_at"`
 }
 
 // CreateResourceServerParams is the body of POST /v1/resource_servers. Each
@@ -35,7 +38,10 @@ type CreateResourceServerParams struct {
 	Name            string        `json:"name"`
 	Scopes          []interface{} `json:"scopes,omitempty"`
 	TokenTTLSeconds *int          `json:"token_ttl_seconds,omitempty"`
-	SigningAlg      string        `json:"signing_alg,omitempty"`
+	// SigningAlg is RS256 or ES256: the algorithm of this API's access tokens.
+	SigningAlg string `json:"signing_alg,omitempty"`
+	// PublishResourceMetadata makes Atlas serve the RFC 9728 metadata document.
+	PublishResourceMetadata *bool `json:"publish_resource_metadata,omitempty"`
 }
 
 // UpdateResourceServerParams is the body of PATCH /v1/resource_servers/:id. The
@@ -46,6 +52,8 @@ type UpdateResourceServerParams struct {
 	TokenTTLSeconds *int          `json:"token_ttl_seconds,omitempty"`
 	SigningAlg      string        `json:"signing_alg,omitempty"`
 	Identifier      string        `json:"identifier,omitempty"`
+	// PublishResourceMetadata turns the RFC 9728 metadata document on or off.
+	PublishResourceMetadata *bool `json:"publish_resource_metadata,omitempty"`
 }
 
 // List returns all resource servers. GET /v1/resource_servers.

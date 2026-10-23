@@ -4,6 +4,25 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.13.0 — 2026-10-23
+
+### Added
+
+- **App roles.** `AppRoles` (`/v1/app_roles`): `List`, `Create`, `Get`, `Update`, `Delete`, `ListUsers`, and per user `GetForUser`, `SetForUser` (replace, or add/remove), `RemoveFromUser`. `SessionClaims.HasAppRole` / `HasAppPermission` read the `app_roles` / `app_permissions` claims (no active organization needed).
+- **Organization teams and custom roles.** `Organizations.Teams` (list, create, get, update, delete, members list/add/remove) and `Organizations.Roles` (the roles an org can assign; create/update/delete its own, with `reassign_to`). `Organizations.GetBySlug`, `Organizations.CheckSlug`, `Organizations.Invitations.Resend`.
+- **User search.** `Users.Search(ctx, UserListParams{...})`: `query`, `email_address`, `username`, `phone_number`, `external_id`, `banned`, `email_verified`, `organization_id`, `created_after` / `created_before`, `order_by`, `offset`, `include_total_count` (`UserSearchPage.TotalCount`).
+- **Timed bans.** `Users.BanWithParams(ctx, id, BanParams{Reason, Note, ExpiresInSeconds, ExpiresAt})`; `User.BanExpiresAt`.
+- **API key controls.** Create: `Prefix`, `ExpiresInSeconds`, `Enabled`, `RateLimit`, `Remaining`, `Scopes`. Update: `Enabled`, `RateLimit` / `ClearRateLimit`, `Remaining` / `ClearRemaining`, `Scopes`. `APIKeys.VerifyWithParams` with `RequiredScopes`; the verdict carries `Code` (`insufficient_scope`, `rate_limited`, `usage_exhausted`), `MissingScopes`, `RetryAfterMS`, `Remaining`.
+- **Billing providers (bring your own key).** `Billing.ListProviders`, `GetProvider`, `SetProvider`, `TestProvider`, `DeleteProvider(force)`; subscription `ChangeSubscription`, `CancelSubscription(immediately)`, `RestoreSubscription`. Plans take `Provider`, `ProviderPriceID`, `AnnualPriceID`, `AnnualAmount`; subscriptions report the provider, account, interval, scheduled change, trial and cancellation fields.
+- **OAuth server administration.** `InstanceSecurity.ListSigningKeys` / `RotateSigningKey` (`alg` RS256 or ES256, grace period, emergency); `OAuthInitialAccessTokens` (list, create, revoke). OAuth clients: `Disabled`, `RequirePKCE`, `SubjectType` (public / pairwise), `SectorIdentifierURI`, `SecretExpiresInSeconds`, and `ClientSecretExpiresAt` on reads. Resource servers: `PublishResourceMetadata`.
+- **Access-token verification for your API.** `NewAccessTokenVerifier` checks an Atlas-issued OAuth access token locally (issuer, expiry, `token_use`, audience, scopes) and returns the RFC 6750 / RFC 9728 `WWW-Authenticate` challenge on refusal; `BuildWWWAuthenticate`, `ProtectedResourceMetadata`, `ProtectedResourceMetadataPath`; `middleware.RequireAccessToken`. DPoP-bound tokens are refused.
+- SCIM tokens: `Scopes`, `RoleMappings`, `SCIMTokens.Update`. User imports: row `ExternalID`, `CreatedAt`, `PasswordSalt`, `PhoneNumber(s)`, `OrganizationMemberships`; job `CreateOrganizations`, `PasswordHashConfig`. `UserHooks.ListBeforeUserCreateCalls`, `Referrals.GetCall`.
+
+### Changed
+
+- Session, logout-token and access-token verification accept **ES256** as well as RS256 (`SigningAlgs`), and nothing else; the token's `kid` selects one key whose type fixes the algorithm.
+- `CreateBillingPlanParams.StripePriceID` is omitted when empty (a free plan, or a plan priced with `ProviderPriceID`).
+
 ## 0.12.0
 
 ### Added

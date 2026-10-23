@@ -3,6 +3,8 @@ package atlas
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
@@ -63,6 +65,29 @@ type SessionClaims struct {
 // HasRole reports whether the session's org_role equals role.
 func (c *SessionClaims) HasRole(role string) bool { return c.OrgRole == role }
 
+// HasAppRole reports whether the app_roles claim (the user's instance-wide
+// app roles) contains role. It needs no active organization.
+func (c *SessionClaims) HasAppRole(role string) bool {
+	return claimListContains(c.Raw, "app_roles", role)
+}
+
+// HasAppPermission reports whether the app_permissions claim (the union of
+// the user's app roles' permissions) contains permission. It needs no active
+// organization.
+func (c *SessionClaims) HasAppPermission(permission string) bool {
+	return claimListContains(c.Raw, "app_permissions", permission)
+}
+
+func claimListContains(raw map[string]interface{}, claim, want string) bool {
+	list, _ := raw[claim].([]interface{})
+	for _, v := range list {
+		if s, ok := v.(string); ok && s == want {
+			return true
+		}
+	}
+	return false
+}
+
 // HasPermission reports whether org_permissions contains permission. Reading the
 // claim rather than calling Atlas is the whole point of putting permissions in
 // the token: a permission change takes effect within one token lifetime, the same
@@ -119,6 +144,9 @@ type jwk struct {
 	Kty string `json:"kty"`
 	N   string `json:"n"`
 	E   string `json:"e"`
+	Crv string `json:"crv"`
+	X   string `json:"x"`
+	Y   string `json:"y"`
 	Alg string `json:"alg"`
 	Use string `json:"use"`
 }
@@ -365,8 +393,9 @@ func (b *AtlasBackend) Verify(ctx context.Context, token string) (*SessionClaims
 		return nil, ErrNoKeys
 	}
 
-	// Header: pin RS256. Without this, a token whose header says alg:none — or
-	// any algorithm the key material can be coerced into — could verify.
+	// Header: pin RS256 / ES256 (SigningAlgs). Without this, a token whose
+	// header says alg:none — or any algorithm the key material can be coerced
+	// into — could verify.
 	headerRaw, err := base64urlDecode(parts[0])
 	if err != nil {
 		return nil, ErrInvalidToken
@@ -375,12 +404,7 @@ func (b *AtlasBackend) Verify(ctx context.Context, token string) (*SessionClaims
 		Alg string `json:"alg"`
 		Kid string `json:"kid"`
 	}
-	if json.Unmarshal(headerRaw, &header) != nil || header.Alg != "RS256" {
-		return nil, ErrInvalidToken
-	}
-
-	pub := b.selectKey(set, header.Kid)
-	if pub == nil {
+	if json.Unmarshal(headerRaw, &header) != nil || !contains(SigningAlgs, header.Alg) {
 		return nil, ErrInvalidToken
 	}
 
@@ -388,9 +412,7 @@ func (b *AtlasBackend) Verify(ctx context.Context, token string) (*SessionClaims
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
-	signingInput := parts[0] + "." + parts[1]
-	digest := sha256.Sum256([]byte(signingInput))
-	if rsa.VerifyPKCS1v15(pub, crypto.SHA256, digest[:], sig) != nil {
+	if !verifyJWSSignature(set, header.Alg, header.Kid, parts[0]+"."+parts[1], sig) {
 		return nil, ErrInvalidToken
 	}
 
@@ -459,14 +481,61 @@ func (b *AtlasBackend) now() time.Time {
 	return time.Now()
 }
 
-func (b *AtlasBackend) selectKey(set *jwks, kid string) *rsa.PublicKey {
-	return selectRSAKey(set, kid)
+// SigningAlgs are the JWS algorithms Atlas signs tokens with: an instance key
+// is RS256 (the default) or ES256, and an API may use either. Every verifier
+// in this package is pinned to exactly this list — "none" and HMAC never
+// verify — and the token's kid selects one published key whose type fixes
+// which of the two applies.
+var SigningAlgs = []string{"RS256", "ES256"}
+
+// verifyJWSSignature checks sig over signingInput with the key kid selects,
+// for alg RS256 (an RSA key) or ES256 (a P-256 EC key, raw r||s signature).
+// A key whose own alg names the other algorithm never verifies.
+func verifyJWSSignature(set *jwks, alg, kid, signingInput string, sig []byte) bool {
+	digest := sha256.Sum256([]byte(signingInput))
+	switch alg {
+	case "RS256":
+		pub := selectRSAKey(set, kid)
+		return pub != nil && rsa.VerifyPKCS1v15(pub, crypto.SHA256, digest[:], sig) == nil
+	case "ES256":
+		pub := selectECKey(set, kid)
+		if pub == nil || len(sig) != 64 {
+			return false
+		}
+		r := new(big.Int).SetBytes(sig[:32])
+		sv := new(big.Int).SetBytes(sig[32:])
+		return ecdsa.Verify(pub, digest[:], r, sv)
+	}
+	return false
+}
+
+// selectECKey picks the P-256 key matching kid (any when kid is empty).
+func selectECKey(set *jwks, kid string) *ecdsa.PublicKey {
+	for _, k := range set.Keys {
+		if k.Kty != "EC" || k.Crv != "P-256" || (k.Alg != "" && k.Alg != "ES256") {
+			continue
+		}
+		if kid != "" && k.Kid != kid {
+			continue
+		}
+		xb, err1 := base64urlDecode(k.X)
+		yb, err2 := base64urlDecode(k.Y)
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		x, y := new(big.Int).SetBytes(xb), new(big.Int).SetBytes(yb)
+		if !elliptic.P256().IsOnCurve(x, y) {
+			continue
+		}
+		return &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
+	}
+	return nil
 }
 
 // selectRSAKey picks the RSA key matching kid (any RSA key when kid is empty).
 func selectRSAKey(set *jwks, kid string) *rsa.PublicKey {
 	for _, k := range set.Keys {
-		if k.Kty != "RSA" {
+		if k.Kty != "RSA" || (k.Alg != "" && k.Alg != "RS256") {
 			continue
 		}
 		if kid != "" && k.Kid != kid {

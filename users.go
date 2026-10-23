@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"strconv"
 )
 
 // UsersService is the /v1/users namespace.
@@ -22,7 +23,10 @@ type User struct {
 	PublicMetadata Metadata `json:"public_metadata"`
 	MFAEnabled     bool     `json:"mfa_enabled"`
 	Banned         bool     `json:"banned"`
-	Locked         bool     `json:"locked"`
+	// BanExpiresAt is when a timed ban lifts (epoch ms); nil for a permanent
+	// ban or no ban.
+	BanExpiresAt *int64 `json:"ban_expires_at,omitempty"`
+	Locked       bool   `json:"locked"`
 	// LastSignInAt is epoch milliseconds, or nil if never signed in.
 	LastSignInAt *int64 `json:"last_sign_in_at"`
 	CreatedAt    int64  `json:"created_at"`
@@ -240,6 +244,81 @@ func (s *UsersService) List(ctx context.Context, params ListParams) (*CursorPage
 	return out, s.client.get(ctx, "/v1/users", params.values(), out)
 }
 
+// UserListParams searches and filters GET /v1/users. Every filter combines
+// with AND. Paginate by cursor (StartingAfter) or, with Offset, by offset.
+type UserListParams struct {
+	Limit         int
+	StartingAfter string
+	// Offset switches to offset paging (do not combine with StartingAfter).
+	Offset int
+	// Query is a free-text search over email, username, names, phone and ids.
+	Query          string
+	EmailAddress   string
+	Username       string
+	PhoneNumber    string
+	ExternalID     string
+	OrganizationID string
+	// Banned / EmailVerified filter on the flag when non-nil.
+	Banned        *bool
+	EmailVerified *bool
+	// CreatedAfter / CreatedBefore bound created_at (epoch ms).
+	CreatedAfter  int64
+	CreatedBefore int64
+	// OrderBy is created_at, -created_at, last_sign_in_at or -last_sign_in_at.
+	OrderBy string
+	// IncludeTotalCount asks for total_count on the page.
+	IncludeTotalCount bool
+}
+
+func (p UserListParams) values() url.Values {
+	v := url.Values{}
+	ListParams{Limit: p.Limit, StartingAfter: p.StartingAfter}.apply(v)
+	if p.Offset > 0 {
+		v.Set("offset", strconv.Itoa(p.Offset))
+	}
+	set := func(k, val string) {
+		if val != "" {
+			v.Set(k, val)
+		}
+	}
+	set("query", p.Query)
+	set("email_address", p.EmailAddress)
+	set("username", p.Username)
+	set("phone_number", p.PhoneNumber)
+	set("external_id", p.ExternalID)
+	set("organization_id", p.OrganizationID)
+	if p.CreatedAfter > 0 {
+		v.Set("created_after", strconv.FormatInt(p.CreatedAfter, 10))
+	}
+	if p.CreatedBefore > 0 {
+		v.Set("created_before", strconv.FormatInt(p.CreatedBefore, 10))
+	}
+	set("order_by", p.OrderBy)
+	if p.Banned != nil {
+		v.Set("banned", strconv.FormatBool(*p.Banned))
+	}
+	if p.EmailVerified != nil {
+		v.Set("email_verified", strconv.FormatBool(*p.EmailVerified))
+	}
+	if p.IncludeTotalCount {
+		v.Set("include_total_count", "true")
+	}
+	return v
+}
+
+// UserSearchPage is a GET /v1/users page; TotalCount is set only when the
+// search asked for IncludeTotalCount.
+type UserSearchPage struct {
+	CursorPage[User]
+	TotalCount *int64 `json:"total_count,omitempty"`
+}
+
+// Search lists users matching the filters. GET /v1/users.
+func (s *UsersService) Search(ctx context.Context, params UserListParams) (*UserSearchPage, error) {
+	out := &UserSearchPage{}
+	return out, s.client.get(ctx, "/v1/users", params.values(), out)
+}
+
 // Get fetches a single user. GET /v1/users/:id.
 func (s *UsersService) Get(ctx context.Context, id string) (*User, error) {
 	out := &User{}
@@ -285,6 +364,22 @@ func (s *UsersService) ReplaceMetadata(ctx context.Context, id string, params Re
 func (s *UsersService) Ban(ctx context.Context, id string, opts ...RequestOption) (*User, error) {
 	out := &User{}
 	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/ban", nil, out, opts...)
+}
+
+// BanParams is the body of POST /v1/users/:id/ban. Without ExpiresInSeconds
+// or ExpiresAt (epoch ms) the ban is permanent; with one it lifts itself.
+type BanParams struct {
+	Reason           string `json:"reason,omitempty"`
+	Note             string `json:"note,omitempty"`
+	ExpiresInSeconds int64  `json:"expires_in_seconds,omitempty"`
+	ExpiresAt        int64  `json:"expires_at,omitempty"`
+}
+
+// BanWithParams bans a user with a reason, note or expiry (a timed ban).
+// POST /v1/users/:id/ban.
+func (s *UsersService) BanWithParams(ctx context.Context, id string, params BanParams, opts ...RequestOption) (*User, error) {
+	out := &User{}
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/ban", params, out, opts...)
 }
 
 // Unban lifts a ban. POST /v1/users/:id/unban.

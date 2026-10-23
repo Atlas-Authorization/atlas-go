@@ -14,6 +14,8 @@ type OrganizationsService struct {
 	Invitations *OrgInvitationsService
 	Domains     *OrgDomainsService
 	GroupRoles  *OrgGroupRolesService
+	Teams       *OrgTeamsService
+	Roles       *OrgRolesService
 }
 
 // Organization is an organization as the BAPI serves it.

@@ -25,12 +25,34 @@ type APIKey struct {
 	// Limits are the key's spend caps; nil when it has none.
 	Limits []APIKeyLimit `json:"limits"`
 	// Usage is each cap with its current-window usage (empty without caps).
-	Usage      []APIKeyLimitState `json:"usage"`
-	LastUsedAt *int64             `json:"last_used_at"`
-	ExpiresAt  *int64             `json:"expires_at"`
-	RevokedAt  *int64             `json:"revoked_at"`
-	CreatedAt  int64              `json:"created_at"`
+	Usage []APIKeyLimitState `json:"usage"`
+	// Enabled is false for a key that was disabled (it verifies as invalid
+	// until re-enabled). Nil from a server that predates key controls.
+	Enabled *bool `json:"enabled,omitempty"`
+	// RateLimit is the per-key verify throttle, nil when the key has none.
+	RateLimit *APIKeyRateLimit `json:"rate_limit,omitempty"`
+	// Remaining is the use budget left (each successful verify spends one);
+	// nil means unlimited.
+	Remaining  *int64 `json:"remaining,omitempty"`
+	LastUsedAt *int64 `json:"last_used_at"`
+	ExpiresAt  *int64 `json:"expires_at"`
+	RevokedAt  *int64 `json:"revoked_at"`
+	CreatedAt  int64  `json:"created_at"`
 }
+
+// APIKeyRateLimit throttles verifies of one key: at most Max per
+// WindowSeconds. A throttled verify answers Code=rate_limited.
+type APIKeyRateLimit struct {
+	Max           int64 `json:"max"`
+	WindowSeconds int64 `json:"window_seconds"`
+}
+
+// Coded refusals of a live key by its own policy (APIKeyVerification.Code).
+const (
+	APIKeyRefusalInsufficientScope = "insufficient_scope"
+	APIKeyRefusalRateLimited       = "rate_limited"
+	APIKeyRefusalUsageExhausted    = "usage_exhausted"
+)
 
 // API key spend-cap periods. Request caps a single debit; day and month are
 // UTC calendar windows; total never resets.
@@ -134,6 +156,19 @@ type CreateAPIKeyParams struct {
 	Claims      map[string]interface{} `json:"claims,omitempty"`
 	// ExpiresAt is epoch ms; a nil pointer never expires.
 	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// ExpiresInSeconds is an alternative to ExpiresAt. Without either the
+	// instance expiry policy's default lifetime applies (if one is set).
+	ExpiresInSeconds int64 `json:"expires_in_seconds,omitempty"`
+	// Prefix is a custom secret prefix (e.g. "acme" gives acme_<id>_<secret>).
+	Prefix string `json:"prefix,omitempty"`
+	// Enabled=false mints the key disabled.
+	Enabled *bool `json:"enabled,omitempty"`
+	// RateLimit is a per-key verify throttle.
+	RateLimit *APIKeyRateLimit `json:"rate_limit,omitempty"`
+	// Remaining is a use budget each successful verify spends.
+	Remaining *int64 `json:"remaining,omitempty"`
+	// Scopes the key carries (checked by Verify's RequiredScopes).
+	Scopes []string `json:"scopes,omitempty"`
 	// Limits are per-key spend caps, metered with RecordUsage.
 	Limits []APIKeyLimit `json:"limits,omitempty"`
 }
@@ -141,35 +176,64 @@ type CreateAPIKeyParams struct {
 // UpdateAPIKeyParams is the body of PATCH /v1/api_keys/:id. Set Limits to
 // replace the spend caps, or ClearLimits to send limits: null and remove them
 // (usage counters are kept).
+//
+// Enabled disables (false) or re-enables (true) the key without revoking it.
+// RateLimit sets the verify throttle (ClearRateLimit removes it); Remaining
+// sets the use budget (ClearRemaining makes it unlimited).
 type UpdateAPIKeyParams struct {
-	Name        *string                `json:"name,omitempty"`
-	Claims      map[string]interface{} `json:"claims,omitempty"`
-	ExpiresAt   *int64                 `json:"expires_at,omitempty"`
-	Limits      []APIKeyLimit          `json:"limits,omitempty"`
-	ClearLimits bool                   `json:"-"`
+	Name           *string                `json:"name,omitempty"`
+	Claims         map[string]interface{} `json:"claims,omitempty"`
+	ExpiresAt      *int64                 `json:"expires_at,omitempty"`
+	Scopes         []string               `json:"scopes,omitempty"`
+	Limits         []APIKeyLimit          `json:"limits,omitempty"`
+	ClearLimits    bool                   `json:"-"`
+	Enabled        *bool                  `json:"enabled,omitempty"`
+	RateLimit      *APIKeyRateLimit       `json:"rate_limit,omitempty"`
+	ClearRateLimit bool                   `json:"-"`
+	Remaining      *int64                 `json:"remaining,omitempty"`
+	ClearRemaining bool                   `json:"-"`
 }
 
-// MarshalJSON renders limits: null when ClearLimits is set.
+// MarshalJSON renders limits / rate_limit / remaining as null when their
+// Clear* flag is set.
 func (p UpdateAPIKeyParams) MarshalJSON() ([]byte, error) {
 	type alias UpdateAPIKeyParams
 	raw, err := json.Marshal(alias(p))
-	if err != nil || !p.ClearLimits {
+	if err != nil || !(p.ClearLimits || p.ClearRateLimit || p.ClearRemaining) {
 		return raw, err
 	}
 	var m map[string]interface{}
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return nil, err
 	}
-	m["limits"] = nil
+	if p.ClearLimits {
+		m["limits"] = nil
+	}
+	if p.ClearRateLimit {
+		m["rate_limit"] = nil
+	}
+	if p.ClearRemaining {
+		m["remaining"] = nil
+	}
 	return json.Marshal(m)
 }
 
 // APIKeyVerification is the verify verdict. Every negative — unknown, malformed,
 // revoked, expired, or a key whose subject was since deleted — resolves to the
 // same Valid=false, so a caller learns nothing about which keys exist.
+//
+// A LIVE key refused by its own policy is also Valid=false, but carries Code
+// (APIKeyRefusalInsufficientScope with MissingScopes, APIKeyRefusalRateLimited
+// with RetryAfterMS, or APIKeyRefusalUsageExhausted) so you can tell the
+// holder what to do.
 type APIKeyVerification struct {
-	Object      string                 `json:"object"`
-	Valid       bool                   `json:"valid"`
+	Object        string   `json:"object"`
+	Valid         bool     `json:"valid"`
+	Code          string   `json:"code,omitempty"`
+	MissingScopes []string `json:"missing_scopes,omitempty"`
+	RetryAfterMS  *int64   `json:"retry_after_ms,omitempty"`
+	// Remaining is the use budget left after this verify (nil = unlimited).
+	Remaining   *int64                 `json:"remaining,omitempty"`
 	ID          string                 `json:"id,omitempty"`
 	SubjectType string                 `json:"subject_type,omitempty"`
 	SubjectID   string                 `json:"subject_id,omitempty"`
@@ -220,6 +284,20 @@ func (s *APIKeysService) Verify(ctx context.Context, secret string, opts ...Requ
 	out := &APIKeyVerification{}
 	body := map[string]string{"secret": secret}
 	return out, s.client.post(ctx, "/v1/api_keys/verify", body, out, opts...)
+}
+
+// VerifyAPIKeyParams is the body of POST /v1/api_keys/verify with options.
+// RequiredScopes must all be on the key, else the verdict is Valid=false with
+// Code=insufficient_scope and the MissingScopes.
+type VerifyAPIKeyParams struct {
+	Secret         string   `json:"secret"`
+	RequiredScopes []string `json:"required_scopes,omitempty"`
+}
+
+// VerifyWithParams is Verify with required scopes. POST /v1/api_keys/verify.
+func (s *APIKeysService) VerifyWithParams(ctx context.Context, params VerifyAPIKeyParams, opts ...RequestOption) (*APIKeyVerification, error) {
+	out := &APIKeyVerification{}
+	return out, s.client.post(ctx, "/v1/api_keys/verify", params, out, opts...)
 }
 
 // Get returns one key. GET /v1/api_keys/:id.

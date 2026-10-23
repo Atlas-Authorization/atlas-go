@@ -2,9 +2,6 @@ package atlas
 
 import (
 	"context"
-	"crypto"
-	"crypto/rsa"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -121,7 +118,7 @@ func (v *LogoutTokenVerifier) Verify(ctx context.Context, token string) (*Logout
 	if json.Unmarshal(headerRaw, &header) != nil {
 		return nil, ErrMalformed
 	}
-	if header.Alg != "RS256" {
+	if !contains(SigningAlgs, header.Alg) {
 		return nil, ErrInvalidToken
 	}
 	if header.Typ != nil && !strings.EqualFold(*header.Typ, "logout+jwt") && !strings.EqualFold(*header.Typ, "application/logout+jwt") {
@@ -132,8 +129,13 @@ func (v *LogoutTokenVerifier) Verify(ctx context.Context, token string) (*Logout
 	if set == nil || len(set.Keys) == 0 {
 		return nil, ErrNoKeys
 	}
-	pub := selectRSAKey(set, header.Kid)
-	if pub == nil {
+	var keyFound bool
+	if header.Alg == "ES256" {
+		keyFound = selectECKey(set, header.Kid) != nil
+	} else {
+		keyFound = selectRSAKey(set, header.Kid) != nil
+	}
+	if !keyFound {
 		// A key Atlas just rotated to, whose refetch failed: temporary.
 		v.jwks.mu.Lock()
 		failed := v.jwks.LastOutcome == OutcomeFailed
@@ -147,8 +149,7 @@ func (v *LogoutTokenVerifier) Verify(ctx context.Context, token string) (*Logout
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
-	digest := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
-	if rsa.VerifyPKCS1v15(pub, crypto.SHA256, digest[:], sig) != nil {
+	if !verifyJWSSignature(set, header.Alg, header.Kid, parts[0]+"."+parts[1], sig) {
 		return nil, ErrInvalidToken
 	}
 

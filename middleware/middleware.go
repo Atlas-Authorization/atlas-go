@@ -73,3 +73,38 @@ func Optional(v Verifier) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+// accessTokenKey holds the verified access-token result on the context.
+type accessTokenKey struct{}
+
+// AccessTokenFromContext returns the verified access token a
+// RequireAccessToken handler stored on the request context.
+func AccessTokenFromContext(ctx context.Context) (*atlas.AccessTokenResult, bool) {
+	res, ok := ctx.Value(accessTokenKey{}).(*atlas.AccessTokenResult)
+	return res, ok
+}
+
+// RequireAccessToken protects an API route with an Atlas-issued OAuth access
+// token (an Authorization: Bearer header, never a cookie). It answers a
+// refusal with the verifier's status and RFC 6750 / RFC 9728
+// WWW-Authenticate challenge, and requires the verifier's scopes plus
+// extraScopes. The verified result is readable with AccessTokenFromContext.
+func RequireAccessToken(v *atlas.AccessTokenVerifier, extraScopes ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			res := v.VerifyRequest(r.Context(), r, extraScopes...)
+			if !res.OK {
+				w.Header().Set("WWW-Authenticate", res.WWWAuthenticate)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(res.Status)
+				body := `{"error":"` + string(res.Error) + `"}`
+				if res.Error == "" {
+					body = `{"error":"unauthorized"}`
+				}
+				_, _ = w.Write([]byte(body))
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), accessTokenKey{}, res)))
+		})
+	}
+}

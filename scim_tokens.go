@@ -17,10 +17,14 @@ type ScimToken struct {
 	OrganizationID string  `json:"organization_id"`
 	ConnectionID   *string `json:"connection_id"`
 	Prefix         string  `json:"prefix"`
-	LastUsedAt     *int64  `json:"last_used_at"`
-	ExpiresAt      *int64  `json:"expires_at"`
-	RevokedAt      *int64  `json:"revoked_at"`
-	CreatedAt      int64   `json:"created_at"`
+	// Scopes is nil for a read-write token, ["read"] for a read-only one.
+	Scopes []string `json:"scopes"`
+	// RoleMappings map SCIM roles values to organization role keys.
+	RoleMappings []ScimRoleMapping `json:"role_mappings,omitempty"`
+	LastUsedAt   *int64            `json:"last_used_at"`
+	ExpiresAt    *int64            `json:"expires_at"`
+	RevokedAt    *int64            `json:"revoked_at"`
+	CreatedAt    int64             `json:"created_at"`
 }
 
 // ScimTokenWithSecret reveals the usable secret once, on create.
@@ -35,6 +39,31 @@ type CreateScimTokenParams struct {
 	OrganizationID string `json:"organization_id"`
 	Name           string `json:"name,omitempty"`
 	ConnectionID   string `json:"connection_id,omitempty"`
+	// Scopes ["read"] makes the token read-only; omit for read and write.
+	Scopes []string `json:"scopes,omitempty"`
+	// RoleMappings map SCIM roles values to organization role keys.
+	RoleMappings []ScimRoleMapping `json:"role_mappings,omitempty"`
+}
+
+// ScimRoleMapping maps one SCIM roles value to an organization role key.
+type ScimRoleMapping struct {
+	Value string `json:"value"`
+	Role  string `json:"role"`
+}
+
+// UpdateScimTokenParams is the body of PATCH /v1/scim_tokens/:id. Nil fields
+// are left alone.
+type UpdateScimTokenParams struct {
+	Name         *string           `json:"name,omitempty"`
+	Scopes       []string          `json:"scopes,omitempty"`
+	RoleMappings []ScimRoleMapping `json:"role_mappings,omitempty"`
+}
+
+// Update changes a SCIM token's name, scopes or role mappings (the secret is
+// unchanged). PATCH /v1/scim_tokens/:id.
+func (s *SCIMTokensService) Update(ctx context.Context, id string, params UpdateScimTokenParams, opts ...RequestOption) (*ScimToken, error) {
+	out := &ScimToken{}
+	return out, s.client.patch(ctx, "/v1/scim_tokens/"+url.PathEscape(id), params, out, opts...)
 }
 
 // ScimTokenRevokeResult is the acknowledgement of a revoke.
