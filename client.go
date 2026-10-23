@@ -102,9 +102,13 @@ type Client struct {
 	Actions               *ActionsService
 	// ActionGallery browses and installs Action templates; ActionTemplates
 	// publishes your own.
-	ActionGallery       *ActionGalleryService
-	ActionTemplates     *ActionTemplatesService
-	Billing             *BillingService
+	ActionGallery   *ActionGalleryService
+	ActionTemplates *ActionTemplatesService
+	Billing         *BillingService
+	// Policies is policy acceptance (terms, privacy, any key); PolicySource
+	// connects an external system that serves the policy documents.
+	Policies            *PoliciesService
+	PolicySource        *PolicySourceService
 	Messaging           *MessagingService
 	ImportExport        *ImportExportService
 	DataSubjectRequests *DataSubjectRequestsService
@@ -265,6 +269,12 @@ func New(secretKey string, opts ...Option) *Client {
 	c.ActionGallery = &ActionGalleryService{client: c}
 	c.ActionTemplates = &ActionTemplatesService{client: c}
 	c.Billing = &BillingService{client: c}
+	c.Policies = &PoliciesService{
+		client:   c,
+		Versions: &PolicyVersionsService{client: c},
+		Settings: &PolicySettingsService{client: c},
+	}
+	c.PolicySource = &PolicySourceService{client: c}
 	c.Messaging = &MessagingService{client: c}
 	c.ImportExport = &ImportExportService{client: c}
 	c.DataSubjectRequests = &DataSubjectRequestsService{client: c}

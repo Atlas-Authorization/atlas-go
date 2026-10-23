@@ -4,6 +4,14 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.16.0 — 2026-10-24
+
+### Added
+
+- **Policy acceptance.** `Client.Policies` (`List`, `Create`, `Get`, `Update`, `Delete`, `ListAcceptances`, `ExportAcceptancesCSV`, `ForUser`) with `Policies.Versions` (`List`, `Create`, `Get`, `Update`, `Delete`, `Publish`, `Retire`) and `Policies.Settings` (`Get`, `Update`: the `pol` session claim), and `Client.PolicySource` (`Get`, `Update`, `Delete`, `Test`, `Sync`, `ListDeliveries`; the signing secret is write-only). `Clear` flags send nulls. `RecordConsentParams` / `UserConsent` carry the acceptance evidence (`PolicyVersionID`, `ContentSHA256`, `Display`, `ScrolledToEnd`, `ViewMS`, `Locale`).
+- **Policy source helpers** for a CMS written in Go: `VerifyPolicyFeedRequest(method, pathAndQuery, header, secret, opts)` checks Atlas's signed feed request (`atlas-id`, `atlas-timestamp` in ms, `atlas-signature` with one or more `v1,<base64 HMAC-SHA256>` values over `{id}.{ts}.GET\n{path+query}`, five-minute window) and returns the `Key` Atlas asked for; `PolicyFeedHandler` serves a `PolicyFeed` behind it; `SignPolicySourceEvent(event, secret, opts)` signs a `policy.published` / `policy.retired` event for Atlas (`SignedPolicySourceEvent.Request` builds the POST). `PolicySourceProtocolVersion`.
+- `SessionClaims.Policies()` and `AcceptedPolicyVersion(key)` read the `pol` session claim. `WebhookEventUserPolicyAccepted`, `WebhookEventPolicyVersionPublished`.
+
 ## 0.15.0 — 2026-10-24
 
 ### Added

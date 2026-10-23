@@ -330,6 +330,46 @@ managed, err := atlas.Messaging.CreateManagedEmail(ctx, atlasauth.CreateManagedE
 _, err = atlas.Messaging.EnableDevelopmentEmail(ctx, atlasauth.EnableDevelopmentEmailParams{ProviderID: "mp_123"})
 ```
 
+## Policy acceptance
+
+Terms of Service, privacy policies and any other policy your users accept at sign-up (and again
+at sign-in when a new version takes effect). A version goes draft, published (with an
+`EffectiveAt`), retired; each acceptance is kept as evidence.
+
+```go
+c.Policies.Create(ctx, atlas.CreatePolicyParams{Key: "tos", Title: "Terms of Service", AppliesTo: atlas.PolicyAppliesToSignInAndSignUp})
+c.Policies.Versions.Create(ctx, "tos", atlas.CreatePolicyVersionParams{Version: "2026-10-24", ContentMarkdown: "# Terms\n..."})
+c.Policies.Versions.Publish(ctx, "tos", "2026-10-24", atlas.PublishPolicyVersionParams{EffectiveAt: "2026-11-01T00:00:00Z"})
+page, _ := c.Policies.ListAcceptances(ctx, "tos", atlas.ListPolicyAcceptancesParams{Version: "2026-10-24", Limit: 50})
+csv, _ := c.Policies.ExportAcceptancesCSV(ctx, "tos", atlas.ListPolicyAcceptancesParams{})
+standing, _ := c.Policies.ForUser(ctx, "user_123") // incl. NeedsAcceptance
+on := true
+c.Policies.Settings.Update(ctx, atlas.UpdatePolicySettingsParams{SessionClaim: &on}) // put `pol` on session tokens
+```
+
+With the session claim on, `claims.Policies()` / `claims.AcceptedPolicyVersion("tos")` read the
+`pol` claim. The `user.policy_accepted` and `policy.version_published` webhook events have the
+constants `WebhookEventUserPolicyAccepted` and `WebhookEventPolicyVersionPublished`.
+
+### Serving policies from your own system (policy source)
+
+Point Atlas at a CMS or service with `c.PolicySource.Update(...)` (the signing secret is
+write-only), then `Test` / `Sync`. In your service, verify Atlas's signed
+`GET {endpoint}/policies[?key=...]` and answer a feed:
+
+```go
+mux.Handle("/atlas/policies", atlas.PolicyFeedHandler(secret, func(ctx context.Context, key string) (atlas.PolicyFeed, error) {
+	return buildFeed(ctx, key) // one policy when key is set
+}))
+
+// or by hand:
+req, err := atlas.VerifyPolicyFeedRequest(r.Method, r.URL.RequestURI(), r.Header, secret, nil)
+
+// When a policy changes, tell Atlas (it re-fetches; nothing in the event is trusted as content):
+e, _ := atlas.SignPolicySourceEvent(atlas.PolicySourceEvent{Type: atlas.PolicySourceEventPublished, Key: "tos", Version: "2026-10-24"}, secret, nil)
+httpReq, _ := e.Request(ctx, webhookURL) // webhookURL from c.PolicySource.Get
+```
+
 ## OAuth client secret rotation
 
 The previous secret keeps working for the overlap (default 24 hours, at most 7 days), so you can deploy the
@@ -597,6 +637,7 @@ covered:
 | Bot signals | `c.BotSignals` | export signal lake + labels, add labels |
 | Risk-based MFA | `c.RiskBasedMFA` | get, update (adaptive MFA) |
 | Rate-limit policy | `c.RateLimitPolicy` | get, update |
+| Policy acceptance | `c.Policies` / `c.PolicySource` | policies, versions (publish/retire), acceptances + CSV, user standing, `pol` claim setting; external source config, test, sync, deliveries |
 | Actor / Sign-in tokens | `c.ActorTokens` / `c.SignInTokens` | create, revoke |
 | Audit logs | `c.AuditLogs` | list (filtered) |
 | Log streams | `c.LogStreams` | CRUD, test (HTTP/Datadog/Splunk sinks) |

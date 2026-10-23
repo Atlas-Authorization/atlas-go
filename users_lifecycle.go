@@ -325,6 +325,13 @@ type UserConsent struct {
 	Source    *string     `json:"source"`
 	Metadata  interface{} `json:"metadata,omitempty"`
 	CreatedAt int64       `json:"created_at"`
+	// Policy acceptance evidence (nil on records made outside a policy flow).
+	PolicyVersionID *string `json:"policy_version_id,omitempty"`
+	ContentSHA256   *string `json:"content_sha256,omitempty"`
+	Display         *string `json:"display,omitempty"`
+	ScrolledToEnd   *bool   `json:"scrolled_to_end,omitempty"`
+	ViewMS          *int64  `json:"view_ms,omitempty"`
+	Locale          *string `json:"locale,omitempty"`
 }
 
 // RecordConsentParams is the body of POST /v1/users/:id/consents.
@@ -335,6 +342,14 @@ type RecordConsentParams struct {
 	Status   string      `json:"status,omitempty"`
 	Source   string      `json:"source,omitempty"`
 	Metadata interface{} `json:"metadata,omitempty"`
+	// Policy acceptance evidence: the exact version (must be that version of
+	// that policy); ContentSHA256 must equal the version's content_sha256.
+	PolicyVersionID string `json:"policy_version_id,omitempty"`
+	ContentSHA256   string `json:"content_sha256,omitempty"`
+	Display         string `json:"display,omitempty"`
+	ScrolledToEnd   *bool  `json:"scrolled_to_end,omitempty"`
+	ViewMS          *int64 `json:"view_ms,omitempty"`
+	Locale          string `json:"locale,omitempty"`
 }
 
 // RecordConsent records a versioned consent grant or withdrawal.
