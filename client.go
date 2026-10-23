@@ -81,16 +81,18 @@ type Client struct {
 	JWTTemplates             *JWTTemplatesService
 	APIKeys                  *APIKeysService
 
-	OAuthProviders   *OAuthProvidersService
-	SSOOnboarding    *SSOOnboardingService
-	SCIMProvisioning *SCIMProvisioningService
-	FGA              *FGAService
-	RateLimitPolicy  *RateLimitPolicyService
-	RiskBasedMFA     *RiskBasedMFAService
-	BotSignals       *BotSignalsService
-	NetworkACLs      *NetworkACLsService
-	ManagedWAF       *ManagedWAFService
-	LogStreams       *LogStreamsService
+	OAuthProviders *OAuthProvidersService
+	// CustomOAuthProviders are your own upstream OAuth / OIDC login providers.
+	CustomOAuthProviders *CustomOAuthProvidersService
+	SSOOnboarding        *SSOOnboardingService
+	SCIMProvisioning     *SCIMProvisioningService
+	FGA                  *FGAService
+	RateLimitPolicy      *RateLimitPolicyService
+	RiskBasedMFA         *RiskBasedMFAService
+	BotSignals           *BotSignalsService
+	NetworkACLs          *NetworkACLsService
+	ManagedWAF           *ManagedWAFService
+	LogStreams           *LogStreamsService
 	// LogoutNotifyEndpoints is /v1/logout_notify_endpoints — logout fan-out.
 	LogoutNotifyEndpoints *LogoutNotifyEndpointsService
 	Branding              *BrandingService
@@ -98,17 +100,21 @@ type Client struct {
 	SMSTemplates          *SMSTemplatesService
 	Localizations         *LocalizationsService
 	Actions               *ActionsService
-	Billing               *BillingService
-	Messaging             *MessagingService
-	ImportExport          *ImportExportService
-	DataSubjectRequests   *DataSubjectRequestsService
-	RadiusClients         *RadiusClientsService
-	LTIPlatforms          *LTIPlatformsService
-	Instance              *InstanceService
-	InstanceSecurity      *InstanceSecurityService
-	Referrals             *ReferralsService
-	UserHooks             *UserHooksService
-	Tokens                *TokensService
+	// ActionGallery browses and installs Action templates; ActionTemplates
+	// publishes your own.
+	ActionGallery       *ActionGalleryService
+	ActionTemplates     *ActionTemplatesService
+	Billing             *BillingService
+	Messaging           *MessagingService
+	ImportExport        *ImportExportService
+	DataSubjectRequests *DataSubjectRequestsService
+	RadiusClients       *RadiusClientsService
+	LTIPlatforms        *LTIPlatformsService
+	Instance            *InstanceService
+	InstanceSecurity    *InstanceSecurityService
+	Referrals           *ReferralsService
+	UserHooks           *UserHooksService
+	Tokens              *TokensService
 
 	EmailAddresses             *EmailAddressesService
 	OrganizationSettingsSchema *OrganizationSettingsSchemaService
@@ -232,6 +238,7 @@ func New(secretKey string, opts ...Option) *Client {
 	c.APIKeys = &APIKeysService{client: c}
 
 	c.OAuthProviders = &OAuthProvidersService{client: c}
+	c.CustomOAuthProviders = &CustomOAuthProvidersService{client: c}
 	c.SSOOnboarding = &SSOOnboardingService{client: c}
 	c.SCIMProvisioning = &SCIMProvisioningService{client: c}
 	c.FGA = &FGAService{
@@ -251,6 +258,8 @@ func New(secretKey string, opts ...Option) *Client {
 	c.SMSTemplates = &SMSTemplatesService{client: c}
 	c.Localizations = &LocalizationsService{client: c}
 	c.Actions = &ActionsService{client: c}
+	c.ActionGallery = &ActionGalleryService{client: c}
+	c.ActionTemplates = &ActionTemplatesService{client: c}
 	c.Billing = &BillingService{client: c}
 	c.Messaging = &MessagingService{client: c}
 	c.ImportExport = &ImportExportService{client: c}

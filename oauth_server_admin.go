@@ -19,6 +19,9 @@ type SigningKey struct {
 	Status    string `json:"status"`
 	Role      string `json:"role,omitempty"`
 	RetiresAt *int64 `json:"retires_at"`
+	// Provider is, on the current main key, "local" or the KMS holding its
+	// private half (aws_kms, gcp_kms, azure_key_vault).
+	Provider string `json:"provider,omitempty"`
 }
 
 // SigningKeyList is GET /v1/instance/signing_keys.
@@ -60,6 +63,98 @@ func (s *InstanceSecurityService) ListSigningKeys(ctx context.Context) (*Signing
 func (s *InstanceSecurityService) RotateSigningKey(ctx context.Context, params RotateSigningKeyParams, opts ...RequestOption) (*SigningKeyRotation, error) {
 	out := &SigningKeyRotation{}
 	return out, s.client.post(ctx, "/v1/instance/signing_keys/rotate", params, out, opts...)
+}
+
+// --- Signing keys held in your own KMS --------------------------------------
+
+// Key management services a signing key can live in.
+const (
+	SigningKeyProviderLocal         = "local"
+	SigningKeyProviderAWSKMS        = "aws_kms"
+	SigningKeyProviderGCPKMS        = "gcp_kms"
+	SigningKeyProviderAzureKeyVault = "azure_key_vault"
+)
+
+// SigningKeyProviderSettings is GET /v1/instance/signing_key_provider. It never
+// carries credentials. Config holds the non-secret settings (region, key / key
+// ring / vault, algorithm), nil for "local"; Active is true when the current
+// main key is in this KMS; KeyVersion is the KMS key version tokens are signed
+// with (ARN, resource name or key id).
+type SigningKeyProviderSettings struct {
+	Object         string                 `json:"object"`
+	ID             string                 `json:"id,omitempty"`
+	Provider       string                 `json:"provider"`
+	Config         map[string]interface{} `json:"config"`
+	Active         bool                   `json:"active"`
+	KeyVersion     *string                `json:"key_version"`
+	LastVerifiedAt *int64                 `json:"last_verified_at,omitempty"`
+	CreatedAt      int64                  `json:"created_at,omitempty"`
+	UpdatedAt      int64                  `json:"updated_at,omitempty"`
+	// Rotation is set on a PUT: the rotation onto the KMS key.
+	Rotation *SigningKeyRotation `json:"rotation,omitempty"`
+}
+
+// SetSigningKeyProviderParams switches signing to a key in your own KMS.
+//   - aws_kms: Config {region, key_id?, alg?}, Credentials {access_key_id, secret_access_key, session_token?}
+//   - gcp_kms: Config {crypto_key, key_version?}, Credentials {service_account_json}
+//   - azure_key_vault: Config {vault_url, key_name, key_version?, alg?}, Credentials {tenant_id, client_id, client_secret}
+//
+// Without a key id / version Atlas creates a new key version in the KMS.
+// GracePeriodSeconds keeps the previous key published (default 86400, at most
+// 2592000); Emergency publishes only the new key now.
+type SetSigningKeyProviderParams struct {
+	Provider           string                 `json:"provider"`
+	Config             map[string]interface{} `json:"config"`
+	Credentials        map[string]interface{} `json:"credentials"`
+	GracePeriodSeconds *int64                 `json:"grace_period_seconds,omitempty"`
+	Emergency          bool                   `json:"emergency,omitempty"`
+}
+
+// SigningKeyProviderRemoved acknowledges DELETE /v1/instance/signing_key_provider.
+type SigningKeyProviderRemoved struct {
+	Object   string              `json:"object"`
+	Provider string              `json:"provider"`
+	Deleted  bool                `json:"deleted"`
+	Rotation *SigningKeyRotation `json:"rotation"`
+}
+
+// GetSigningKeyProvider reads where the signing key lives ("local" when no
+// KMS is set). GET /v1/instance/signing_key_provider.
+func (s *InstanceSecurityService) GetSigningKeyProvider(ctx context.Context) (*SigningKeyProviderSettings, error) {
+	out := &SigningKeyProviderSettings{}
+	return out, s.client.get(ctx, "/v1/instance/signing_key_provider", nil, out)
+}
+
+// SetSigningKeyProvider signs every token with a key in your AWS KMS, Google
+// Cloud KMS or Azure Key Vault. PUT /v1/instance/signing_key_provider.
+func (s *InstanceSecurityService) SetSigningKeyProvider(ctx context.Context, params SetSigningKeyProviderParams, opts ...RequestOption) (*SigningKeyProviderSettings, error) {
+	out := &SigningKeyProviderSettings{}
+	return out, s.client.put(ctx, "/v1/instance/signing_key_provider", params, out, opts...)
+}
+
+// RemoveSigningKeyProvider stops using the KMS: it rotates back to a key Atlas
+// holds and forgets the credentials. params may set the grace period or
+// Emergency. DELETE /v1/instance/signing_key_provider.
+func (s *InstanceSecurityService) RemoveSigningKeyProvider(ctx context.Context, params RotateSigningKeyParams, opts ...RequestOption) (*SigningKeyProviderRemoved, error) {
+	out := &SigningKeyProviderRemoved{}
+	return out, s.client.do(ctx, "DELETE", "/v1/instance/signing_key_provider", nil, params, out, opts...)
+}
+
+// WalletRPCSecretResult acknowledges PUT /v1/instance/wallet_rpc_secret.
+type WalletRPCSecretResult struct {
+	Object  string `json:"object"`
+	ChainID int64  `json:"chain_id"`
+	Set     bool   `json:"set"`
+}
+
+// SetWalletRPCSecret stores (write-only, encrypted) the wallet RPC endpoint for
+// an EIP-155 chain, used by wallet token gating and the Sign in with Ethereum
+// ENS lookup. An empty url removes it; the URL is never returned.
+// PUT /v1/instance/wallet_rpc_secret.
+func (s *InstanceSecurityService) SetWalletRPCSecret(ctx context.Context, chainID int64, rpcURL string, opts ...RequestOption) (*WalletRPCSecretResult, error) {
+	out := &WalletRPCSecretResult{}
+	body := map[string]interface{}{"chain_id": chainID, "url": rpcURL}
+	return out, s.client.put(ctx, "/v1/instance/wallet_rpc_secret", body, out, opts...)
 }
 
 // --- OAuth initial access tokens (RFC 7591 §3) -------------------------------

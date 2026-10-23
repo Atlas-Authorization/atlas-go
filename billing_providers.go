@@ -12,6 +12,16 @@ const (
 	BillingProviderPolar  = "polar"
 	BillingProviderDodo   = "dodo"
 	BillingProviderCreem  = "creem"
+	// BillingProviderChargebee sells through Chargebee (Product Catalog 2.0).
+	// Config: api_key and webhook_password (secrets), site (the bare site name)
+	// and webhook_username.
+	BillingProviderChargebee = "chargebee"
+	// BillingProviderAutumn sells and meters through Autumn. Config:
+	// secret_key (am_sk_…) and webhook_secret (whsec_…).
+	BillingProviderAutumn = "autumn"
+	// BillingProviderCommet sells and meters through Commet. Config: api_key,
+	// webhook_secret and optionally seat_feature_code.
+	BillingProviderCommet = "commet"
 )
 
 // BillingProvider is one provider's settings. Secrets are never returned:
@@ -35,7 +45,9 @@ type BillingProvider struct {
 // SetBillingProviderParams is the body of PUT /v1/billing/providers/:provider,
 // merged onto what is stored. Config keys: Stripe secret_key, webhook_secret,
 // publishable_key; Polar access_token, webhook_secret; Dodo and Creem api_key,
-// webhook_secret. Environment is "live" or "test" (Stripe's follows its key).
+// webhook_secret; Chargebee api_key, site, webhook_username + webhook_password;
+// Autumn secret_key, webhook_secret; Commet api_key, webhook_secret,
+// seat_feature_code. Environment is "live" or "test" (Stripe's follows its key).
 type SetBillingProviderParams struct {
 	Environment string            `json:"environment,omitempty"`
 	Config      map[string]string `json:"config,omitempty"`
@@ -132,4 +144,76 @@ func (s *BillingService) CancelSubscription(ctx context.Context, id string, imme
 func (s *BillingService) RestoreSubscription(ctx context.Context, id string, opts ...RequestOption) (*BillingSubscription, error) {
 	out := &BillingSubscription{}
 	return out, s.client.post(ctx, "/v1/billing/subscriptions/"+url.PathEscape(id)+"/restore", nil, out, opts...)
+}
+
+// GetSubscription reads one subscription (a subject may hold several: a base
+// plan plus add-ons). GET /v1/billing/subscriptions/:id.
+func (s *BillingService) GetSubscription(ctx context.Context, id string) (*BillingSubscription, error) {
+	out := &BillingSubscription{}
+	return out, s.client.get(ctx, "/v1/billing/subscriptions/"+url.PathEscape(id), nil, out)
+}
+
+// SyncPlanEntitlements mirrors a plan's features and limits from its provider
+// (Autumn, Commet). POST /v1/billing/plans/:id/sync_entitlements.
+func (s *BillingService) SyncPlanEntitlements(ctx context.Context, planID string, opts ...RequestOption) (*BillingPlan, error) {
+	out := &BillingPlan{}
+	return out, s.client.post(ctx, "/v1/billing/plans/"+url.PathEscape(planID)+"/sync_entitlements", nil, out, opts...)
+}
+
+// BillingSettings say how numeric limits merge when a subject holds several
+// entitling subscriptions: "max" (default) or "sum", per limit key.
+type BillingSettings struct {
+	Object            string            `json:"object"`
+	DefaultLimitMerge string            `json:"default_limit_merge"`
+	LimitMerge        map[string]string `json:"limit_merge"`
+}
+
+// UpdateBillingSettingsParams is the body of PUT /v1/billing/settings.
+// LimitMerge (limit key → "max" | "sum") replaces the stored map.
+type UpdateBillingSettingsParams struct {
+	DefaultLimitMerge string            `json:"default_limit_merge,omitempty"`
+	LimitMerge        map[string]string `json:"limit_merge,omitempty"`
+}
+
+// GetSettings reads the limit-merge policy. GET /v1/billing/settings.
+func (s *BillingService) GetSettings(ctx context.Context) (*BillingSettings, error) {
+	out := &BillingSettings{}
+	return out, s.client.get(ctx, "/v1/billing/settings", nil, out)
+}
+
+// UpdateSettings writes the limit-merge policy. PUT /v1/billing/settings.
+func (s *BillingService) UpdateSettings(ctx context.Context, params UpdateBillingSettingsParams, opts ...RequestOption) (*BillingSettings, error) {
+	out := &BillingSettings{}
+	return out, s.client.put(ctx, "/v1/billing/settings", params, out, opts...)
+}
+
+// CheckBillingFeatureParams asks whether a subject may use a feature.
+// Required is the units about to be used (default 1).
+type CheckBillingFeatureParams struct {
+	SubjectType string   `json:"subject_type"`
+	SubjectID   string   `json:"subject_id"`
+	Feature     string   `json:"feature"`
+	Required    *float64 `json:"required,omitempty"`
+}
+
+// BillingFeatureCheck is the answer. Source is "provider" (asked live of
+// Autumn/Commet) or "atlas" (from the resolved entitlement and this period's
+// usage).
+type BillingFeatureCheck struct {
+	Object    string   `json:"object"`
+	Feature   string   `json:"feature"`
+	Allowed   bool     `json:"allowed"`
+	Source    string   `json:"source"`
+	Provider  *string  `json:"provider"`
+	Remaining *float64 `json:"remaining"`
+	Granted   *float64 `json:"granted"`
+	Usage     *float64 `json:"usage"`
+	Unlimited bool     `json:"unlimited"`
+}
+
+// CheckFeature answers whether a subject may use a feature.
+// POST /v1/billing/check.
+func (s *BillingService) CheckFeature(ctx context.Context, params CheckBillingFeatureParams, opts ...RequestOption) (*BillingFeatureCheck, error) {
+	out := &BillingFeatureCheck{}
+	return out, s.client.post(ctx, "/v1/billing/check", params, out, opts...)
 }

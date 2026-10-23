@@ -4,6 +4,26 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.14.0 — 2026-10-24
+
+### Added
+
+- **DPoP (RFC 9449) on the access-token verifier.** A DPoP-bound token (`cnf.jkt`) is accepted only with the DPoP scheme and a valid proof (never as Bearer): `typ` `dpop+jwt`, `DPoPAlgs` (ES256/384/512, RS256/384/512, PS256/384/512, EdDSA), public embedded JWK, signature, `htm`, normalised `htu` (`NormalizeHTU`; `PublicOrigin` for path-only URLs), `iat` window (`DPoPProofMaxAgeSeconds`), `ath`, `jti` replay via `DPoPReplayStore` (`NewMemoryDPoPReplayStore` by default), RFC 7638 `JWKThumbprint` match. `RequireDPoP` refuses unbound tokens; `DPoPNonces` (`NewHMACDPoPNonceSource`) demands a server nonce (`use_dpop_nonce`, `DPoP-Nonce` header via `AccessTokenResult.DPoPNonce`). Challenges use the `DPoP` scheme with `algs`. `VerifyResource(ctx, ResourceRequest{...})`; `VerifyRequest` and `middleware.RequireAccessToken` read the `DPoP` header and set `DPoP-Nonce`. Metadata advertises `dpop_signing_alg_values_supported`; `ProtectedResourceMetadataRequiringDPoP`.
+- **Billing: several subscriptions per subject, add-ons, Chargebee / Autumn / Commet.** Provider constants `BillingProviderChargebee`, `BillingProviderAutumn`, `BillingProviderCommet` (config keys documented on `SetBillingProviderParams`). Plans: `Kind` (`BillingPlanKindBase` / `BillingPlanKindAddon`), `Limits`, `SeatFeatureID` (Autumn; `ClearSeatFeatureID` on update). Subscriptions carry `Entitlements`. New `Billing.GetSubscription`, `SyncPlanEntitlements`, `GetSettings` / `UpdateSettings` (limit merge `max` / `sum`), `CheckFeature`. `ReportUsageParams` takes `Feature` and `SubscriptionID`.
+- **Custom OAuth / OIDC providers.** `CustomOAuthProviders`: `List`, `Get`, `Create`, `Update` (`Clear` sends nulls), `Delete`, `Discover`, `PreviewProfileMapping` (stored or ad-hoc mapping), `SigningKeys(id).List` / `Rotate` / `Retire`. Typed `ProfileMapping` / `ProfileMappingRule`, `UpstreamLogoutSettings`, `IdpInitiatedLoginSettings`, `UpstreamURLs`. OIDC SSO connections take the same relying-party settings and gain `PreviewProfileMapping` and `SigningKeys`.
+- **Actions gallery.** `ActionGallery` (`List` with filters, `Get`, `Install`, `Installs`, `Update`) and `ActionTemplates` (`List`, `Create`, `Get`, `Update`, `Delete`, `AddVersion`, `SubmitVersion`, `DeleteVersion`, `Publish`, `Unlist`). Action dry runs report `HTTPRequests` (what `api.http` queued); sample events take `user.organizations` and `request.country`.
+- **Session custom data.** `Sessions.SetCustomData` (replace; nil clears) and `UpdateCustomData` (merge; a nil value removes a key); `Session.CustomData`; `CreateSessionParams.CustomData`. The `session.updated` webhook (`WebhookEventSessionUpdated`) fires on a change.
+- **Sign-in settings.** `InstanceSecurity.SetWalletRPCSecret(chainID, url)`; per-endpoint rate-limit `Rules` (`RateLimitRule`, keys `ip` / `user` / `instance`) on the rate-limit policy, plus the verify and LDAP budgets and the group catalog; `Instance.SetAccountLinkingTrust` (`LinkingTrustAlways` / `Verified` / `Never`); `Instance.SetCaptchaConfig` with a typed `CaptchaConfig` (incl. `AttestationURL`) and `CaptchaProvider*` constants (incl. `captchafox`, `vercel_botid`).
+- **Vercel BotID attestations.** `CreateBotIDAttestation(secret, verdict, opts)` signs a verdict in Atlas's `atlas_botid.v1` format; `BotIDAttestationHandler` serves `{token}` from your own verdict check.
+- **Enterprise SSO.** SAML Single Logout fields (`SAMLSingleLogout`, `SAMLIDPSLOURL`, `SAMLIDPSLOResponseURL`, `SAMLIDPSLOBinding`, `SAMLIDPSLOSOAPURL`), `SAMLRequireEncryptedAssertions` and the encryption-key flags on connections; `SamlMetadata.SLOURL`; `GetSAMLEncryptionKey`, `CreateSAMLEncryptionKey` (create or rotate), `RetirePreviousSAMLEncryptionKey`, `DeleteSAMLEncryptionKey`. Attack protection `DormantAccounts`; risk weight and signal `DormantAccount`; `EmailTemplateAccountReactivated`; `WebhookEventUserReactivated`.
+- **Atlas as OAuth provider.** OAuth clients: `AccessTokenFormat` (`AccessTokenFormatJWT` / `AccessTokenFormatOpaque`) and `TokenLifetimes`. Resource servers: `AccessTokenFormat`, refresh-token lifetimes, `IntrospectionClientIDs`. `SigningKey.Provider`; `InstanceSecurity.GetSigningKeyProvider` / `SetSigningKeyProvider` / `RemoveSigningKeyProvider` (AWS KMS, Google Cloud KMS, Azure Key Vault).
+- **Opaque access tokens.** `AccessTokenVerifierOptions.Introspection` validates non-JWT access tokens at Atlas's RFC 7662 endpoint with your API's client credentials, cached by token hash (TTL, negative TTL, never past `exp`, bounded); `IntrospectJWTs` checks JWTs live too. `NewIntrospector` is exported.
+- **Device sign-in approval.** `NewDeviceAuthorizations(frontendAPI, sessionToken, opts)`: `Lookup`, `Approve`, `Deny` on the Frontend API with the user's session token; `DeviceAuthorizationError` (`NeedsReverification`, `IsInvalidCode`); `FormatUserCode`, `UserCodeFromURL`.
+
+### Changed
+
+- A token that is not a JWT is now refused with "configure Introspection to accept opaque tokens" instead of "malformed" when `Introspection` is not set.
+
 ## 0.13.0 — 2026-10-23
 
 ### Added

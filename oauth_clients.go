@@ -46,8 +46,34 @@ type OAuthClient struct {
 	// ClientSecretExpiresAt is when the current secret stops authenticating
 	// (epoch ms); nil means it never expires.
 	ClientSecretExpiresAt *int64 `json:"client_secret_expires_at,omitempty"`
-	CreatedAt             int64  `json:"created_at"`
-	UpdatedAt             int64  `json:"updated_at"`
+	// AccessTokenFormat is "jwt" or "opaque" for this client; nil inherits from
+	// the API / instance.
+	AccessTokenFormat *string `json:"access_token_format,omitempty"`
+	// TokenLifetimes are this client's lifetime overrides (seconds); a nil
+	// field is inherited.
+	TokenLifetimes *OAuthTokenLifetimes `json:"token_lifetimes,omitempty"`
+	CreatedAt      int64                `json:"created_at"`
+	UpdatedAt      int64                `json:"updated_at"`
+}
+
+// Access-token formats: signed JWTs, or opaque references validated by
+// introspection.
+const (
+	AccessTokenFormatJWT    = "jwt"
+	AccessTokenFormatOpaque = "opaque"
+)
+
+// OAuthTokenLifetimes are token lifetimes in seconds. A nil field inherits
+// the API's, then the instance's, then Atlas's default. Bounds: access / id
+// token 60–86400; refresh token 300–31536000 (idle ≤ absolute); authorization
+// code 10–600; device code 60–1800.
+type OAuthTokenLifetimes struct {
+	AccessTokenTTLSeconds          *int64 `json:"access_token_ttl_seconds,omitempty"`
+	IDTokenTTLSeconds              *int64 `json:"id_token_ttl_seconds,omitempty"`
+	RefreshTokenAbsoluteTTLSeconds *int64 `json:"refresh_token_absolute_ttl_seconds,omitempty"`
+	RefreshTokenIdleTTLSeconds     *int64 `json:"refresh_token_idle_ttl_seconds,omitempty"`
+	AuthorizationCodeTTLSeconds    *int64 `json:"authorization_code_ttl_seconds,omitempty"`
+	DeviceCodeTTLSeconds           *int64 `json:"device_code_ttl_seconds,omitempty"`
 }
 
 // OAuthClientWithSecret carries the client_secret, revealed once on create and
@@ -107,6 +133,14 @@ type CreateOAuthClientParams struct {
 	// SectorIdentifierURI is an https URL listing every redirect_uri; required
 	// for a pairwise client whose redirect_uris span more than one host.
 	SectorIdentifierURI string `json:"sector_identifier_uri,omitempty"`
+	// AccessTokenFormat is "jwt" or "opaque"; ClearAccessTokenFormat sends
+	// null (inherit).
+	AccessTokenFormat      string `json:"access_token_format,omitempty"`
+	ClearAccessTokenFormat bool   `json:"-"`
+	// TokenLifetimes replaces the client's overrides; ClearTokenLifetimes
+	// sends null and clears them all.
+	TokenLifetimes      *OAuthTokenLifetimes `json:"token_lifetimes,omitempty"`
+	ClearTokenLifetimes bool                 `json:"-"`
 }
 
 // UpdateOAuthClientParams is the body of PATCH /v1/oauth_clients/:id.
@@ -136,6 +170,37 @@ type UpdateOAuthClientParams struct {
 	Disabled *bool `json:"disabled,omitempty"`
 	// RequirePKCE forces PKCE for this confidential client too.
 	RequirePKCE *bool `json:"require_pkce,omitempty"`
+	// AccessTokenFormat is "jwt" or "opaque"; ClearAccessTokenFormat sends
+	// null (inherit).
+	AccessTokenFormat      string `json:"access_token_format,omitempty"`
+	ClearAccessTokenFormat bool   `json:"-"`
+	// TokenLifetimes replaces the client's overrides; ClearTokenLifetimes
+	// sends null and clears them all.
+	TokenLifetimes      *OAuthTokenLifetimes `json:"token_lifetimes,omitempty"`
+	ClearTokenLifetimes bool                 `json:"-"`
+}
+
+func oauthClientTokenNulls(format, lifetimes bool) map[string]interface{} {
+	extra := map[string]interface{}{}
+	if format {
+		extra["access_token_format"] = nil
+	}
+	if lifetimes {
+		extra["token_lifetimes"] = nil
+	}
+	return extra
+}
+
+// MarshalJSON sends null for the Clear* flags.
+func (p CreateOAuthClientParams) MarshalJSON() ([]byte, error) {
+	type plain CreateOAuthClientParams
+	return marshalWithExtra(plain(p), oauthClientTokenNulls(p.ClearAccessTokenFormat, p.ClearTokenLifetimes))
+}
+
+// MarshalJSON sends null for the Clear* flags.
+func (p UpdateOAuthClientParams) MarshalJSON() ([]byte, error) {
+	type plain UpdateOAuthClientParams
+	return marshalWithExtra(plain(p), oauthClientTokenNulls(p.ClearAccessTokenFormat, p.ClearTokenLifetimes))
 }
 
 // List returns all OAuth clients. GET /v1/oauth_clients.

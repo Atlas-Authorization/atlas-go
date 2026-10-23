@@ -36,9 +36,34 @@ type AttackProtection struct {
 		SecretSet  bool   `json:"secret_set"`
 		ManagedBy  string `json:"managed_by"`
 	} `json:"captcha"`
+	// DormantAccounts is the dormant-account reactivation policy (writable).
+	DormantAccounts *DormantAccountsSettings `json:"dormant_accounts,omitempty"`
 }
 
-// UpdateAttackProtectionParams toggles the two writable flags.
+// DormantAccountsSettings: when an account idle for ThresholdDays signs in
+// again there is an audit entry, the user.reactivated webhook, an optional
+// notice to the user and, with RequireMFA, a second-factor step-up (OnNoFactor
+// decides for an account without one: "allow", "require_enroll" or "block").
+type DormantAccountsSettings struct {
+	Enabled       bool   `json:"enabled"`
+	ThresholdDays int    `json:"threshold_days"`
+	RequireMFA    bool   `json:"require_mfa"`
+	OnNoFactor    string `json:"on_no_factor"`
+	NotifyUser    bool   `json:"notify_user"`
+}
+
+// UpdateDormantAccountsParams changes any subset of the dormant-account
+// policy. ThresholdDays is 1–3650.
+type UpdateDormantAccountsParams struct {
+	Enabled       *bool  `json:"enabled,omitempty"`
+	ThresholdDays *int   `json:"threshold_days,omitempty"`
+	RequireMFA    *bool  `json:"require_mfa,omitempty"`
+	OnNoFactor    string `json:"on_no_factor,omitempty"`
+	NotifyUser    *bool  `json:"notify_user,omitempty"`
+}
+
+// UpdateAttackProtectionParams toggles the writable flags and the
+// dormant-account policy.
 type UpdateAttackProtectionParams struct {
 	BruteForce *struct {
 		Enabled *bool `json:"enabled,omitempty"`
@@ -46,6 +71,7 @@ type UpdateAttackProtectionParams struct {
 	BreachedPassword *struct {
 		Enabled *bool `json:"enabled,omitempty"`
 	} `json:"breached_password,omitempty"`
+	DormantAccounts *UpdateDormantAccountsParams `json:"dormant_accounts,omitempty"`
 }
 
 // Get returns the attack-protection configuration. GET /v1/attack_protection.

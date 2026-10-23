@@ -29,8 +29,30 @@ type BillingPlan struct {
 	// AnnualPriceID / AnnualAmount offer the plan yearly too.
 	AnnualPriceID *string `json:"annual_price_id,omitempty"`
 	AnnualAmount  *string `json:"annual_amount,omitempty"`
+	// Limits are the numeric limits the plan grants (the ent.limits claim);
+	// -1 means unlimited.
+	Limits map[string]interface{} `json:"limits,omitempty"`
+	// Kind is "base" (the subject's main plan) or "addon" (bought alongside
+	// it; several may be live at once).
+	Kind string `json:"kind,omitempty"`
+	// SeatFeatureID (Autumn plans) is the feature whose usage follows the
+	// organization's member count.
+	SeatFeatureID *string `json:"seat_feature_id,omitempty"`
 	CreatedAt     int64   `json:"created_at"`
 	UpdatedAt     int64   `json:"updated_at"`
+}
+
+// Plan kinds.
+const (
+	BillingPlanKindBase  = "base"
+	BillingPlanKindAddon = "addon"
+)
+
+// BillingEntitlements is what an entitlement provider (Autumn, Commet)
+// reports a subscription grants.
+type BillingEntitlements struct {
+	Features []string           `json:"features"`
+	Limits   map[string]float64 `json:"limits"`
 }
 
 // BillingSubscription is a read view of who is subscribed. Status is written only
@@ -63,9 +85,12 @@ type BillingSubscription struct {
 	CanceledAt        *int64  `json:"canceled_at,omitempty"`
 	// Scheduled is set on a change response: true when the switch waits for
 	// the period end.
-	Scheduled bool  `json:"scheduled,omitempty"`
-	CreatedAt int64 `json:"created_at"`
-	UpdatedAt int64 `json:"updated_at"`
+	Scheduled bool `json:"scheduled,omitempty"`
+	// Entitlements is what an entitlement provider (Autumn, Commet) reports
+	// this subscription grants; nil for other providers.
+	Entitlements *BillingEntitlements `json:"entitlements,omitempty"`
+	CreatedAt    int64                `json:"created_at"`
+	UpdatedAt    int64                `json:"updated_at"`
 }
 
 // CreateBillingPlanParams is the body of POST /v1/billing/plans.
@@ -86,6 +111,13 @@ type CreateBillingPlanParams struct {
 	// AnnualPriceID / AnnualAmount offer the plan yearly too.
 	AnnualPriceID string `json:"annual_price_id,omitempty"`
 	AnnualAmount  string `json:"annual_amount,omitempty"`
+	// Limits are numeric limits the plan grants (-1 = unlimited).
+	Limits map[string]interface{} `json:"limits,omitempty"`
+	// Kind is "base" (default) or "addon".
+	Kind string `json:"kind,omitempty"`
+	// SeatFeatureID (Autumn plans): one of the plan's features; its usage
+	// follows the organization's member count.
+	SeatFeatureID string `json:"seat_feature_id,omitempty"`
 }
 
 // UpdateBillingPlanParams is the body of PATCH /v1/billing/plans/:id.
@@ -106,6 +138,24 @@ type UpdateBillingPlanParams struct {
 	// AnnualPriceID / AnnualAmount offer the plan yearly too.
 	AnnualPriceID string `json:"annual_price_id,omitempty"`
 	AnnualAmount  string `json:"annual_amount,omitempty"`
+	// Limits replaces the plan's numeric limits.
+	Limits map[string]interface{} `json:"limits,omitempty"`
+	// Kind is "base" or "addon" (refused once the plan has subscriptions).
+	Kind string `json:"kind,omitempty"`
+	// SeatFeatureID sets the Autumn seat feature; ClearSeatFeatureID sends
+	// null and removes it.
+	SeatFeatureID      string `json:"seat_feature_id,omitempty"`
+	ClearSeatFeatureID bool   `json:"-"`
+}
+
+// MarshalJSON sends seat_feature_id: null when ClearSeatFeatureID is set.
+func (p UpdateBillingPlanParams) MarshalJSON() ([]byte, error) {
+	type plain UpdateBillingPlanParams
+	var extra map[string]interface{}
+	if p.ClearSeatFeatureID {
+		extra = map[string]interface{}{"seat_feature_id": nil}
+	}
+	return marshalWithExtra(plain(p), extra)
 }
 
 // ListSubscriptionsParams filters the subscription read view to one subject.
@@ -180,6 +230,12 @@ type ReportUsageParams struct {
 	SubjectID      string  `json:"subject_id"`
 	Quantity       float64 `json:"quantity"`
 	IdempotencyKey string  `json:"idempotency_key"`
+	// Feature counts the usage against this provider feature (an Autumn
+	// feature id or Commet feature code).
+	Feature string `json:"feature,omitempty"`
+	// SubscriptionID attributes the usage to one subscription when the
+	// subject holds several.
+	SubscriptionID string `json:"subscription_id,omitempty"`
 }
 
 // UsageRecordResult is the result of reporting usage: whether it was newly

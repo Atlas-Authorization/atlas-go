@@ -23,6 +23,9 @@ type Session struct {
 	// there is activity first (same value as AbandonAt).
 	IdleExpiresAt int64 `json:"idle_expires_at,omitempty"`
 	CreatedAt     int64 `json:"created_at"`
+	// CustomData is the custom per-session data your backend (or a post_login
+	// Action) attached; nil when none.
+	CustomData map[string]interface{} `json:"custom_data,omitempty"`
 }
 
 // TouchedSession is the session after a keep-alive touch.
@@ -59,18 +62,21 @@ type SessionActor struct {
 type CreateSessionParams struct {
 	UserID string        `json:"user_id"`
 	Actor  *SessionActor `json:"actor,omitempty"`
+	// CustomData attaches custom per-session data (a JSON object, at most 2 KB).
+	CustomData map[string]interface{} `json:"custom_data,omitempty"`
 }
 
 // MintedSession is a freshly-minted session. Unlike a listed Session it carries
 // the bearer JWT and refresh token in-body, returned by design for headless use.
 type MintedSession struct {
-	Object         string        `json:"object"`
-	ID             string        `json:"id"`
-	UserID         string        `json:"user_id"`
-	JWT            string        `json:"jwt"`
-	RefreshToken   string        `json:"refresh_token"`
-	ExpiresIn      int64         `json:"expires_in"`
-	ImpersonatedBy *SessionActor `json:"impersonated_by,omitempty"`
+	Object         string                 `json:"object"`
+	ID             string                 `json:"id"`
+	UserID         string                 `json:"user_id"`
+	JWT            string                 `json:"jwt"`
+	RefreshToken   string                 `json:"refresh_token"`
+	ExpiresIn      int64                  `json:"expires_in"`
+	ImpersonatedBy *SessionActor          `json:"impersonated_by,omitempty"`
+	CustomData     map[string]interface{} `json:"custom_data,omitempty"`
 }
 
 // Create mints a session for a user without the sign-in flow. POST /v1/sessions.
@@ -99,4 +105,22 @@ func (s *SessionsService) Get(ctx context.Context, id string) (*Session, error) 
 func (s *SessionsService) Revoke(ctx context.Context, id string, opts ...RequestOption) (*RevokeSessionResult, error) {
 	out := &RevokeSessionResult{}
 	return out, s.client.post(ctx, "/v1/sessions/"+url.PathEscape(id)+"/revoke", nil, out, opts...)
+}
+
+// SetCustomData replaces a session's custom data (nil clears it). At most
+// 2 KB; only an active session can be changed. Not for secrets: the signed-in
+// user can read it. Sends the session.updated webhook.
+// PUT /v1/sessions/:id/custom_data.
+func (s *SessionsService) SetCustomData(ctx context.Context, id string, data map[string]interface{}, opts ...RequestOption) (*Session, error) {
+	out := &Session{}
+	body := map[string]interface{}{"custom_data": data}
+	return out, s.client.put(ctx, "/v1/sessions/"+url.PathEscape(id)+"/custom_data", body, out, opts...)
+}
+
+// UpdateCustomData merges keys into a session's custom data; a key set to nil
+// is removed. PATCH /v1/sessions/:id/custom_data.
+func (s *SessionsService) UpdateCustomData(ctx context.Context, id string, patch map[string]interface{}, opts ...RequestOption) (*Session, error) {
+	out := &Session{}
+	body := map[string]interface{}{"custom_data": patch}
+	return out, s.client.patch(ctx, "/v1/sessions/"+url.PathEscape(id)+"/custom_data", body, out, opts...)
 }

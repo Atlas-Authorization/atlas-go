@@ -85,7 +85,9 @@ func AccessTokenFromContext(ctx context.Context) (*atlas.AccessTokenResult, bool
 }
 
 // RequireAccessToken protects an API route with an Atlas-issued OAuth access
-// token (an Authorization: Bearer header, never a cookie). It answers a
+// token (an Authorization: Bearer or DPoP header, never a cookie). A
+// DPoP-bound token must come with a valid DPoP proof (RFC 9449); the
+// verifier's DPoP-Nonce, when it issues nonces, is set on every response. It answers a
 // refusal with the verifier's status and RFC 6750 / RFC 9728
 // WWW-Authenticate challenge, and requires the verifier's scopes plus
 // extraScopes. The verified result is readable with AccessTokenFromContext.
@@ -93,6 +95,9 @@ func RequireAccessToken(v *atlas.AccessTokenVerifier, extraScopes ...string) fun
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			res := v.VerifyRequest(r.Context(), r, extraScopes...)
+			if res.DPoPNonce != "" {
+				w.Header().Set("DPoP-Nonce", res.DPoPNonce)
+			}
 			if !res.OK {
 				w.Header().Set("WWW-Authenticate", res.WWWAuthenticate)
 				w.Header().Set("Content-Type", "application/json")

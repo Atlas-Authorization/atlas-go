@@ -48,6 +48,8 @@ type ActionTestEvent struct {
 		Email         string                 `json:"email,omitempty"`
 		EmailVerified *bool                  `json:"emailVerified,omitempty"`
 		Metadata      map[string]interface{} `json:"metadata,omitempty"`
+		// Organizations are the user's memberships, as event.user.organizations.
+		Organizations []ActionTestOrganization `json:"organizations,omitempty"`
 	} `json:"user,omitempty"`
 	Connection *struct {
 		Strategy string `json:"strategy,omitempty"`
@@ -55,7 +57,28 @@ type ActionTestEvent struct {
 	Request *struct {
 		IP        string `json:"ip,omitempty"`
 		UserAgent string `json:"user_agent,omitempty"`
+		// Country is the ISO code event.request.country should carry.
+		Country string `json:"country,omitempty"`
 	} `json:"request,omitempty"`
+}
+
+// ActionTestOrganization is one membership in a sample event.
+type ActionTestOrganization struct {
+	ID   string `json:"id"`
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+	Role string `json:"role"`
+}
+
+// ActionTestHTTPRequest is an outbound request the code queued with api.http
+// (a dry run sends nothing). Query values in URL are masked; only header
+// names are echoed.
+type ActionTestHTTPRequest struct {
+	Method         string   `json:"method"`
+	URL            string   `json:"url"`
+	HeaderNames    []string `json:"header_names"`
+	HasBody        bool     `json:"has_body"`
+	SaveResponseAs *string  `json:"save_response_as"`
 }
 
 // ActionTestResult is what an action produced against a sample event.
@@ -68,7 +91,10 @@ type ActionTestResult struct {
 	IDTokenClaims     map[string]interface{} `json:"id_token_claims"`
 	AppMetadata       map[string]interface{} `json:"app_metadata"`
 	Logs              []string               `json:"logs"`
-	Error             *string                `json:"error"`
+	// HTTPRequests is what the code queued with api.http; sent only on a real
+	// post_login / post_user_registration run.
+	HTTPRequests []ActionTestHTTPRequest `json:"http_requests,omitempty"`
+	Error        *string                 `json:"error"`
 }
 
 // ActionBindingList is the ordered binding list for a trigger.

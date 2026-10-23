@@ -14,6 +14,9 @@ type RiskWeights struct {
 	NewIP            float64 `json:"newIp"`
 	Velocity         float64 `json:"velocity"`
 	ImpossibleTravel float64 `json:"impossibleTravel"`
+	// DormantAccount: the account was idle past the dormant-account threshold
+	// before this sign-in.
+	DormantAccount float64 `json:"dormantAccount,omitempty"`
 }
 
 // RiskSignalToggles are per-signal on/off switches.
@@ -23,6 +26,7 @@ type RiskSignalToggles struct {
 	NewIP            bool `json:"newIp"`
 	Velocity         bool `json:"velocity"`
 	ImpossibleTravel bool `json:"impossibleTravel"`
+	DormantAccount   bool `json:"dormantAccount,omitempty"`
 }
 
 // RiskBasedMFA is the adaptive-MFA config.
