@@ -65,3 +65,21 @@ func OpenSealedBox(sealed []byte, publicKey, secretKey [32]byte) ([]byte, error)
 	}
 	return plain, nil
 }
+
+// SecretsSealed says a response was sealed to the key named in X-Secret-Recipient
+// (WithSecretRecipient): each listed field arrives as sealed_<field> instead of in
+// plaintext. Open one with OpenSealedSecret.
+type SecretsSealed struct {
+	Algorithm string   `json:"algorithm"`
+	Recipient string   `json:"recipient"`
+	Fields    []string `json:"fields"`
+}
+
+// SealedFields are the sealed_* values any shown-once secret response can carry
+// when the request named a recipient. The plaintext field is then empty.
+type SealedFields struct {
+	SealedSecret        string         `json:"sealed_secret,omitempty"`
+	SealedClientSecret  string         `json:"sealed_client_secret,omitempty"`
+	SealedWebhookSecret string         `json:"sealed_webhook_secret,omitempty"`
+	SecretsSealed       *SecretsSealed `json:"secrets_sealed,omitempty"`
+}

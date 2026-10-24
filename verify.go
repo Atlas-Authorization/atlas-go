@@ -57,6 +57,13 @@ type SessionClaims struct {
 	OrgSlug        string   `json:"org_slug"`
 	OrgRole        string   `json:"org_role"`
 	OrgPermissions []string `json:"org_permissions"`
+	// SSOConnectionID is the enterprise SSO connection the session was made through.
+	SSOConnectionID string `json:"sso_connection_id"`
+	// SSOOrganizationID is the Atlas organization that owns that connection ("" for
+	// an instance-wide one), independent of OrgID.
+	SSOOrganizationID string `json:"sso_organization_id"`
+	// SSOConnectionType is saml or oidc.
+	SSOConnectionType string `json:"sso_connection_type"`
 
 	// Raw is the full claim set, including any not modelled above.
 	Raw map[string]interface{} `json:"-"`

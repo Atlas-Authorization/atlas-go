@@ -99,6 +99,37 @@ type AtlasIDAppPreflight struct {
 	// UserCount is the number of people who approved the app.
 	UserCount int                `json:"user_count"`
 	Findings  []PreflightFinding `json:"findings"`
+	// ButtonRenderedOrigins are the page origins the Sign in with Atlas button
+	// script ran on in the last 7 days.
+	ButtonRenderedOrigins []AtlasIDOriginSeen `json:"button_rendered_origins,omitempty"`
+	// AuthorizeRequests7d counts how the last 7 days' sign-ins started.
+	AuthorizeRequests7d *AtlasIDAuthorizeSources `json:"authorize_requests_7d,omitempty"`
+	// FallbackOrigins are origins of sign-ins that came through the no-script
+	// fallback link (?atlasid_fallback=1).
+	FallbackOrigins []AtlasIDOriginSeen `json:"fallback_origins,omitempty"`
+	// HomepageIncludesScript is whether the app's homepage references the
+	// button script (nil = could not check).
+	HomepageIncludesScript *bool `json:"homepage_includes_script,omitempty"`
+}
+
+// SetManagedByResult is an app after SetManagedBy, with whether anything changed.
+type SetManagedByResult struct {
+	AtlasIDApp
+	Changed bool `json:"changed"`
+}
+
+// SetManagedBy hands the app's grant management to an instance of the same
+// account (managed_via "adopted"), or takes it back when instanceID is nil. That
+// instance's secret key, scoped to privacy:grants:revoke or atlas_id_apps:*, then
+// lists and revokes the app's grants, so a data-rights tool never needs the
+// platform key. The app stays yours to edit.
+// PUT /v1/platform/atlas_id_apps/:id/managed_by.
+func (s *AtlasIDAppsService) SetManagedBy(ctx context.Context, id string, instanceID *string, opts ...RequestOption) (*SetManagedByResult, error) {
+	out := &SetManagedByResult{}
+	body := struct {
+		InstanceID *string `json:"instance_id"`
+	}{instanceID}
+	return out, s.client.platPut(ctx, "/v1/platform/atlas_id_apps/"+url.PathEscape(id)+"/managed_by", body, out, opts...)
 }
 
 // Preflight checks one app's setup. GET /v1/platform/atlas_id_apps/:id/preflight.

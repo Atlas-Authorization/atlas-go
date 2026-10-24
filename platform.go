@@ -76,6 +76,8 @@ type PlatformApp struct {
 
 // PlatformAppWithSecret is a PlatformApp plus its reveal-once secret key.
 type PlatformAppWithSecret struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	PlatformApp
 	Secret string `json:"secret"`
 }
@@ -184,6 +186,8 @@ type PlatformAppsBulkDeleteResult struct {
 // PlatformAppSecretRotation is the result of rotating an app's secret with
 // overlap: the new secret (revealed once) and when the prior keys expire.
 type PlatformAppSecretRotation struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	Object               string `json:"object"`
 	AppID                string `json:"app_id"`
 	Secret               string `json:"secret"`
@@ -206,6 +210,8 @@ type PlatformSecretKey struct {
 
 // PlatformInstanceSecret is the result of rotating one instance's secret.
 type PlatformInstanceSecret struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	Object     string `json:"object"`
 	AppID      string `json:"app_id"`
 	InstanceID string `json:"instance_id"`
@@ -431,6 +437,8 @@ type AtlasIDAppsService struct{ client *Client }
 // AtlasIDApp is a registered Sign in with Atlas app. It never carries the
 // client secret except on create and rotate (ClientSecret).
 type AtlasIDApp struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	Object      string              `json:"object"`
 	ID          string              `json:"id"`
 	ClientID    string              `json:"client_id"`
@@ -451,8 +459,11 @@ type AtlasIDApp struct {
 	Type                string  `json:"type"`
 	SecretPrefix        *string `json:"secret_prefix"`
 	ManagedByInstanceID *string `json:"managed_by_instance_id"`
-	CreatedAt           int64   `json:"created_at"`
-	UpdatedAt           int64   `json:"updated_at"`
+	// ManagedVia is instance_toggle (an instance's Sign in with Atlas toggle app)
+	// or adopted (handed to an instance with SetManagedBy); nil otherwise.
+	ManagedVia *string `json:"managed_via,omitempty"`
+	CreatedAt  int64   `json:"created_at"`
+	UpdatedAt  int64   `json:"updated_at"`
 	// UserCount is the number of people who approved the app (Get only).
 	UserCount *int `json:"user_count,omitempty"`
 	// ClientSecret is returned exactly once, on create and rotate, for
@@ -792,6 +803,8 @@ type CreatePlatformSecretKeyParams struct {
 // CreatedPlatformSecretKey is a minted secret key. Secret is present only on a
 // fresh create (never on an idempotent replay).
 type CreatedPlatformSecretKey struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	PlatformSecretKey
 	AppID      string `json:"app_id"`
 	InstanceID string `json:"instance_id"`
@@ -828,6 +841,8 @@ type CloneConfigExcluded struct {
 
 // CloneConfigResult is the answer to a config clone.
 type CloneConfigResult struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	// Object is clone_config_result, or dry_run.
 	Object           string                `json:"object"`
 	SourceInstanceID string                `json:"source_instance_id"`
@@ -902,6 +917,8 @@ type CreatePlatformKeyParams struct {
 
 // PlatformAPIKey is a platform key; Secret / SealedSecret are present once.
 type PlatformAPIKey struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	Object       string   `json:"object"`
 	ID           string   `json:"id"`
 	Prefix       string   `json:"prefix,omitempty"`
@@ -1001,6 +1018,8 @@ type AccountAuditRecord struct {
 
 // AccountAuditStream forwards the account audit log to a URL.
 type AccountAuditStream struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	Object string `json:"object"`
 	ID     string `json:"id"`
 	URL    string `json:"url"`

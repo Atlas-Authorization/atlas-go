@@ -59,6 +59,8 @@ type SecretKey struct {
 // SecretKeyWithSecret is a create or rotate response: the secret is present
 // once (or sealed, with WithSecretRecipient).
 type SecretKeyWithSecret struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	SecretKey
 	Secret       string `json:"secret,omitempty"`
 	SealedSecret string `json:"sealed_secret,omitempty"`
@@ -250,6 +252,8 @@ func (c *Client) Whoami(ctx context.Context) (*Whoami, error) {
 // PartnerLink is a credential an integrated partner service holds on this
 // instance.
 type PartnerLink struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	Object   string `json:"object"`
 	ID       string `json:"id"`
 	ClientID string `json:"client_id"`
@@ -451,6 +455,20 @@ type ManagedAtlasIDApp struct {
 	ClientID            string `json:"client_id"`
 	Name                string `json:"name"`
 	ManagedByInstanceID string `json:"managed_by_instance_id"`
+	// ManagedVia is instance_toggle or adopted.
+	ManagedVia    string   `json:"managed_via,omitempty"`
+	AllowedScopes []string `json:"allowed_scopes,omitempty"`
+	CreatedAt     int64    `json:"created_at,omitempty"`
+	// ButtonRenderedOrigins are the page origins the button script ran on in the
+	// last 7 days.
+	ButtonRenderedOrigins []AtlasIDOriginSeen `json:"button_rendered_origins,omitempty"`
+}
+
+// Preflight is the setup check of an app this instance manages
+// (diagnostics:read is enough). GET /v1/atlas_id_apps/:id/preflight.
+func (s *AtlasIDGrantsService) Preflight(ctx context.Context, appID string) (*AtlasIDAppPreflight, error) {
+	out := &AtlasIDAppPreflight{}
+	return out, s.client.get(ctx, "/v1/atlas_id_apps/"+url.PathEscape(appID)+"/preflight", nil, out)
 }
 
 // AtlasIDGrantLookup says a verified email is a user of an app.

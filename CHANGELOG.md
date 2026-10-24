@@ -4,6 +4,16 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.18.0 — 2026-10-24
+
+### Added
+
+- **Enterprise SSO claims.** `SessionClaims` carries `SSOConnectionID`, `SSOOrganizationID` and `SSOConnectionType`; `OIDCSSOContext` (from `OIDCSSOOf`) carries `OrganizationID` and `Type`. Scope a per-organization "require SSO" rule on `sso_organization_id`, never on "signed in via SSO".
+- **Adopting a Sign in with Atlas app.** `Platform.AtlasIDApps.SetManagedBy(ctx, id, instanceID *string)` (`PUT /v1/platform/atlas_id_apps/{id}/managed_by`; nil takes it back) returning `SetManagedByResult`. `AtlasIDApp` and `ManagedAtlasIDApp` gain `ManagedVia` (`instance_toggle` | `adopted`); `ManagedAtlasIDApp` gains `ButtonRenderedOrigins`.
+- **Instance-surface app setup check.** `Client.AtlasIDGrants.Preflight(ctx, appID)` (`GET /v1/atlas_id_apps/{id}/preflight`). `AtlasIDAppPreflight` (both surfaces) gains `ButtonRenderedOrigins`, `AuthorizeRequests7d`, `FallbackOrigins` and `HomepageIncludesScript`.
+- **Dry run.** `DryRunResult` gains `Warnings`, `WouldReturnStatus`, `Suppressed` and `ValidationSkipped`; `Mode` is `native`, `rollback` or `plan`.
+- **Sealed secrets.** `SealedFields` (`sealed_secret`, `sealed_client_secret`, `sealed_webhook_secret`, `secrets_sealed`) and `SecretsSealed` are embedded in every shown-once secret response type (webhook endpoints and secrets, OAuth clients, Sign in with Atlas apps, SCIM tokens, machines, API keys, platform apps and keys, audit streams, partner links), so `WithSecretRecipient` works on every newly covered route.
+
 ## 0.17.0 — 2026-10-24
 
 ### Added

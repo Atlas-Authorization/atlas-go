@@ -66,15 +66,42 @@ type DryRunChange struct {
 type DryRunResult struct {
 	Object string `json:"object"`
 	DryRun bool   `json:"dry_run"`
-	// Mode is "native" (the endpoint validated in full) or "plan" (the body
-	// diffed over the current object, unvalidated).
-	Mode        string         `json:"mode"`
-	Validated   bool           `json:"validated"`
-	Method      string         `json:"method"`
-	Path        string         `json:"path"`
-	Changes     []DryRunChange `json:"changes"`
-	WouldReturn interface{}    `json:"would_return,omitempty"`
-	Note        string         `json:"note"`
+	// Mode is "native" (the endpoint's own dry run, validated in full),
+	// "rollback" (the real write ran in a transaction that was rolled back, every
+	// side effect held back, validated in full) or "plan" (validation could not
+	// run to the end; see ValidationSkipped).
+	Mode      string         `json:"mode"`
+	Validated bool           `json:"validated"`
+	Method    string         `json:"method"`
+	Path      string         `json:"path"`
+	Changes   []DryRunChange `json:"changes"`
+	// Warnings are the same non-fatal warnings the real write returns, e.g.
+	// origin_still_referenced.
+	Warnings []DryRunWarning `json:"warnings,omitempty"`
+	// WouldReturn is what the real write would return (secrets redacted).
+	WouldReturn interface{} `json:"would_return,omitempty"`
+	// WouldReturnStatus is the status the real write would answer with
+	// (rollback mode).
+	WouldReturnStatus int `json:"would_return_status,omitempty"`
+	// Suppressed lists the side effects held back: email, sms, voice, push,
+	// outbound_network, redis, cache, file.
+	Suppressed []string `json:"suppressed,omitempty"`
+	// ValidationSkipped says why plan mode did not validate to the end.
+	ValidationSkipped *DryRunValidationSkipped `json:"validation_skipped,omitempty"`
+	Note              string                   `json:"note"`
+}
+
+// DryRunWarning is one non-fatal warning of a dry run. Code is stable.
+type DryRunWarning struct {
+	Code    string `json:"code"`
+	Message string `json:"message,omitempty"`
+}
+
+// DryRunValidationSkipped says why a plan-mode dry run did not validate:
+// Reason is external_call, database or unsupported_response.
+type DryRunValidationSkipped struct {
+	Reason string `json:"reason"`
+	Detail string `json:"detail"`
 }
 
 // WithDryRun marks one write (POST, PUT, PATCH, DELETE) as a dry run: it is

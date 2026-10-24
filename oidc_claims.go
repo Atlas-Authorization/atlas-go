@@ -48,6 +48,13 @@ type OIDCSSOContext struct {
 	// ConnectionID is sso_connection_id: the connection the user signed in
 	// through.
 	ConnectionID string
+	// OrganizationID is sso_organization_id: the Atlas organization that owns the
+	// connection, "" for an instance-wide connection. Independent of the
+	// organization claims: scope a per-organization "require SSO" rule on this,
+	// never on "signed in via SSO".
+	OrganizationID string
+	// Type is sso_connection_type: saml or oidc ("" when absent).
+	Type string
 	// TenantID is sso_tenant_id: the IdP-side tenant (Entra tid, Google hd,
 	// SAML entity id), when known.
 	TenantID string
@@ -117,6 +124,10 @@ func OIDCSSOOf(claims map[string]interface{}) *OIDCSSOContext {
 		return nil
 	}
 	sso := &OIDCSSOContext{ConnectionID: id}
+	sso.OrganizationID, _ = claimString(claims, "sso_organization_id")
+	if t, _ := claimString(claims, "sso_connection_type"); t == "saml" || t == "oidc" {
+		sso.Type = t
+	}
 	sso.TenantID, _ = claimString(claims, "sso_tenant_id")
 	sso.Issuer, _ = claimString(claims, "sso_issuer")
 	sso.Domain, _ = claimString(claims, "sso_domain")

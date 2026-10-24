@@ -41,6 +41,8 @@ type Machine struct {
 
 // MachineWithSecret reveals the mk_ secret once, on create or rotate.
 type MachineWithSecret struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	Machine
 	Secret string `json:"secret"`
 }

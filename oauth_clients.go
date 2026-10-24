@@ -80,6 +80,8 @@ type OAuthTokenLifetimes struct {
 // OAuthClientWithSecret carries the client_secret, revealed once on create and
 // rotate.
 type OAuthClientWithSecret struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	OAuthClient
 	ClientSecret string `json:"client_secret,omitempty"`
 	Note         string `json:"note"`

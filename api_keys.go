@@ -143,6 +143,8 @@ type APIKeyUsage struct {
 
 // APIKeyWithSecret is the mint response: the key plus its secret, revealed once.
 type APIKeyWithSecret struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	APIKey
 	Secret string `json:"secret"`
 	Note   string `json:"note"`

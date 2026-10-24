@@ -131,6 +131,8 @@ type UpsertWebhookEndpointParams struct {
 // WebhookEndpointUpserted is the result of an upsert: the endpoint (Created
 // says whether this call created it) and, then, its secret once.
 type WebhookEndpointUpserted struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	WebhookEndpoint
 	Secret string `json:"secret,omitempty"`
 }

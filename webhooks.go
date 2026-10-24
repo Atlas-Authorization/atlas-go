@@ -73,6 +73,8 @@ type WebhookEndpoint struct {
 // WebhookEndpointWithSecret reveals the signing secret (whsec_...) once, on
 // create.
 type WebhookEndpointWithSecret struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	WebhookEndpoint
 	Secret string `json:"secret"`
 }
@@ -205,6 +207,8 @@ type UpdateWebhookEndpointParams struct {
 
 // WebhookSecret is an endpoint's signing secret (whsec_...).
 type WebhookSecret struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	Object string `json:"object"`
 	Secret string `json:"secret"`
 	// Warning is set on rotation: what happens to the old secret.

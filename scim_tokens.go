@@ -29,6 +29,8 @@ type ScimToken struct {
 
 // ScimTokenWithSecret reveals the usable secret once, on create.
 type ScimTokenWithSecret struct {
+	// SealedFields carries the sealed_* values when the request named a secret recipient.
+	SealedFields
 	ScimToken
 	Secret string `json:"secret"`
 	Note   string `json:"note"`
