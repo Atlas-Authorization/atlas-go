@@ -231,6 +231,61 @@ type DesignSettings struct {
 	// older branding settings; LegacyDesign is then the equivalent design.
 	Legacy       bool    `json:"legacy"`
 	LegacyDesign *Design `json:"legacy_design,omitempty"`
+	// Brand is the imported brand document layer (nil when none). Instance
+	// designs only.
+	Brand *BrandImport `json:"brand,omitempty"`
+	// Precedence lists the layers, lowest first (preset < brand < design <
+	// audience). Instance designs only.
+	Precedence []DesignLayer `json:"precedence,omitempty"`
+	// Sources says which layer each field set by the brand or the design
+	// comes from (brand or design).
+	Sources map[string]string `json:"sources,omitempty"`
+	// Ignored lists, after a brand import, the tokens that were not applied.
+	Ignored []BrandIgnoredToken `json:"ignored,omitempty"`
+}
+
+// DesignLayer is one layer of the design precedence.
+type DesignLayer struct {
+	// Layer is preset, brand, design or audience.
+	Layer  string  `json:"layer"`
+	Source *string `json:"source"`
+}
+
+// BrandIgnoredToken is a brand token that was not applied, and why.
+type BrandIgnoredToken struct {
+	// Token is the token path in the brand document, e.g. color.sparkle.
+	Token  string `json:"token"`
+	Reason string `json:"reason"`
+}
+
+// BrandMapping says which design field a brand token set.
+type BrandMapping struct {
+	Token string      `json:"token"`
+	To    string      `json:"to"`
+	Value interface{} `json:"value"`
+}
+
+// BrandMeta is the identity data a brand document carried.
+type BrandMeta struct {
+	Name         *string `json:"name"`
+	LegalName    *string `json:"legalName"`
+	SupportEmail *string `json:"supportEmail"`
+	Favicon      *string `json:"favicon"`
+}
+
+// BrandImport is an imported brand document (W3C design tokens), as its own
+// layer under the instance design.
+type BrandImport struct {
+	// Source is url or inline.
+	Source string  `json:"source"`
+	URL    *string `json:"url"`
+	// ImportedAt is epoch ms.
+	ImportedAt     int64               `json:"imported_at"`
+	DocumentSHA256 string              `json:"document_sha256"`
+	Design         Design              `json:"design"`
+	Mapping        []BrandMapping      `json:"mapping"`
+	Ignored        []BrandIgnoredToken `json:"ignored"`
+	Meta           BrandMeta           `json:"meta"`
 }
 
 // DesignPreview is a compiled, unsaved design.
@@ -416,4 +471,26 @@ func uploadDesignAsset(ctx context.Context, c *Client, auth authKind, path strin
 	}
 	out := &DesignAsset{}
 	return out, c.doRaw(ctx, auth, http.MethodPost, path, query, contentType, image, out, opts...)
+}
+
+// ImportBrandURL imports a brand document (W3C design tokens) from an https
+// URL as its own layer under the instance design. The result lists
+// Brand.Mapping and Ignored. PUT /v1/instance/design with brand_url.
+func (s *DesignService) ImportBrandURL(ctx context.Context, brandURL string, opts ...RequestOption) (*DesignSettings, error) {
+	out := &DesignSettings{}
+	return out, s.client.put(ctx, "/v1/instance/design", map[string]interface{}{"brand_url": brandURL}, out, opts...)
+}
+
+// ImportBrand imports an inline brand document. PUT /v1/instance/design with
+// brand.
+func (s *DesignService) ImportBrand(ctx context.Context, brand map[string]interface{}, opts ...RequestOption) (*DesignSettings, error) {
+	out := &DesignSettings{}
+	return out, s.client.put(ctx, "/v1/instance/design", map[string]interface{}{"brand": brand}, out, opts...)
+}
+
+// RemoveBrand removes the imported brand layer. PUT /v1/instance/design with
+// brand: null.
+func (s *DesignService) RemoveBrand(ctx context.Context, opts ...RequestOption) (*DesignSettings, error) {
+	out := &DesignSettings{}
+	return out, s.client.put(ctx, "/v1/instance/design", map[string]interface{}{"brand": nil}, out, opts...)
 }

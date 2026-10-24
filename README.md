@@ -5,7 +5,7 @@ secret-key (`sk_`) Backend API (BAPI). It is the Go peer of the TypeScript SDK
 (`@atlas/backend`, `packages/backend/src/client`): the same namespaces, the same
 snake_case wire types, the same `{ errors: [...] }` error envelope.
 
-- Standard library only (`net/http` + `encoding/json`) — no dependencies.
+- `net/http` + `encoding/json`; the only dependency is `golang.org/x/crypto` (`nacl/box`) for sealed secrets.
 - One service per BAPI area, each method taking a `context.Context` and typed
   params, returning a typed struct and an `error`.
 - A first-class `*APIError` recoverable with `errors.As`.
@@ -397,6 +397,53 @@ rotated, err := atlas.Webhooks.Endpoints.RotateSecretWithParams(ctx, endpointID,
 // rotated.PreviousSecretExpiresAt says when the old secret stops signing.
 ```
 
+## Integrator platform (0.17)
+
+```go
+// Scoped, expiring, rotatable secret keys; whoami; every credential in one list.
+k, _ := c.SecretKeys.Create(ctx, atlas.CreateSecretKeyParams{Name: "ci", Scopes: []string{"read_only"}})
+me, _ := c.Whoami(ctx)
+
+// Dry run any write, idempotent creates by external_ref, W3C trace context.
+plan, _ := c.DryRun(ctx, "PATCH", "/v1/secret_keys/"+k.ID, map[string]any{"name": "ci-2"})
+app, _ := c.Platform.Apps.Create(ctx, atlas.CreatePlatformAppParams{Name: "Acme",
+	ProvisioningInput: atlas.ProvisioningInput{ExternalRef: "acme-prod", Metadata: map[string]any{"product": "acme"}}},
+	atlas.WithTraceparent(atlas.NewTraceparent()))
+
+// Data-rights executor and orchestrator.
+_, _ = c.Privacy.Lookup(ctx, atlas.PrivacyLookupParams{Emails: []string{"a@b.com"}})
+call, err := atlas.VerifyPrivacyCall(body, r.Header, caseSigningSecret, nil) // signed case calls from Atlas
+
+// Webhooks: destinations, health, replay, URL-bound v2 signatures.
+hook, err := atlas.VerifyWebhookURL(body, r.Header, secret, "https://app.example.com/hooks/atlas", true, nil)
+_, _ = c.Webhooks.Endpoints.Replay(ctx, "we_1", atlas.ReplayWebhookParams{WebhookWindow: atlas.WebhookWindow{Since: since}})
+
+// Identity integrations, status, audit export, notices, advisories, sub-processors.
+tok, _ := c.Sessions.GetIntegrationToken(ctx, "sess_1", "chatly")
+h, _ := atlas.BackchannelLogoutHandler(atlas.BackchannelLogoutHandlerOptions{ /* Verify, OnLogout */ })
+```
+
+Key prefix checks accept both the suite format (`atlas_live_sk_…`) and the legacy
+one (`sk_live_…`): use `atlas.IsSecretKey`, `IsPlatformKey`, `ParseKeyPrefix`. A CLI can
+sign an operator in with `StartOperatorLogin` / `PollOperatorLogin` /
+`ExchangeOperatorToken`, and open sealed secrets with `GenerateSealKeyPair`,
+`WithSecretRecipient` and `OpenSealedSecret` (libsodium sealed boxes, opened with
+`golang.org/x/crypto/nacl/box`). `INSUFFICIENT_SCOPE` replaces
+`SCOPE_MISSING`: `APIError.IsInsufficientScope()` accepts both.
+
+Partner links need no pasted key. A partner product calls `atlas.RequestPartnerLink(ctx, input, nil)`;
+you `c.PartnerLinks.Requests.List` / `Approve` / `Deny`; Atlas delivers the credentials to the partner's
+callback, which checks them with `atlas.VerifyPartnerLinkDelivery(body, r.Header, requestSecret, callbackURL, nil)`.
+`c.PartnerLinks.SetCertificates` locks a link to client certificates (mTLS) and
+`c.PartnerLinks.Outbound.Request` asks a partner for a link. Secret and platform keys take `Owner`,
+`ExpiresAt` (one year by default, never longer) and `AllowedOrigins` (another browser origin is refused with
+`ORIGIN_NOT_ALLOWED`: `APIError.IsOriginNotAllowed()`). Replay what an endpoint missed with
+`ReplayWebhookParams{SinceKeyword: atlas.SinceFailingSince}` (endpoints report `LastFailingSince`, which
+survives recovery). OIDC relying parties read the token claims with `OIDCOrganizationOf`,
+`OIDCOrganizationsOf` (scope `organizations`) and `OIDCSSOOf`, and pin an organization with
+`OIDCAuthorizeURLWithOrganization`. `AtlasIDIntegrationTokenFor` is the browser `atlas_id_tokens` route
+for Sign in with Atlas users.
+
 ## Trusted reverse proxy
 
 If a reverse proxy serves the Frontend API from your own origin, give it a proxy secret. It sends the secret in
@@ -431,7 +478,7 @@ them; nil when the user was never reported), `ReferralCode` and `ReferralLink`. 
 on := true
 _, err := c.Referrals.Update(ctx, atlas.UpdateReferralSettingsParams{
 	Enabled:       &on,
-	Provider:      "webhook", // the Atlas referral protocol; or "referally" or another built-in adapter
+	Provider:      "webhook", // the Atlas referral protocol; or "referalli" or another built-in adapter
 	EndpointURL:   "https://referrals.example.com/atlas",
 	SigningSecret: os.Getenv("REFERRAL_SIGNING_SECRET"),
 	Clear:         []string{"link_template"}, // sent as null

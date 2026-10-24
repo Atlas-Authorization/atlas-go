@@ -15,6 +15,14 @@ type ErrorItem struct {
 	Message string                 `json:"message"`
 	Param   string                 `json:"param,omitempty"`
 	Meta    map[string]interface{} `json:"meta,omitempty"`
+	// DocsURL is the code's page in the error reference
+	// (https://atlasauth.net/errors/<code>).
+	DocsURL string `json:"docs_url,omitempty"`
+	// DidYouMean is, on ROUTE_NOT_FOUND only, the closest documented paths.
+	DidYouMean []string `json:"did_you_mean,omitempty"`
+	// AllowedMethods is, on ROUTE_NOT_FOUND only, the methods the path does
+	// support.
+	AllowedMethods []string `json:"allowed_methods,omitempty"`
 }
 
 // Stable error codes worth branching on with APIError.HasCode / Code.
@@ -81,6 +89,30 @@ const (
 	ErrCodeSessionRevoked     = "SESSION_REVOKED"
 	ErrCodeSessionIdleExpired = "SESSION_IDLE_EXPIRED"
 	ErrCodeSessionExpired     = "SESSION_EXPIRED"
+	// ErrCodeInsufficientScope: the key lacks a scope the call needs;
+	// Meta["required_scope"] names it (403). It replaces ErrCodeScopeMissing;
+	// use APIError.IsInsufficientScope, which accepts both.
+	ErrCodeInsufficientScope = "INSUFFICIENT_SCOPE"
+	// ErrCodeScopeMissing is the former spelling of ErrCodeInsufficientScope
+	// (the new envelope carries it as Meta["legacy_code"]); still tolerated.
+	ErrCodeScopeMissing = "SCOPE_MISSING"
+	// ErrCodeOriginNotAllowed: a key locked to allowed_origins was used from
+	// another browser origin (403). See APIError.IsOriginNotAllowed.
+	ErrCodeOriginNotAllowed = "ORIGIN_NOT_ALLOWED"
+	// ErrCodeStepUpRequired: a root action (create an app or instance, mint a
+	// key) needs a multi-factor sign-in within the last five minutes (403).
+	ErrCodeStepUpRequired = "STEP_UP_REQUIRED"
+	// ErrCodeRouteNotFound: no endpoint matches the method and path (a typo
+	// or a guessed route); see ErrorItem.DidYouMean and AllowedMethods.
+	ErrCodeRouteNotFound = "ROUTE_NOT_FOUND"
+	// ErrCodeNotALiveInstance, ErrCodeTestModeOnly, ErrCodeTestingUnavailable:
+	// the call is for (or refused on) a live or test-mode instance only.
+	ErrCodeNotALiveInstance   = "NOT_A_LIVE_INSTANCE"
+	ErrCodeTestModeOnly       = "TEST_MODE_ONLY"
+	ErrCodeTestingUnavailable = "TESTING_UNAVAILABLE"
+	// ErrCodePartnerLinkUnavailable: the partner-link credential an
+	// integration needs is not available on this instance.
+	ErrCodePartnerLinkUnavailable = "PARTNER_LINK_UNAVAILABLE"
 )
 
 // APIError is returned by every SDK method on a non-2xx response. It carries the
@@ -125,6 +157,45 @@ func (e *APIError) HasCode(code string) bool {
 		}
 	}
 	return false
+}
+
+// IsInsufficientScope reports whether the key lacked a required scope. It
+// accepts INSUFFICIENT_SCOPE and the former SCOPE_MISSING.
+func (e *APIError) IsInsufficientScope() bool {
+	return e.HasCode(ErrCodeInsufficientScope) || e.HasCode(ErrCodeScopeMissing)
+}
+
+// RequiredScope returns the scope an INSUFFICIENT_SCOPE (or SCOPE_MISSING)
+// error says the call needed, or "".
+func (e *APIError) RequiredScope() string {
+	for _, item := range e.Errors {
+		if item.Code == ErrCodeInsufficientScope || item.Code == ErrCodeScopeMissing {
+			if s, ok := item.Meta["required_scope"].(string); ok {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// IsOriginNotAllowed reports whether a browser-origin-locked key was used from
+// another origin (ORIGIN_NOT_ALLOWED).
+func (e *APIError) IsOriginNotAllowed() bool { return e.HasCode(ErrCodeOriginNotAllowed) }
+
+// IsStepUpRequired reports whether a multi-factor sign-in is needed first.
+func (e *APIError) IsStepUpRequired() bool { return e.HasCode(ErrCodeStepUpRequired) }
+
+// IsRouteNotFound reports whether no endpoint matched the method and path.
+func (e *APIError) IsRouteNotFound() bool { return e.HasCode(ErrCodeRouteNotFound) }
+
+// DidYouMean returns the closest documented paths of a ROUTE_NOT_FOUND error.
+func (e *APIError) DidYouMean() []string {
+	for _, item := range e.Errors {
+		if item.Code == ErrCodeRouteNotFound {
+			return item.DidYouMean
+		}
+	}
+	return nil
 }
 
 // IsNotFound reports whether the error represents a missing object (404 /

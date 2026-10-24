@@ -205,7 +205,10 @@ type ManagedEmailRecord struct {
 // Resend or Brevo account and sends through your key. Email sends only once
 // Verified.
 type ManagedEmail struct {
-	Object      string `json:"object"`
+	Object string `json:"object"`
+	// Configured is false when the singleton has never been set (the GET
+	// answers 200, no longer 404).
+	Configured  *bool  `json:"configured,omitempty"`
 	ID          string `json:"id"`
 	FromAddress string `json:"from_address"`
 	Domain      string `json:"domain"`
@@ -286,7 +289,10 @@ type DeletedManagedEmail struct {
 // DevelopmentEmail is your own email provider in development mode: a
 // development instance sends Atlas's sign-in emails without a verified domain.
 type DevelopmentEmail struct {
-	Object     string `json:"object"`
+	Object string `json:"object"`
+	// Configured is false when the singleton has never been set (the GET
+	// answers 200, no longer 404).
+	Configured *bool  `json:"configured,omitempty"`
 	ProviderID string `json:"provider_id"`
 	Enabled    bool   `json:"enabled"`
 	// Active is whether mail goes out through it now; always false on a

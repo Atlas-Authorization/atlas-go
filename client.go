@@ -53,6 +53,7 @@ type Client struct {
 	httpClient      *http.Client
 	strict          *bool
 	onUnknownFields UnknownFieldsHandler
+	secretRecipient string
 
 	// Namespaces — one per BAPI area, mirroring the TypeScript SDK.
 	Users           *UsersService
@@ -146,6 +147,38 @@ type Client struct {
 	EntitlementOverrides *EntitlementOverridesService
 	// Platform is the platform-key surface (/v1/platform/*); see WithPlatformKey.
 	Platform *PlatformService
+
+	// SecretKeys is /v1/secret_keys: scoped, expiring, rotatable secret keys.
+	SecretKeys *SecretKeysService
+	// Keys is /v1/keys: every credential on the instance in one standard shape.
+	Keys *KeysService
+	// PartnerLinks is /v1/partner_links: credentials granted to (and held for)
+	// an integrated partner service.
+	PartnerLinks *PartnerLinksService
+	// AtlasIDGrants manages the Sign in with Atlas apps the instance owns and
+	// their per-user grants (/v1/atlas_id_apps).
+	AtlasIDGrants *AtlasIDGrantsService
+	// Privacy is the data-rights executor protocol (/v1/privacy) and the
+	// instance's own orchestrator connection.
+	Privacy *PrivacyService
+	// Integrations is the integration-facing surface (/v1/integrations/*).
+	Integrations *IntegrationsService
+	// Entitlements is /v1/entitlements: the standard entitlements document.
+	Entitlements *EntitlementsService
+	// Notices is /v1/instance/notices: behaviour changes that affect this instance.
+	Notices *NoticesService
+	// SecurityAdvisories is /v1/security_advisories.
+	SecurityAdvisories *SecurityAdvisoriesService
+	// SubProcessors is /v1/instance/sub_processors.
+	SubProcessors *SubProcessorsService
+	// AuditExports is /v1/audit_exports: continuous audit-log forwarding.
+	AuditExports *AuditExportsService
+	// Status is the service status, the instance's incident subscription and
+	// its status dependencies.
+	Status *StatusService
+	// Delivery is outbound delivery health (/v1/delivery_health) and the
+	// fixed egress addresses (/v1/meta/egress_ips).
+	Delivery *DeliveryService
 }
 
 // Option configures a Client at construction time.
@@ -318,7 +351,22 @@ func New(secretKey string, opts ...Option) *Client {
 		AtlasIDApps:      &AtlasIDAppsService{client: c},
 		DesignAssets:     &PlatformDesignAssetsService{client: c},
 		AtlasIDPublisher: &AtlasIDPublisherService{client: c},
+		Keys:             &PlatformKeysService{client: c},
+		Audit:            &PlatformAuditService{client: c, Streams: &PlatformAuditStreamsService{client: c}},
 	}
+	c.SecretKeys = &SecretKeysService{client: c}
+	c.Keys = &KeysService{client: c}
+	c.PartnerLinks = &PartnerLinksService{client: c, Outbound: &OutboundPartnerLinksService{client: c}, Requests: &PartnerLinkRequestsService{client: c}}
+	c.AtlasIDGrants = &AtlasIDGrantsService{client: c}
+	c.Privacy = &PrivacyService{client: c, Orchestrator: &PrivacyOrchestratorService{client: c}}
+	c.Integrations = &IntegrationsService{client: c}
+	c.Entitlements = &EntitlementsService{client: c}
+	c.Notices = &NoticesService{client: c}
+	c.SecurityAdvisories = &SecurityAdvisoriesService{client: c}
+	c.SubProcessors = &SubProcessorsService{client: c}
+	c.AuditExports = &AuditExportsService{client: c}
+	c.Status = &StatusService{client: c}
+	c.Delivery = &DeliveryService{client: c}
 	return c
 }
 
@@ -327,6 +375,8 @@ type requestConfig struct {
 	idempotencyKey string
 	strict         *bool
 	headers        map[string]string
+	dryRun         bool
+	traceparent    string
 }
 
 // RequestOption tunes a single request: WithIdempotencyKey on creates, and
@@ -418,6 +468,15 @@ func (c *Client) send(ctx context.Context, auth authKind, method, path string, q
 		reader = bytes.NewReader(payload)
 	}
 
+	if cfg.dryRun && method != http.MethodGet {
+		q := url.Values{}
+		for k, vs := range query {
+			q[k] = append([]string(nil), vs...)
+		}
+		q.Set("dry_run", "true")
+		query = q
+	}
+
 	fullURL := c.baseURL + path
 	if len(query) > 0 {
 		fullURL += "?" + query.Encode()
@@ -437,8 +496,14 @@ func (c *Client) send(ctx context.Context, auth authKind, method, path string, q
 	if hasBody && contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
-	if cfg.idempotencyKey != "" {
+	if cfg.idempotencyKey != "" && !(cfg.dryRun && method != http.MethodGet) {
 		req.Header.Set("Idempotency-Key", cfg.idempotencyKey)
+	}
+	if cfg.traceparent != "" {
+		req.Header.Set("traceparent", cfg.traceparent)
+	}
+	if c.secretRecipient != "" {
+		req.Header.Set("X-Secret-Recipient", c.secretRecipient)
 	}
 	if isWrite(method) {
 		strict := c.strict

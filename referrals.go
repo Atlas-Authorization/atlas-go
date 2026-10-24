@@ -54,7 +54,7 @@ type ReferralProviderCapabilities struct {
 
 // ReferralProvider is a referral provider Atlas supports.
 type ReferralProvider struct {
-	// ID is "webhook" (the Atlas referral protocol), "referally" or another
+	// ID is "webhook" (the Atlas referral protocol), "referalli" or another
 	// vendor adapter id.
 	ID           string                       `json:"id"`
 	Name         string                       `json:"name"`
@@ -64,6 +64,52 @@ type ReferralProvider struct {
 	Needs                []string `json:"needs"`
 	DefaultContextCookie *string  `json:"default_context_cookie"`
 	DocsURL              *string  `json:"docs_url"`
+	// DefaultContextCookies is every cookie the vendor has written, in the
+	// order Atlas tries them.
+	DefaultContextCookies []string `json:"default_context_cookies,omitempty"`
+	// Aliases are retired spellings of ID that are still accepted on write
+	// (for example "referally" for "referalli").
+	Aliases []string `json:"aliases,omitempty"`
+}
+
+// Referral provider ids. The built-in adapter was renamed from "referally" to
+// "referalli"; the API accepts both on write.
+const (
+	ReferralProviderWebhook         = "webhook"
+	ReferralProviderReferalli       = "referalli"
+	ReferralProviderReferalliLegacy = "referally"
+)
+
+// ReferralOneClick is a one-click (OAuth) install a deployment offers for a
+// referral platform.
+type ReferralOneClick struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Available bool   `json:"available"`
+	// Provider is what the connection is saved as: referalli or webhook (the
+	// generic protocol).
+	Provider    string `json:"provider"`
+	Scope       string `json:"scope"`
+	RedirectURI string `json:"redirect_uri"`
+}
+
+// ReferralInstall is POST /v1/instance/referrals/:preset/install.
+type ReferralInstall struct {
+	Object   string `json:"object"`
+	Preset   string `json:"preset"`
+	Provider string `json:"provider"`
+	// AuthorizeURL is where to send the merchant to pick an organization and
+	// program.
+	AuthorizeURL string `json:"authorize_url"`
+	RedirectURI  string `json:"redirect_uri"`
+	// ExpiresAt is epoch ms; the link lasts 15 minutes.
+	ExpiresAt int64 `json:"expires_at"`
+}
+
+// InstallReferralParams is the body of the one-click install.
+type InstallReferralParams struct {
+	// ReturnTo is where to send the merchant afterwards.
+	ReturnTo string `json:"return_to,omitempty"`
 }
 
 // ReferralSecuritySettings is fraud and bot protection for referred sign-ups.
@@ -123,6 +169,8 @@ type ReferralPing struct {
 	ClockSkewMS *int64 `json:"clock_skew_ms,omitempty"`
 	// ClockSkewWarning is true when the skew is over 60 seconds.
 	ClockSkewWarning bool `json:"clock_skew_warning,omitempty"`
+	// AdvertisedCapabilities is what the platform said it can do.
+	AdvertisedCapabilities *ReferralProviderCapabilities `json:"advertised_capabilities,omitempty"`
 }
 
 // ReferralAlert is set while delivery is blocked on something only a person
@@ -185,16 +233,28 @@ type ReferralSettings struct {
 	SigningSecretSet bool    `json:"signing_secret_set"`
 	APIKeySet        bool    `json:"api_key_set"`
 	// URLParams are the query parameters that carry a referral code, in priority order.
-	URLParams               []string `json:"url_params"`
-	ContextCookie           *string  `json:"context_cookie"`
-	ConsentCategory         string   `json:"consent_category"`
-	ConsentFallbackCategory *string  `json:"consent_fallback_category"`
-	AutoEnrollUsers         bool     `json:"auto_enroll_users"`
+	URLParams     []string `json:"url_params"`
+	ContextCookie *string  `json:"context_cookie"`
+	// ContextCookies lists every tracking cookie, in the order they are tried.
+	ContextCookies []string `json:"context_cookies,omitempty"`
+	// ProviderAliases are retired spellings of Provider still accepted on write.
+	ProviderAliases []string `json:"provider_aliases,omitempty"`
+	// Capabilities is what the chosen provider can do now: its built-in
+	// capabilities plus what its last ping advertised.
+	Capabilities *ReferralProviderCapabilities `json:"capabilities,omitempty"`
+	// OneClick is the one-click connect to Referalli (the referalli preset).
+	OneClick *ReferralOneClick `json:"one_click,omitempty"`
+	// OneClickPresets is every platform this deployment offers a one-click
+	// install for.
+	OneClickPresets         []ReferralOneClick `json:"one_click_presets,omitempty"`
+	ConsentCategory         string             `json:"consent_category"`
+	ConsentFallbackCategory *string            `json:"consent_fallback_category"`
+	AutoEnrollUsers         bool               `json:"auto_enroll_users"`
 	// LinkTemplate (e.g. https://app.example.com/join?ref={code}) builds referral_link.
 	LinkTemplate *string                  `json:"link_template"`
 	TimeoutMS    int                      `json:"timeout_ms"`
 	Security     ReferralSecuritySettings `json:"security"`
-	// TrackingToken is the public tracking token (the referally provider
+	// TrackingToken is the public tracking token (the referalli provider
 	// derives the code lookup from it). Not a secret.
 	TrackingToken *string `json:"tracking_token,omitempty"`
 	// CodeLookupURL is a public, CORS-enabled URL template with {code} for
@@ -203,7 +263,7 @@ type ReferralSettings struct {
 	// SignupCodeField shows an optional "Referral code" field on hosted sign-up.
 	SignupCodeField bool `json:"signup_code_field,omitempty"`
 	// BrowserSources are the referral programs whose script or cookie the
-	// browser reads, in order (referally, rewardful, tolt, promotekit,
+	// browser reads, in order (referalli, rewardful, tolt, promotekit,
 	// firstpromoter, partnerstack, dub); the provider's default unless set.
 	BrowserSources []string `json:"browser_sources,omitempty"`
 	// BrowserSourcesDefault is true when BrowserSources is the provider's default.
@@ -211,7 +271,7 @@ type ReferralSettings struct {
 	// ConsentProvider is the consent manager that decides on the tracking
 	// cookie's ids: auto (any common one), one manager (cookiemunch, onetrust,
 	// cookiebot, didomi, usercentrics, osano, cookieyes, complianz, klaro, tcf,
-	// consent_mode), or app (only the app's own decision).
+	// consent_mode, gpc), or app (only the app's own decision).
 	ConsentProvider string `json:"consent_provider,omitempty"`
 	// ForwardLifecycle forwards email, name and suspension changes to the
 	// platform (default true).
@@ -255,9 +315,12 @@ type UpdateReferralSettingsParams struct {
 	InboundSecret string `json:"inbound_secret,omitempty"`
 	// InboundEndpointID is the platform's id for Atlas's event subscription,
 	// kept for reference.
-	InboundEndpointID       string                        `json:"inbound_endpoint_id,omitempty"`
-	URLParams               []string                      `json:"url_params,omitempty"`
-	ContextCookie           string                        `json:"context_cookie,omitempty"`
+	InboundEndpointID string   `json:"inbound_endpoint_id,omitempty"`
+	URLParams         []string `json:"url_params,omitempty"`
+	ContextCookie     string   `json:"context_cookie,omitempty"`
+	// ContextCookies is a list of up to 5 cookie names tried in order; it
+	// wins over ContextCookie.
+	ContextCookies          []string                      `json:"context_cookies,omitempty"`
 	ConsentCategory         string                        `json:"consent_category,omitempty"`
 	ConsentFallbackCategory string                        `json:"consent_fallback_category,omitempty"`
 	AutoEnrollUsers         *bool                         `json:"auto_enroll_users,omitempty"`
@@ -486,6 +549,9 @@ type ReferralCall struct {
 	Object string `json:"object"`
 	// ID is also the signed atlas-id header of every attempt.
 	ID string `json:"id"`
+	// TraceID correlates the call with the request that caused it (W3C
+	// traceparent trace-id).
+	TraceID *string `json:"trace_id,omitempty"`
 	// Kind is signup, erase, export, partner, signal, alias, user, ping or test.
 	Kind string `json:"kind"`
 	// Status is pending, succeeded, retrying, failed, held or skipped.
@@ -531,6 +597,8 @@ type ListReferralCallsParams struct {
 	// ErrorCode keeps only calls whose last failure had this code, e.g.
 	// signature_rejected.
 	ErrorCode string
+	// Trace keeps only the calls of one operation (trace id).
+	Trace string
 	// StartingAfter is the id of the last call of the previous page.
 	StartingAfter string
 }
@@ -551,6 +619,9 @@ func (p ListReferralCallsParams) values() url.Values {
 	}
 	if p.ErrorCode != "" {
 		q.Set("error_code", p.ErrorCode)
+	}
+	if p.Trace != "" {
+		q.Set("trace", p.Trace)
 	}
 	if p.StartingAfter != "" {
 		q.Set("starting_after", p.StartingAfter)
@@ -1143,4 +1214,13 @@ func SignReferralUpdatedEvent(inboundURL, secret string, event ReferralUpdatedEv
 	h.Set("User-Agent", ReferralProtocolUserAgent)
 	h.Set(ReferralProtocolVersionHeader, ReferralProtocolVersion)
 	return &SignedReferralEvent{URL: inboundURL, Header: h, Body: body}, nil
+}
+
+// Install starts a one-click connection to a referral platform (referalli, or
+// any id in OneClickPresets). 422 REFERRALS_NOT_CONFIGURED when the deployment
+// does not offer it; connect with a key or signing secret then.
+// POST /v1/instance/referrals/:preset/install.
+func (s *ReferralsService) Install(ctx context.Context, preset string, params InstallReferralParams, opts ...RequestOption) (*ReferralInstall, error) {
+	out := &ReferralInstall{}
+	return out, s.client.post(ctx, "/v1/instance/referrals/"+url.PathEscape(preset)+"/install", params, out, opts...)
 }

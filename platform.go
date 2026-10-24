@@ -23,6 +23,11 @@ type PlatformService struct {
 	// AtlasIDPublisher is /v1/platform/atlas_id_publisher — the account's
 	// publisher name and verified domain.
 	AtlasIDPublisher *AtlasIDPublisherService
+	// Keys is /v1/platform/keys — every credential on the account, and
+	// minting / revoking them.
+	Keys *PlatformKeysService
+	// Audit is the account audit log (/v1/platform/audit_logs) and its streams.
+	Audit *PlatformAuditService
 }
 
 // --- Apps -------------------------------------------------------------------
@@ -62,6 +67,11 @@ type PlatformApp struct {
 	UpdatedAt  int64  `json:"updated_at"`
 	// Note is an explanatory message some responses add.
 	Note string `json:"note,omitempty"`
+
+	// ProvisioningFields: metadata, external_ref, idempotent_replay. A create
+	// that sent an external_ref and matched an existing app answers 200 with
+	// IdempotentReplay set and no secret.
+	ProvisioningFields
 }
 
 // PlatformAppWithSecret is a PlatformApp plus its reveal-once secret key.
@@ -90,6 +100,8 @@ type CreatePlatformAppParams struct {
 	// AllowedOriginEntries, when set, is sent as allowed_origins instead of
 	// AllowedOrigins: each entry also says how the origin signs in.
 	AllowedOriginEntries []AllowedOriginEntry `json:"-"`
+	// ProvisioningInput: metadata tags and an external_ref (idempotent create).
+	ProvisioningInput
 }
 
 // MarshalJSON sends AllowedOriginEntries as allowed_origins when set.
@@ -106,6 +118,8 @@ type UpdatePlatformAppParams struct {
 	// AllowedOriginEntries, when set, is sent as allowed_origins instead of
 	// AllowedOrigins: each entry also says how the origin signs in.
 	AllowedOriginEntries []AllowedOriginEntry `json:"-"`
+	// Metadata replaces the provisioning tags.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // MarshalJSON sends AllowedOriginEntries as allowed_origins when set.
@@ -121,6 +135,8 @@ type ListPlatformAppsParams struct {
 	// Archived lists only archived apps.
 	Archived bool
 	Tag      string
+	// Metadata keeps only apps whose provisioning metadata matches every pair.
+	Metadata map[string]interface{}
 }
 
 func (p ListPlatformAppsParams) values() url.Values {
@@ -133,6 +149,9 @@ func (p ListPlatformAppsParams) values() url.Values {
 	}
 	if p.Tag != "" {
 		v.Set("tag", p.Tag)
+	}
+	for k, vals := range MetadataQuery(p.Metadata) {
+		v[k] = vals
 	}
 	return v
 }
@@ -148,12 +167,18 @@ type PlatformAppDisabled struct {
 
 // PlatformAppsBulkDeleteResult is the per-id outcome of a bulk delete.
 type PlatformAppsBulkDeleteResult struct {
-	Object  string `json:"object"`
+	Object string `json:"object"`
+	// Mode is disable (ids) or hard_delete (a sandbox metadata selection).
+	Mode    string `json:"mode,omitempty"`
+	DryRun  bool   `json:"dry_run,omitempty"`
 	Results []struct {
-		ID      string `json:"id"`
-		Deleted bool   `json:"deleted"`
-		Reason  string `json:"reason,omitempty"`
+		ID         string `json:"id"`
+		Type       string `json:"type,omitempty"`
+		InstanceID string `json:"instance_id,omitempty"`
+		Deleted    bool   `json:"deleted"`
+		Reason     string `json:"reason,omitempty"`
 	} `json:"results"`
+	Changes []DryRunChange `json:"changes,omitempty"`
 }
 
 // PlatformAppSecretRotation is the result of rotating an app's secret with
@@ -170,11 +195,13 @@ type PlatformAppSecretRotation struct {
 // PlatformSecretKey is metadata for one currently valid secret key — never the
 // secret itself.
 type PlatformSecretKey struct {
-	Object    string `json:"object"`
-	ID        string `json:"id"`
-	Prefix    string `json:"prefix"`
-	CreatedAt int64  `json:"created_at"`
-	ExpiresAt *int64 `json:"expires_at"`
+	Object    string  `json:"object"`
+	ID        string  `json:"id"`
+	Name      *string `json:"name,omitempty"`
+	Prefix    string  `json:"prefix"`
+	CreatedAt int64   `json:"created_at"`
+	ExpiresAt *int64  `json:"expires_at"`
+	ProvisioningFields
 }
 
 // PlatformInstanceSecret is the result of rotating one instance's secret.
@@ -219,6 +246,7 @@ type CreatePlatformInstanceParams struct {
 	// AllowedOriginEntries, when set, is sent as allowed_origins instead of
 	// AllowedOrigins: each entry also says how the origin signs in.
 	AllowedOriginEntries []AllowedOriginEntry `json:"-"`
+	ProvisioningInput
 }
 
 // MarshalJSON sends AllowedOriginEntries as allowed_origins when set.
@@ -452,6 +480,38 @@ type AtlasIDApp struct {
 	SecretIssuedAt *int64 `json:"secret_issued_at,omitempty"`
 	// OverlapSeconds is, on a rotation, the overlap applied.
 	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
+
+	ProvisioningFields
+
+	// ButtonRenderedOrigins are the page origins the Sign in with Atlas button
+	// script ran on in the last 7 days (Get only).
+	ButtonRenderedOrigins []AtlasIDOriginSeen `json:"button_rendered_origins,omitempty"`
+	// AuthorizeRequests7d counts how the last 7 days' sign-ins started.
+	AuthorizeRequests7d *AtlasIDAuthorizeSources `json:"authorize_requests_7d,omitempty"`
+	// FallbackOrigins are origins of sign-ins that came through the no-script
+	// fallback link (?atlasid_fallback=1).
+	FallbackOrigins []AtlasIDOriginSeen `json:"fallback_origins,omitempty"`
+	// HomepageIncludesScript is whether the app's homepage references the
+	// button script (nil = could not check).
+	HomepageIncludesScript *bool `json:"homepage_includes_script,omitempty"`
+}
+
+// AtlasIDOriginSeen is a page origin the button (or the fallback link) was
+// seen on.
+type AtlasIDOriginSeen struct {
+	Origin     string `json:"origin"`
+	LastSeenAt int64  `json:"last_seen_at"`
+	Requests   int    `json:"requests"`
+}
+
+// AtlasIDAuthorizeSources counts how sign-ins started: the rendered button,
+// the script API, One Tap, the no-script fallback, or unmarked.
+type AtlasIDAuthorizeSources struct {
+	Button   int `json:"button"`
+	JS       int `json:"js"`
+	FedCM    int `json:"fedcm"`
+	Fallback int `json:"fallback"`
+	Unmarked int `json:"unmarked"`
 }
 
 // AtlasIDAppBranding is how the Sign in with Atlas page and consent screen look
@@ -559,6 +619,7 @@ type CreateAtlasIDAppParams struct {
 	// Type is confidential (the default; a client_secret is returned once) or
 	// public (PKCE, no secret).
 	Type string `json:"type,omitempty"`
+	ProvisioningInput
 }
 
 // UpdateAtlasIDAppParams is the body of PATCH /v1/platform/atlas_id_apps/:id.
@@ -582,6 +643,8 @@ type UpdateAtlasIDAppParams struct {
 	// returns WebhookSecret once. Put "webhook_url" in Clear to remove it.
 	WebhookURL *string  `json:"webhook_url,omitempty"`
 	Clear      []string `json:"-"`
+	// Metadata replaces the provisioning tags.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // MarshalJSON omits a nil PostLogoutRedirectURIs (an empty slice clears) and
@@ -700,4 +763,338 @@ func (s *PlatformDesignAssetsService) List(ctx context.Context) (*DesignAssetLis
 func (s *PlatformDesignAssetsService) Delete(ctx context.Context, assetID string, opts ...RequestOption) (*DesignAssetDeleted, error) {
 	out := &DesignAssetDeleted{}
 	return out, s.client.platDel(ctx, "/v1/platform/design/assets/"+url.PathEscape(assetID), out, opts...)
+}
+
+// ---- provisioning additions --------------------------------------------------
+
+// ListWithMetadata returns the account's Sign in with Atlas apps whose
+// provisioning metadata matches every pair. GET /v1/platform/atlas_id_apps.
+func (s *AtlasIDAppsService) ListWithMetadata(ctx context.Context, metadata map[string]interface{}) (*AtlasIDAppList, error) {
+	out := &AtlasIDAppList{}
+	return out, s.client.platGet(ctx, "/v1/platform/atlas_id_apps", MetadataQuery(metadata), out)
+}
+
+// SecretKeysWithMetadata lists an app's secret keys whose provisioning
+// metadata matches every pair. GET /v1/platform/apps/:id/secret_keys.
+func (s *PlatformAppsService) SecretKeysWithMetadata(ctx context.Context, id string, metadata map[string]interface{}) (*ListPage[PlatformSecretKey], error) {
+	out := &ListPage[PlatformSecretKey]{}
+	return out, s.client.platGet(ctx, "/v1/platform/apps/"+url.PathEscape(id)+"/secret_keys", MetadataQuery(metadata), out)
+}
+
+// CreatePlatformSecretKeyParams is the body of POST /v1/platform/apps/:id/secret_keys.
+type CreatePlatformSecretKeyParams struct {
+	Name string `json:"name,omitempty"`
+	// InstanceID is any instance of the same app (default the app's own).
+	InstanceID string `json:"instance_id,omitempty"`
+	ProvisioningInput
+}
+
+// CreatedPlatformSecretKey is a minted secret key. Secret is present only on a
+// fresh create (never on an idempotent replay).
+type CreatedPlatformSecretKey struct {
+	PlatformSecretKey
+	AppID      string `json:"app_id"`
+	InstanceID string `json:"instance_id"`
+	Secret     string `json:"secret,omitempty"`
+	Note       string `json:"note,omitempty"`
+}
+
+// CreateSecretKey mints an additional named, taggable secret key for an app
+// (shown once; an external_ref makes it idempotent). Pass WithIdempotencyKey.
+// POST /v1/platform/apps/:id/secret_keys.
+func (s *PlatformAppsService) CreateSecretKey(ctx context.Context, id string, params CreatePlatformSecretKeyParams, opts ...RequestOption) (*CreatedPlatformSecretKey, error) {
+	out := &CreatedPlatformSecretKey{}
+	return out, s.client.platPost(ctx, "/v1/platform/apps/"+url.PathEscape(id)+"/secret_keys", params, out, opts...)
+}
+
+// CloneConfigParams is the body of POST /v1/platform/apps/:id/clone_config.
+type CloneConfigParams struct {
+	// ToEnvironment is development (default) or production.
+	ToEnvironment    string `json:"to_environment,omitempty"`
+	TargetInstanceID string `json:"target_instance_id,omitempty"`
+	// Sections are auth_config, allowed_origins, roles, redirect_urls (default
+	// auth_config, roles, redirect_urls).
+	Sections       []string `json:"sections,omitempty"`
+	IncludeOrigins bool     `json:"include_origins,omitempty"`
+	DryRun         bool     `json:"dry_run,omitempty"`
+}
+
+// CloneConfigExcluded is a path that was not copied, and why (secret or
+// instance_specific).
+type CloneConfigExcluded struct {
+	Path   string `json:"path"`
+	Reason string `json:"reason"`
+}
+
+// CloneConfigResult is the answer to a config clone.
+type CloneConfigResult struct {
+	// Object is clone_config_result, or dry_run.
+	Object           string                `json:"object"`
+	SourceInstanceID string                `json:"source_instance_id"`
+	TargetInstanceID *string               `json:"target_instance_id"`
+	ToEnvironment    string                `json:"to_environment"`
+	CreatedTarget    bool                  `json:"created_target"`
+	Sections         []string              `json:"sections"`
+	Excluded         []CloneConfigExcluded `json:"excluded"`
+	NeverCopied      []string              `json:"never_copied"`
+	Changes          []DryRunChange        `json:"changes"`
+	Target           *PlatformApp          `json:"target,omitempty"`
+	// Secret is, when a new instance was created for the clone, its secret
+	// key, shown once.
+	Secret string `json:"secret,omitempty"`
+	Note   string `json:"note,omitempty"`
+}
+
+// CloneConfig copies an app's configuration into its development (or another)
+// instance, secrets excluded. Pass WithIdempotencyKey.
+// POST /v1/platform/apps/:id/clone_config.
+func (s *PlatformAppsService) CloneConfig(ctx context.Context, id string, params CloneConfigParams, opts ...RequestOption) (*CloneConfigResult, error) {
+	out := &CloneConfigResult{}
+	return out, s.client.platPost(ctx, "/v1/platform/apps/"+url.PathEscape(id)+"/clone_config", params, out, opts...)
+}
+
+// SandboxTeardown hard-deletes every sandbox-tagged app and resource of this
+// platform. metadata must carry sandbox: true (nil = {"sandbox": true});
+// dryRun lists what would go. POST /v1/platform/apps/bulk_delete.
+func (s *PlatformAppsService) SandboxTeardown(ctx context.Context, metadata map[string]interface{}, dryRun bool, opts ...RequestOption) (*PlatformAppsBulkDeleteResult, error) {
+	if metadata == nil {
+		metadata = map[string]interface{}{"sandbox": true}
+	}
+	body := map[string]interface{}{"metadata": metadata}
+	if dryRun {
+		body["dry_run"] = true
+	}
+	out := &PlatformAppsBulkDeleteResult{}
+	return out, s.client.platPost(ctx, "/v1/platform/apps/bulk_delete", body, out, opts...)
+}
+
+// ---- platform credentials & account audit ------------------------------------
+
+// PlatformKeysService is /v1/platform/keys.
+type PlatformKeysService struct{ client *Client }
+
+// ListPlatformKeysParams filters GET /v1/platform/keys.
+type ListPlatformKeysParams struct {
+	// Kind is secret_key, platform_key, account_key, webhook_secret,
+	// partner_link or access_token.
+	Kind string
+	// Status is active, expiring, expired or revoked.
+	Status     string
+	InstanceID string
+}
+
+// CreatePlatformKeyParams is the body of POST /v1/platform/keys. Scopes are a
+// subset of the caller's; per-app grant scopes
+// atlas_id_apps:<app id>:grants:read|write are allowed.
+type CreatePlatformKeyParams struct {
+	Scopes         []string `json:"scopes"`
+	Name           string   `json:"name,omitempty"`
+	ApplicationIDs []string `json:"application_ids,omitempty"`
+	ExpiresAt      *int64   `json:"expires_at,omitempty"`
+	IPAllowlist    []string `json:"ip_allowlist,omitempty"`
+	// AllowedOrigins locks the key to browser origins; a call from another
+	// origin is refused with ORIGIN_NOT_ALLOWED.
+	AllowedOrigins []string `json:"allowed_origins,omitempty"`
+	Owner          string   `json:"owner,omitempty"`
+	// KeyFormat is atlas (default) or legacy.
+	KeyFormat string `json:"key_format,omitempty"`
+}
+
+// PlatformAPIKey is a platform key; Secret / SealedSecret are present once.
+type PlatformAPIKey struct {
+	Object       string   `json:"object"`
+	ID           string   `json:"id"`
+	Prefix       string   `json:"prefix,omitempty"`
+	Scopes       []string `json:"scopes,omitempty"`
+	Secret       string   `json:"secret,omitempty"`
+	SealedSecret string   `json:"sealed_secret,omitempty"`
+}
+
+// UpdatePlatformKeyParams is the body of PATCH /v1/platform/keys/:id. Clear
+// names nullable fields to send as null: name, owner, expires_at.
+type UpdatePlatformKeyParams struct {
+	Name      string `json:"name,omitempty"`
+	Owner     string `json:"owner,omitempty"`
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// AllowedOrigins replaces the browser-origin lock.
+	AllowedOrigins []string `json:"allowed_origins,omitempty"`
+	Clear          []string `json:"-"`
+}
+
+// MarshalJSON sends the Clear keys as null.
+func (p UpdatePlatformKeyParams) MarshalJSON() ([]byte, error) {
+	type plain UpdatePlatformKeyParams
+	return marshalWithExtra(plain(p), nullKeys(p.Clear))
+}
+
+// PlatformKeyRevoked acknowledges a revocation.
+type PlatformKeyRevoked struct {
+	Object  string `json:"object"`
+	ID      string `json:"id"`
+	Kind    string `json:"kind"`
+	Revoked bool   `json:"revoked"`
+}
+
+// Whoami introspects the platform key / token this client uses.
+// GET /v1/platform/whoami.
+func (s *PlatformService) Whoami(ctx context.Context) (*Whoami, error) {
+	out := &Whoami{}
+	return out, s.client.platGet(ctx, "/v1/platform/whoami", nil, out)
+}
+
+// List returns every credential on the account, revoked ones included.
+// GET /v1/platform/keys.
+func (s *PlatformKeysService) List(ctx context.Context, params ListPlatformKeysParams) (*ListPage[StandardKey], error) {
+	out := &ListPage[StandardKey]{}
+	q := url.Values{}
+	if params.Kind != "" {
+		q.Set("kind", params.Kind)
+	}
+	if params.Status != "" {
+		q.Set("status", params.Status)
+	}
+	if params.InstanceID != "" {
+		q.Set("instance_id", params.InstanceID)
+	}
+	return out, s.client.platGet(ctx, "/v1/platform/keys", q, out)
+}
+
+// Create mints a platform key; the secret is in this response only.
+// POST /v1/platform/keys.
+func (s *PlatformKeysService) Create(ctx context.Context, params CreatePlatformKeyParams, opts ...RequestOption) (*PlatformAPIKey, error) {
+	out := &PlatformAPIKey{}
+	return out, s.client.platPost(ctx, "/v1/platform/keys", params, out, opts...)
+}
+
+// Update changes a key's name, owner or expiry. PATCH /v1/platform/keys/:id.
+func (s *PlatformKeysService) Update(ctx context.Context, id string, params UpdatePlatformKeyParams, opts ...RequestOption) (*PlatformAPIKey, error) {
+	out := &PlatformAPIKey{}
+	return out, s.client.platPatch(ctx, "/v1/platform/keys/"+url.PathEscape(id), params, out, opts...)
+}
+
+// Revoke revokes a key at once. POST /v1/platform/keys/:id/revoke.
+func (s *PlatformKeysService) Revoke(ctx context.Context, id string, opts ...RequestOption) (*PlatformKeyRevoked, error) {
+	out := &PlatformKeyRevoked{}
+	return out, s.client.platPost(ctx, "/v1/platform/keys/"+url.PathEscape(id)+"/revoke", nil, out, opts...)
+}
+
+// AccountAuditRecord is one entry of the account audit log.
+type AccountAuditRecord struct {
+	Object    string `json:"object"`
+	ID        string `json:"id"`
+	AccountID string `json:"account_id"`
+	Actor     struct {
+		Type string  `json:"type"`
+		ID   *string `json:"id"`
+	} `json:"actor"`
+	Action string `json:"action"`
+	Target struct {
+		Type *string `json:"type"`
+		ID   *string `json:"id"`
+	} `json:"target"`
+	InstanceID *string                `json:"instance_id"`
+	IP         *string                `json:"ip"`
+	UserAgent  *string                `json:"user_agent"`
+	Metadata   map[string]interface{} `json:"metadata"`
+	CreatedAt  int64                  `json:"created_at"`
+}
+
+// AccountAuditStream forwards the account audit log to a URL.
+type AccountAuditStream struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	URL    string `json:"url"`
+	// Format is atlas or cloudevents.
+	Format              string  `json:"format"`
+	Active              bool    `json:"active"`
+	HasSecret           bool    `json:"has_secret"`
+	Cursor              *string `json:"cursor"`
+	ConsecutiveFailures int     `json:"consecutive_failures"`
+	FailingSince        *int64  `json:"failing_since"`
+	NextAttemptAt       *int64  `json:"next_attempt_at"`
+	LastDeliveredAt     *int64  `json:"last_delivered_at"`
+	LastError           *string `json:"last_error"`
+	CreatedAt           int64   `json:"created_at"`
+	UpdatedAt           int64   `json:"updated_at"`
+	// Secret / SealedSecret are present once, on create.
+	Secret       string `json:"secret,omitempty"`
+	SealedSecret string `json:"sealed_secret,omitempty"`
+}
+
+// CreateAccountAuditStreamParams is the body of POST /v1/platform/audit_streams.
+type CreateAccountAuditStreamParams struct {
+	URL string `json:"url"`
+	// Format is atlas (default) or cloudevents.
+	Format string `json:"format,omitempty"`
+}
+
+// UpdateAccountAuditStreamParams is the body of PATCH /v1/platform/audit_streams/:id.
+type UpdateAccountAuditStreamParams struct {
+	URL    string `json:"url,omitempty"`
+	Format string `json:"format,omitempty"`
+	Active *bool  `json:"active,omitempty"`
+}
+
+// AccountAuditStreamTest is the answer to a test send.
+type AccountAuditStreamTest struct {
+	ID     string `json:"id"`
+	OK     bool   `json:"ok"`
+	Status *int   `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
+// ListAccountAuditParams filters GET /v1/platform/audit_logs.
+type ListAccountAuditParams struct {
+	ListParams
+	Action string
+}
+
+// PlatformAuditService is the account audit log and its streams.
+type PlatformAuditService struct {
+	client  *Client
+	Streams *PlatformAuditStreamsService
+}
+
+// List returns one page of the account audit log. GET /v1/platform/audit_logs.
+func (s *PlatformAuditService) List(ctx context.Context, params ListAccountAuditParams) (*CursorPage[AccountAuditRecord], error) {
+	out := &CursorPage[AccountAuditRecord]{}
+	q := params.ListParams.values()
+	if params.Action != "" {
+		q.Set("action", params.Action)
+	}
+	return out, s.client.platGet(ctx, "/v1/platform/audit_logs", q, out)
+}
+
+// PlatformAuditStreamsService is /v1/platform/audit_streams.
+type PlatformAuditStreamsService struct{ client *Client }
+
+// List returns the streams. GET /v1/platform/audit_streams.
+func (s *PlatformAuditStreamsService) List(ctx context.Context) (*ListPage[AccountAuditStream], error) {
+	out := &ListPage[AccountAuditStream]{}
+	return out, s.client.platGet(ctx, "/v1/platform/audit_streams", nil, out)
+}
+
+// Create adds a stream; its signing secret is in this response only.
+// POST /v1/platform/audit_streams.
+func (s *PlatformAuditStreamsService) Create(ctx context.Context, params CreateAccountAuditStreamParams, opts ...RequestOption) (*AccountAuditStream, error) {
+	out := &AccountAuditStream{}
+	return out, s.client.platPost(ctx, "/v1/platform/audit_streams", params, out, opts...)
+}
+
+// Update changes a stream. PATCH /v1/platform/audit_streams/:id.
+func (s *PlatformAuditStreamsService) Update(ctx context.Context, id string, params UpdateAccountAuditStreamParams, opts ...RequestOption) (*AccountAuditStream, error) {
+	out := &AccountAuditStream{}
+	return out, s.client.platPatch(ctx, "/v1/platform/audit_streams/"+url.PathEscape(id), params, out, opts...)
+}
+
+// Delete removes a stream. DELETE /v1/platform/audit_streams/:id.
+func (s *PlatformAuditStreamsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*DeletedObject, error) {
+	out := &DeletedObject{}
+	return out, s.client.platDel(ctx, "/v1/platform/audit_streams/"+url.PathEscape(id), out, opts...)
+}
+
+// Test sends one synthetic event. POST /v1/platform/audit_streams/:id/test.
+func (s *PlatformAuditStreamsService) Test(ctx context.Context, id string, opts ...RequestOption) (*AccountAuditStreamTest, error) {
+	out := &AccountAuditStreamTest{}
+	return out, s.client.platPost(ctx, "/v1/platform/audit_streams/"+url.PathEscape(id)+"/test", nil, out, opts...)
 }

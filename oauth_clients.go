@@ -54,6 +54,7 @@ type OAuthClient struct {
 	TokenLifetimes *OAuthTokenLifetimes `json:"token_lifetimes,omitempty"`
 	CreatedAt      int64                `json:"created_at"`
 	UpdatedAt      int64                `json:"updated_at"`
+	ProvisioningFields
 }
 
 // Access-token formats: signed JWTs, or opaque references validated by
@@ -118,6 +119,11 @@ type CreateOAuthClientParams struct {
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method,omitempty"`
 	LogoURL                 string   `json:"logo_url,omitempty"`
 	FirstParty              *bool    `json:"first_party,omitempty"`
+	// RequirePKCE: new clients default to true (confidential ones included);
+	// send false to opt out.
+	RequirePKCE *bool `json:"require_pkce,omitempty"`
+	// ProvisioningInput: metadata tags and an external_ref (idempotent create).
+	ProvisioningInput
 	// SkipLogoutConfirmation, when true, lets RP-initiated logout
 	// (/oauth2/logout) with this client_id and an exactly registered
 	// post_logout_redirect_uri end the session and redirect straight back with
@@ -207,6 +213,13 @@ func (p UpdateOAuthClientParams) MarshalJSON() ([]byte, error) {
 func (s *OAuthClientsService) List(ctx context.Context) (*ListPage[OAuthClient], error) {
 	out := &ListPage[OAuthClient]{}
 	return out, s.client.get(ctx, "/v1/oauth_clients", nil, out)
+}
+
+// ListWithMetadata lists the OAuth clients whose provisioning metadata matches
+// every pair. GET /v1/oauth_clients?metadata[key]=value.
+func (s *OAuthClientsService) ListWithMetadata(ctx context.Context, metadata map[string]interface{}) (*ListPage[OAuthClient], error) {
+	out := &ListPage[OAuthClient]{}
+	return out, s.client.get(ctx, "/v1/oauth_clients", MetadataQuery(metadata), out)
 }
 
 // Get fetches an OAuth client. GET /v1/oauth_clients/:id.

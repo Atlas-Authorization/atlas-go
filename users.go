@@ -264,7 +264,12 @@ type UserListParams struct {
 	// CreatedAfter / CreatedBefore bound created_at (epoch ms).
 	CreatedAfter  int64
 	CreatedBefore int64
-	// OrderBy is created_at, -created_at, last_sign_in_at or -last_sign_in_at.
+	// UpdatedAfter / UpdatedBefore bound updated_at (epoch ms): the way to sync
+	// changed users incrementally.
+	UpdatedAfter  int64
+	UpdatedBefore int64
+	// OrderBy is created_at, -created_at, last_sign_in_at, -last_sign_in_at,
+	// updated_at or -updated_at.
 	OrderBy string
 	// IncludeTotalCount asks for total_count on the page.
 	IncludeTotalCount bool
@@ -292,6 +297,12 @@ func (p UserListParams) values() url.Values {
 	}
 	if p.CreatedBefore > 0 {
 		v.Set("created_before", strconv.FormatInt(p.CreatedBefore, 10))
+	}
+	if p.UpdatedAfter > 0 {
+		v.Set("updated_after", strconv.FormatInt(p.UpdatedAfter, 10))
+	}
+	if p.UpdatedBefore > 0 {
+		v.Set("updated_before", strconv.FormatInt(p.UpdatedBefore, 10))
 	}
 	set("order_by", p.OrderBy)
 	if p.Banned != nil {

@@ -3,6 +3,7 @@ package atlas
 import (
 	"context"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -173,7 +174,10 @@ type AtlasIDPublisherService struct{ client *Client }
 
 // AtlasIDPublisher is the account's Sign in with Atlas publisher.
 type AtlasIDPublisher struct {
-	Object     string `json:"object"`
+	Object string `json:"object"`
+	// Configured is false when the singleton has never been set (the GET
+	// answers 200, no longer 404).
+	Configured *bool  `json:"configured,omitempty"`
 	Name       string `json:"name"`
 	Domain     string `json:"domain"`
 	Verified   bool   `json:"verified"`
@@ -243,6 +247,9 @@ func (s *PlatformService) ConfigChangelog(ctx context.Context, params ConfigChan
 	}
 	if !params.Since.IsZero() {
 		q.Set("since", params.Since.UTC().Format(time.RFC3339))
+	}
+	if params.IncludeNoOp != nil {
+		q.Set("include_no_op", strconv.FormatBool(*params.IncludeNoOp))
 	}
 	out := &CursorPage[ConfigChange]{}
 	return out, s.client.platGet(ctx, "/v1/platform/config_changelog", q, out)

@@ -16,6 +16,17 @@ type AuditLog struct {
 	TargetID   *string                `json:"target_id"`
 	Metadata   map[string]interface{} `json:"metadata"`
 	CreatedAt  int64                  `json:"created_at"`
+	// Actor says who acted; KeyName names the secret or platform key when a
+	// key did.
+	Actor *AuditLogActor `json:"actor,omitempty"`
+}
+
+// AuditLogActor is who performed an audited action.
+type AuditLogActor struct {
+	Type      string  `json:"type"`
+	ID        *string `json:"id"`
+	KeyName   *string `json:"key_name"`
+	KeyPrefix *string `json:"key_prefix"`
 }
 
 // ListAuditLogsParams filters and paginates the audit log.

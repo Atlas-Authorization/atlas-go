@@ -252,9 +252,18 @@ type ConfigChange struct {
 	Action string          `json:"action"`
 	IP     *string         `json:"ip"`
 	// Target is the object that changed, e.g. {Type: oauth_client, ID: ...}.
-	Target  *ConfigChangeTarget `json:"target,omitempty"`
-	Changes []ConfigChangeDiff  `json:"changes,omitempty"`
-	Fields  []string            `json:"fields,omitempty"`
+	Target *ConfigChangeTarget `json:"target,omitempty"`
+	// Changes always has one entry per changed field. On an older entry that
+	// recorded only field names, ValuesRecorded is false and Before / After
+	// are nil.
+	Changes []ConfigChangeDiff `json:"changes,omitempty"`
+	// Fields is deprecated: read Changes[].Section.
+	Fields []string `json:"fields,omitempty"`
+	// NoOp is true when the write changed nothing.
+	NoOp bool `json:"no_op,omitempty"`
+	// Recorded is what the source recorded: diff (before/after values), fields
+	// (names only) or none.
+	Recorded string `json:"recorded,omitempty"`
 }
 
 // ConfigChangeTarget names the object a config change touched.
@@ -265,9 +274,10 @@ type ConfigChangeTarget struct {
 
 // ConfigChangeDiff is the before/after of one config section.
 type ConfigChangeDiff struct {
-	Section string      `json:"section"`
-	Before  interface{} `json:"before"`
-	After   interface{} `json:"after"`
+	Section        string      `json:"section"`
+	Before         interface{} `json:"before"`
+	After          interface{} `json:"after"`
+	ValuesRecorded bool        `json:"values_recorded"`
 }
 
 // ConfigChangelogParams filters GET /v1/config_changelog.
@@ -275,6 +285,9 @@ type ConfigChangelogParams struct {
 	ListParams
 	Action string
 	Since  time.Time
+	// IncludeNoOp false leaves out writes that changed nothing; nil keeps the
+	// server default.
+	IncludeNoOp *bool
 }
 
 // LoginReadiness probes end-to-end login readiness for origin; live upgrades
@@ -315,6 +328,9 @@ func (s *DiagnosticsService) ConfigChangelog(ctx context.Context, params ConfigC
 	if !params.Since.IsZero() {
 		q.Set("since", params.Since.UTC().Format(time.RFC3339))
 	}
+	if params.IncludeNoOp != nil {
+		q.Set("include_no_op", strconv.FormatBool(*params.IncludeNoOp))
+	}
 	out := &CursorPage[ConfigChange]{}
 	return out, s.client.get(ctx, "/v1/config_changelog", q, out)
 }
@@ -341,6 +357,8 @@ type ActivityEventPage struct {
 	HasMore        bool            `json:"has_more"`
 	NextCursor     *string         `json:"next_cursor"`
 	AvailableTypes []string        `json:"available_types"`
+	// Retention is how long events are kept.
+	Retention interface{} `json:"retention,omitempty"`
 }
 
 // ListActivityEventsParams filters GET /v1/events.
@@ -349,6 +367,11 @@ type ListActivityEventsParams struct {
 	Type string
 	From time.Time
 	To   time.Time
+	// Since and Until bound the feed by time (they win over From / To).
+	Since time.Time
+	Until time.Time
+	// Order is asc or desc.
+	Order string
 }
 
 // UsagePoint is one day of a usage series (Day is YYYY-MM-DD).
@@ -409,6 +432,15 @@ func (s *AnalyticsService) Events(ctx context.Context, params ListActivityEvents
 	}
 	if !params.To.IsZero() {
 		q.Set("to", params.To.UTC().Format(time.RFC3339))
+	}
+	if !params.Since.IsZero() {
+		q.Set("since", params.Since.UTC().Format(time.RFC3339))
+	}
+	if !params.Until.IsZero() {
+		q.Set("until", params.Until.UTC().Format(time.RFC3339))
+	}
+	if params.Order != "" {
+		q.Set("order", params.Order)
 	}
 	out := &ActivityEventPage{}
 	return out, s.client.get(ctx, "/v1/events", q, out)

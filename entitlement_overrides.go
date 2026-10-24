@@ -24,7 +24,10 @@ type EntitlementOverride struct {
 	Features []string               `json:"features"`
 	Limits   map[string]interface{} `json:"limits"`
 	// ExpiresAt is when the override lapses (epoch ms), or nil for open-ended.
-	ExpiresAt *int64  `json:"expires_at"`
+	ExpiresAt *int64 `json:"expires_at"`
+	// Internal marks a grant for an account of the owner's own products: it
+	// reads back as planSource "internal" and never counts as revenue.
+	Internal  bool    `json:"internal,omitempty"`
 	CreatedBy *string `json:"created_by"`
 	CreatedAt int64   `json:"created_at"`
 }
@@ -40,6 +43,9 @@ type CreateEntitlementOverrideParams struct {
 	Limits      map[string]interface{} `json:"limits,omitempty"`
 	// ExpiresAt is epoch ms; nil for open-ended.
 	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// Internal marks the grant as an owner-account grant (reported as
+	// "internal", never revenue).
+	Internal bool `json:"internal,omitempty"`
 }
 
 // ListEntitlementOverridesParams filters GET /v1/entitlement_overrides.

@@ -21,6 +21,9 @@ type MessagingService struct{ client *Client }
 // MessagingProvider is one configured channel provider, secrets omitted.
 type MessagingProvider struct {
 	Object string `json:"object"`
+	// Configured is false when the singleton has never been set (the GET
+	// answers 200, no longer 404).
+	Configured *bool `json:"configured,omitempty"`
 	// ID is the provider id: pass it as ProviderID to managed email or the
 	// development sender.
 	ID      string `json:"id,omitempty"`
@@ -147,4 +150,12 @@ func (s *MessagingService) Test(ctx context.Context, channel, to string, opts ..
 	out := &MessagingTestResult{}
 	body := map[string]string{"to": to}
 	return out, s.client.post(ctx, "/v1/messaging_providers/"+url.PathEscape(channel)+"/test", body, out, opts...)
+}
+
+// Channel returns one channel's provider ("email" or "sms"). When none is set
+// it answers 200 with Configured=false (never a 404).
+// GET /v1/messaging_providers/:channel.
+func (s *MessagingService) Channel(ctx context.Context, channel string) (*MessagingProvider, error) {
+	out := &MessagingProvider{}
+	return out, s.client.get(ctx, "/v1/messaging_providers/"+url.PathEscape(channel), nil, out)
 }

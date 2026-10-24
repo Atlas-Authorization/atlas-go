@@ -242,15 +242,15 @@ func TestReferralOpForPath(t *testing.T) {
 // paging, retry_failed, simulate, backfill and the per-user result.
 func TestReferralsV2(t *testing.T) {
 	ctx := context.Background()
-	settings := `{"object":"referral_settings","enabled":true,"provider":"referally","signing_secret_set":true,"api_key_set":false,"url_params":["ref"],"tracking_token":"tt_public_1","code_lookup_url":"https://referrals.example.com/lookup/{code}","signup_code_field":true,"forward_lifecycle":true,"mirror_to_public_metadata":false,"include_referral_claims":true,"connection":{"last_test":null,"last_ping":{"ok":true,"at":7,"http_status":200,"org_name":"Acme","server_time":"2026-10-21T12:00:00.000Z","clock_skew_ms":90000,"clock_skew_warning":true},"alert":{"code":"signature_rejected","message":"401","at":9,"call_id":"rfc_9"},"failed_calls_7d":1,"retrying_calls":0,"last_success_at":null},"providers":[{"id":"referally","name":"Referalli","capabilities":{"signup":true,"erase":true,"export":true,"partner":true,"auto_enroll":true,"signal":true,"alias":true,"user":true,"ping":true},"needs":["endpoint_url","connection_id","signing_secret"],"default_context_cookie":"referally_ctx","docs_url":null}]}`
+	settings := `{"object":"referral_settings","enabled":true,"provider":"referalli","signing_secret_set":true,"api_key_set":false,"url_params":["ref"],"tracking_token":"tt_public_1","code_lookup_url":"https://referrals.example.com/lookup/{code}","signup_code_field":true,"forward_lifecycle":true,"mirror_to_public_metadata":false,"include_referral_claims":true,"connection":{"last_test":null,"last_ping":{"ok":true,"at":7,"http_status":200,"org_name":"Acme","server_time":"2026-10-21T12:00:00.000Z","clock_skew_ms":90000,"clock_skew_warning":true},"alert":{"code":"signature_rejected","message":"401","at":9,"call_id":"rfc_9"},"failed_calls_7d":1,"retrying_calls":0,"last_success_at":null},"providers":[{"id":"referalli","name":"Referalli","capabilities":{"signup":true,"erase":true,"export":true,"partner":true,"auto_enroll":true,"signal":true,"alias":true,"user":true,"ping":true},"needs":["endpoint_url","connection_id","signing_secret"],"default_context_cookie":"referalli_ctx","docs_url":null}]}`
 	c, rec := recordingClient(t, settings)
 	view, err := c.Referrals.Get(ctx)
 	if err != nil || *view.TrackingToken != "tt_public_1" || !view.SignupCodeField || !view.IncludeReferralClaims || view.Connection.Alert == nil || view.Connection.Alert.Code != "signature_rejected" || !view.Connection.LastPing.ClockSkewWarning || *view.Connection.LastPing.ClockSkewMS != 90000 || !view.Providers[0].Capabilities.Ping {
 		t.Fatalf("get = %+v, %v", view, err)
 	}
 	off, on := false, true
-	_, _ = c.Referrals.Update(ctx, UpdateReferralSettingsParams{Provider: "referally", TrackingToken: "tt_public_1", ForwardLifecycle: &off, IncludeReferralClaims: &on, Clear: []string{"code_lookup_url"}})
-	if rec.RawBody != `{"code_lookup_url":null,"forward_lifecycle":false,"include_referral_claims":true,"provider":"referally","tracking_token":"tt_public_1"}` {
+	_, _ = c.Referrals.Update(ctx, UpdateReferralSettingsParams{Provider: "referalli", TrackingToken: "tt_public_1", ForwardLifecycle: &off, IncludeReferralClaims: &on, Clear: []string{"code_lookup_url"}})
+	if rec.RawBody != `{"code_lookup_url":null,"forward_lifecycle":false,"include_referral_claims":true,"provider":"referalli","tracking_token":"tt_public_1"}` {
 		t.Errorf("update body = %s", rec.RawBody)
 	}
 

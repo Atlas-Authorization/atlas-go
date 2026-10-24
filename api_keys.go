@@ -356,6 +356,8 @@ type RevokedAPIKey struct {
 type ListRevokedAPIKeysParams struct {
 	Since string
 	Limit int
+	// StartingAfter is the NextCursor of the previous page.
+	StartingAfter string
 }
 
 // MintAPIKeyTokenParams is the body of POST /v1/api_keys/token. Audience is a
@@ -399,6 +401,9 @@ func (s *APIKeysService) ListRevoked(ctx context.Context, params ListRevokedAPIK
 	}
 	if params.Limit > 0 {
 		q.Set("limit", strconv.Itoa(params.Limit))
+	}
+	if params.StartingAfter != "" {
+		q.Set("starting_after", params.StartingAfter)
 	}
 	out := &CursorPage[RevokedAPIKey]{}
 	return out, s.client.get(ctx, "/v1/api_keys/revoked", q, out)

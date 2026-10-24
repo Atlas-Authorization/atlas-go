@@ -49,10 +49,13 @@ type OrganizationSettingsSchemaService struct{ client *Client }
 
 // OrganizationSettingsSchema is the registered schema and its version.
 type OrganizationSettingsSchema struct {
-	Object    string                 `json:"object"`
-	Schema    map[string]interface{} `json:"schema"`
-	Version   int                    `json:"version"`
-	UpdatedAt int64                  `json:"updated_at"`
+	Object string `json:"object"`
+	// Configured is false when the singleton has never been set (the GET
+	// answers 200, no longer 404).
+	Configured *bool                  `json:"configured,omitempty"`
+	Schema     map[string]interface{} `json:"schema"`
+	Version    int                    `json:"version"`
+	UpdatedAt  int64                  `json:"updated_at"`
 }
 
 // Get fetches the registered schema (404 if none).

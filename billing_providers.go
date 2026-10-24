@@ -28,7 +28,10 @@ const (
 // SecretsSet reports which are stored. WebhookURL is the endpoint to register
 // with the provider.
 type BillingProvider struct {
-	Object      string            `json:"object"`
+	Object string `json:"object"`
+	// Configured is false when the singleton has never been set (the GET
+	// answers 200, no longer 404).
+	Configured  *bool             `json:"configured,omitempty"`
 	Provider    string            `json:"provider"`
 	Environment string            `json:"environment"`
 	Status      string            `json:"status"`
