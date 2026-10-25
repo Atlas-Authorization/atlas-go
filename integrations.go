@@ -38,6 +38,30 @@ type IntegrationCMP struct {
 	SettingsPreset *string  `json:"settings_preset"`
 }
 
+// PerCallAudience lets one integration mint tokens for more than one audience:
+// the token's aud is Template with {Param} filled in, when the value is the
+// configured one, listed in Allowed, or AnyMatching is on.
+type PerCallAudience struct {
+	// Param is the per-call parameter (for example cbid, channel, org_id).
+	Param    string   `json:"param"`
+	Template string   `json:"template"`
+	Allowed  []string `json:"allowed"`
+	// AnyMatching permits any value of the audience format.
+	AnyMatching bool `json:"any_matching"`
+	// Default is true when this is the preset default (read only).
+	Default bool `json:"default,omitempty"`
+}
+
+// PerCallAudienceParams is the per_call_audience of SetIntegrationParams. A
+// preset's template is fixed (leave Template out); a custom integration needs
+// one, with {Param} in it once. Send null with Clear: []string{"per_call_audience"}.
+type PerCallAudienceParams struct {
+	Param       string   `json:"param,omitempty"`
+	Template    string   `json:"template,omitempty"`
+	Allowed     []string `json:"allowed,omitempty"`
+	AnyMatching bool     `json:"any_matching,omitempty"`
+}
+
 // IntegrationAtlasIDIssuer is the Sign in with Atlas issuer an integration trusts.
 type IntegrationAtlasIDIssuer struct {
 	Issuer  string `json:"issuer"`
@@ -83,23 +107,26 @@ type Integration struct {
 	// PrincipalClaim is audience_hint or nil.
 	PrincipalClaim *string `json:"principal_claim,omitempty"`
 	// ExtClaim is external_id or nil.
-	ExtClaim                    *string                   `json:"ext_claim,omitempty"`
-	TTLSeconds                  int                       `json:"ttl_seconds,omitempty"`
-	Issuer                      string                    `json:"issuer,omitempty"`
-	JWKSURL                     string                    `json:"jwks_url,omitempty"`
-	TokenSchema                 string                    `json:"token_schema,omitempty"`
-	EventsURL                   *string                   `json:"events_url,omitempty"`
-	EventsURLDefault            bool                      `json:"events_url_default,omitempty"`
-	Events                      []string                  `json:"events,omitempty"`
-	BackchannelLogoutURL        *string                   `json:"backchannel_logout_url,omitempty"`
-	BackchannelLogoutURLDefault bool                      `json:"backchannel_logout_url_default,omitempty"`
-	VerifyErrorReportURL        *string                   `json:"verify_error_report_url,omitempty"`
-	CMP                         *IntegrationCMP           `json:"cmp,omitempty"`
-	AtlasIDUsers                bool                      `json:"atlas_id_users,omitempty"`
-	AtlasIDIssuer               *IntegrationAtlasIDIssuer `json:"atlas_id_issuer,omitempty"`
-	ExternalRef                 *string                   `json:"external_ref,omitempty"`
-	EnabledAt                   *int64                    `json:"enabled_at,omitempty"`
-	UpdatedAt                   *int64                    `json:"updated_at,omitempty"`
+	ExtClaim                    *string         `json:"ext_claim,omitempty"`
+	TTLSeconds                  int             `json:"ttl_seconds,omitempty"`
+	Issuer                      string          `json:"issuer,omitempty"`
+	JWKSURL                     string          `json:"jwks_url,omitempty"`
+	TokenSchema                 string          `json:"token_schema,omitempty"`
+	EventsURL                   *string         `json:"events_url,omitempty"`
+	EventsURLDefault            bool            `json:"events_url_default,omitempty"`
+	Events                      []string        `json:"events,omitempty"`
+	BackchannelLogoutURL        *string         `json:"backchannel_logout_url,omitempty"`
+	BackchannelLogoutURLDefault bool            `json:"backchannel_logout_url_default,omitempty"`
+	VerifyErrorReportURL        *string         `json:"verify_error_report_url,omitempty"`
+	CMP                         *IntegrationCMP `json:"cmp,omitempty"`
+	AtlasIDUsers                bool            `json:"atlas_id_users,omitempty"`
+	// PerCallAudience is nil when the integration mints for its configured
+	// audience only.
+	PerCallAudience *PerCallAudience          `json:"per_call_audience,omitempty"`
+	AtlasIDIssuer   *IntegrationAtlasIDIssuer `json:"atlas_id_issuer,omitempty"`
+	ExternalRef     *string                   `json:"external_ref,omitempty"`
+	EnabledAt       *int64                    `json:"enabled_at,omitempty"`
+	UpdatedAt       *int64                    `json:"updated_at,omitempty"`
 	// DryRun is present on a ?dry_run=true answer.
 	DryRun bool               `json:"dry_run,omitempty"`
 	Health *IntegrationHealth `json:"health,omitempty"`
@@ -143,7 +170,7 @@ type IntegrationCMPParams struct {
 // SetIntegrationParams is the body of PUT /v1/instance/integrations/:id.
 // Clear names nullable fields to send as null: events_url,
 // backchannel_logout_url, verify_error_report_url, cmp, audience_format,
-// principal_claim, ext_claim, external_ref.
+// principal_claim, ext_claim, external_ref, per_call_audience.
 type SetIntegrationParams struct {
 	Enabled *bool `json:"enabled,omitempty"`
 	// Audience is "<preset>:<id>" for a preset; any value for a custom one.
@@ -160,8 +187,12 @@ type SetIntegrationParams struct {
 	BackchannelLogoutURL string                `json:"backchannel_logout_url,omitempty"`
 	VerifyErrorReportURL string                `json:"verify_error_report_url,omitempty"`
 	CMP                  *IntegrationCMPParams `json:"cmp,omitempty"`
-	AtlasIDUsers         *bool                 `json:"atlas_id_users,omitempty"`
-	ExternalRef          string                `json:"external_ref,omitempty"`
+	// PerCallAudience sets the per-call audience (nil = leave as is; the
+	// preset default applies on a first connect). Clear it with
+	// Clear: []string{"per_call_audience"}.
+	PerCallAudience *PerCallAudienceParams `json:"per_call_audience,omitempty"`
+	AtlasIDUsers    *bool                  `json:"atlas_id_users,omitempty"`
+	ExternalRef     string                 `json:"external_ref,omitempty"`
 	// Channel (chatly), OrgID and Spaces (forumulate) are preset fields.
 	Channel string             `json:"channel,omitempty"`
 	OrgID   string             `json:"org_id,omitempty"`
@@ -301,6 +332,40 @@ func (s *InstanceService) IntegrationAtlasIDToken(ctx context.Context, id, acces
 func (s *SessionsService) GetIntegrationToken(ctx context.Context, id, integration string, opts ...RequestOption) (*IntegrationToken, error) {
 	out := &IntegrationToken{}
 	return out, s.client.post(ctx, "/v1/sessions/"+url.PathEscape(id)+"/integration_tokens/"+url.PathEscape(integration), nil, out, opts...)
+}
+
+// IntegrationTokenParams picks a per-call audience on a mint.
+type IntegrationTokenParams struct {
+	// Audience is the whole audience, the integration's PerCallAudience.Template
+	// filled in (for example acme:tenant-1).
+	Audience string
+	// CBID is the site id of an integration whose per-call parameter is cbid
+	// (the same as Audience "<preset>:<cbid>").
+	CBID string
+	// AudienceParams are the integration's own per-call parameters by name.
+	AudienceParams map[string]string
+}
+
+func (p IntegrationTokenParams) values() url.Values {
+	v := url.Values{}
+	for k, val := range p.AudienceParams {
+		v.Set(k, val)
+	}
+	if p.CBID != "" {
+		v.Set("cbid", p.CBID)
+	}
+	if p.Audience != "" {
+		v.Set("audience", p.Audience)
+	}
+	return v
+}
+
+// GetIntegrationTokenFor is GetIntegrationToken with a per-call audience. The
+// token is minted only when the integration's per_call_audience permits it
+// (403 otherwise). POST /v1/sessions/:id/integration_tokens/:integration.
+func (s *SessionsService) GetIntegrationTokenFor(ctx context.Context, id, integration string, params IntegrationTokenParams, opts ...RequestOption) (*IntegrationToken, error) {
+	out := &IntegrationToken{}
+	return out, s.client.postQ(ctx, "/v1/sessions/"+url.PathEscape(id)+"/integration_tokens/"+url.PathEscape(integration), params.values(), nil, out, opts...)
 }
 
 // ---- integration-facing routes -----------------------------------------------

@@ -319,7 +319,8 @@ type OutboundPartnerLink struct {
 	// AuthMethod is client_credentials or bearer_secret.
 	AuthMethod      string `json:"auth_method"`
 	HasClientSecret bool   `json:"has_client_secret"`
-	// Source is manual or oauth_install.
+	// Source is manual, oauth_install, or registration (a partner platform's
+	// stored partner token).
 	Source string `json:"source"`
 	// Status is active, revoked or failing.
 	Status      string  `json:"status"`
@@ -498,7 +499,10 @@ func (s *AtlasIDGrantsService) ListApps(ctx context.Context) (*ListPage[ManagedA
 }
 
 // Lookup asks whether a verified email is a user of the app (an empty list
-// when not). GET /v1/atlas_id_apps/:id/users?email=.
+// when not). GET /v1/atlas_id_apps/:id/users?email=. The platform routes
+// GET /v1/platform/atlas_id_apps/:id/users and DELETE
+// /v1/platform/atlas_id_apps/:id/grants/:grantId also accept an instance
+// (secret) key of the instance that manages the app; this method is the instance-key form of that call.
 func (s *AtlasIDGrantsService) Lookup(ctx context.Context, appID, email string) (*ListPage[AtlasIDGrantLookup], error) {
 	out := &ListPage[AtlasIDGrantLookup]{}
 	return out, s.client.get(ctx, "/v1/atlas_id_apps/"+url.PathEscape(appID)+"/users", url.Values{"email": {email}}, out)

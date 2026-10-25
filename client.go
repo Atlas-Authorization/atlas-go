@@ -155,6 +155,10 @@ type Client struct {
 	// PartnerLinks is /v1/partner_links: credentials granted to (and held for)
 	// an integrated partner service.
 	PartnerLinks *PartnerLinksService
+	// PartnerPlatforms is /v1/partner_platforms: this instance as the partner
+	// platform of another product (signed deliveries in, partner token stored
+	// once and never returned).
+	PartnerPlatforms *PartnerPlatformsService
 	// AtlasIDGrants manages the Sign in with Atlas apps the instance owns and
 	// their per-user grants (/v1/atlas_id_apps).
 	AtlasIDGrants *AtlasIDGrantsService
@@ -357,6 +361,7 @@ func New(secretKey string, opts ...Option) *Client {
 	c.SecretKeys = &SecretKeysService{client: c}
 	c.Keys = &KeysService{client: c}
 	c.PartnerLinks = &PartnerLinksService{client: c, Outbound: &OutboundPartnerLinksService{client: c}, Requests: &PartnerLinkRequestsService{client: c}}
+	c.PartnerPlatforms = &PartnerPlatformsService{client: c}
 	c.AtlasIDGrants = &AtlasIDGrantsService{client: c}
 	c.Privacy = &PrivacyService{client: c, Orchestrator: &PrivacyOrchestratorService{client: c}}
 	c.Integrations = &IntegrationsService{client: c}

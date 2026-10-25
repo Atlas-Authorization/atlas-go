@@ -147,24 +147,32 @@ func (p CreatePrivacyRequestParams) MarshalJSON() ([]byte, error) {
 // The credentials are never returned; a signing secret appears once, on the
 // write that mints it.
 type PrivacyOrchestrator struct {
-	Object            string                   `json:"object"`
-	Configured        bool                     `json:"configured"`
-	Enabled           bool                     `json:"enabled"`
-	Provider          *string                  `json:"provider"`
-	Name              *string                  `json:"name"`
-	CaseURL           *string                  `json:"case_url"`
-	CancelURL         *string                  `json:"cancel_url"`
-	AuthHeader        string                   `json:"auth_header"`
-	AuthScheme        string                   `json:"auth_scheme"`
-	APIKeySet         bool                     `json:"api_key_set"`
-	SigningSecretSet  bool                     `json:"signing_secret_set"`
-	UsePartnerLink    bool                     `json:"use_partner_link"`
-	OpenClosureCases  bool                     `json:"open_closure_cases"`
-	CompletionWebhook map[string]interface{}   `json:"completion_webhook"`
-	LastCaseAt        *int64                   `json:"last_case_at"`
-	LastError         *string                  `json:"last_error"`
-	LastErrorAt       *int64                   `json:"last_error_at"`
-	Presets           []map[string]interface{} `json:"presets"`
+	Object           string  `json:"object"`
+	Configured       bool    `json:"configured"`
+	Enabled          bool    `json:"enabled"`
+	Provider         *string `json:"provider"`
+	Name             *string `json:"name"`
+	CaseURL          *string `json:"case_url"`
+	CancelURL        *string `json:"cancel_url"`
+	AuthHeader       string  `json:"auth_header"`
+	AuthScheme       string  `json:"auth_scheme"`
+	APIKeySet        bool    `json:"api_key_set"`
+	SigningSecretSet bool    `json:"signing_secret_set"`
+	UsePartnerLink   bool    `json:"use_partner_link"`
+	// PartnerLinkID is the partner link the orchestrator's owner granted this
+	// platform (sent as X-Partner-Link).
+	PartnerLinkID *string `json:"partner_link_id"`
+	// SiteID is the orchestrator-side site a case is for.
+	SiteID *string `json:"site_id"`
+	// CancelDeletionOnSignIn cancels a self-scheduled deletion when the person
+	// signs back in during the grace period.
+	CancelDeletionOnSignIn bool                     `json:"cancel_deletion_on_sign_in"`
+	OpenClosureCases       bool                     `json:"open_closure_cases"`
+	CompletionWebhook      map[string]interface{}   `json:"completion_webhook"`
+	LastCaseAt             *int64                   `json:"last_case_at"`
+	LastError              *string                  `json:"last_error"`
+	LastErrorAt            *int64                   `json:"last_error_at"`
+	Presets                []map[string]interface{} `json:"presets"`
 	// SigningSecret / CompletionWebhookSecret (whsec_…) are returned once.
 	SigningSecret           string `json:"signing_secret,omitempty"`
 	CompletionWebhookSecret string `json:"completion_webhook_secret,omitempty"`
@@ -174,7 +182,7 @@ type PrivacyOrchestrator struct {
 
 // SetPrivacyOrchestratorParams is the body of PUT /v1/instance/privacy_orchestrator.
 // Clear names nullable fields to send as null: case_url, cancel_url, api_key,
-// completion_webhook_url.
+// completion_webhook_url, partner_link_id, site_id.
 type SetPrivacyOrchestratorParams struct {
 	// Provider is a preset id (cookiemunch, custom) or your own lower-case id.
 	Provider string `json:"provider,omitempty"`
@@ -190,8 +198,15 @@ type SetPrivacyOrchestratorParams struct {
 	APIKey string `json:"api_key,omitempty"`
 	// UsePartnerLink calls through the partner link the orchestrator granted
 	// Atlas (partner id = provider).
-	UsePartnerLink   *bool `json:"use_partner_link,omitempty"`
-	OpenClosureCases *bool `json:"open_closure_cases,omitempty"`
+	UsePartnerLink *bool `json:"use_partner_link,omitempty"`
+	// PartnerLinkID implies UsePartnerLink.
+	PartnerLinkID string `json:"partner_link_id,omitempty"`
+	// SiteID is the orchestrator-side site a case is for.
+	SiteID string `json:"site_id,omitempty"`
+	// CancelDeletionOnSignIn cancels a self-scheduled deletion when the person
+	// signs back in during the grace period.
+	CancelDeletionOnSignIn *bool `json:"cancel_deletion_on_sign_in,omitempty"`
+	OpenClosureCases       *bool `json:"open_closure_cases,omitempty"`
 	// SignRequests mints (true) a secret and signs every case call; true again
 	// rotates it, false stops signing.
 	SignRequests         *bool    `json:"sign_requests,omitempty"`

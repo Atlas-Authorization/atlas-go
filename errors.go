@@ -68,6 +68,9 @@ const (
 	// ErrCodeReferralCodeTaken: another user on the instance already holds that
 	// referral code (409).
 	ErrCodeReferralCodeTaken = "REFERRAL_CODE_TAKEN"
+	// ErrCodeManagedWAFNotConfigured: managed WAF provision or deprovision on
+	// an instance with no WAF configuration saved (HTTP 422; Meta["action"]).
+	ErrCodeManagedWAFNotConfigured = "MANAGED_WAF_NOT_CONFIGURED"
 	// ErrCodePlanInUse: a billing plan cannot be removed while subscriptions
 	// still use it.
 	ErrCodePlanInUse = "PLAN_IN_USE"

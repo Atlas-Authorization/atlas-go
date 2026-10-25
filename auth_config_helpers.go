@@ -81,3 +81,13 @@ const (
 	// WebhookEventUserReactivated: a dormant account signed in again.
 	WebhookEventUserReactivated = "user.reactivated"
 )
+
+// ComplianceRetentionConfig is the auth_config.compliance.retention block.
+// CancelDeletionOnSignIn (default false): when a person who scheduled their own
+// deletion signs back in during the grace period, the deletion is cancelled and
+// its case withdrawn (user.deletion_canceled).
+type ComplianceRetentionConfig struct {
+	DeletedUserGraceDays   *float64 `json:"deletedUserGraceDays,omitempty"`
+	ErasureGraceDays       *float64 `json:"erasureGraceDays,omitempty"`
+	CancelDeletionOnSignIn *bool    `json:"cancelDeletionOnSignIn,omitempty"`
+}

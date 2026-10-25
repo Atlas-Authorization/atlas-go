@@ -4,6 +4,18 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.19.0 — 2026-10-25
+
+### Added
+
+- **Partner platforms.** `Client.PartnerPlatforms` (`List`, `Get`, `Set`, `Remove`, `Registration`, `StoreToken`, `Deliveries`; `/v1/partner_platforms`) with typed `PartnerPlatform`, `PartnerPlatformRegistration` and `PartnerDelivery`. The partner token is write-only: `StorePartnerPlatformTokenParams` redacts it when printed or formatted, and no response carries it.
+- **Per-call audiences.** `PerCallAudience` on `Integration`, `PerCallAudienceParams` on `SetIntegrationParams` (clear it with `Clear: []string{"per_call_audience"}`), and `Sessions.GetIntegrationTokenFor` with `IntegrationTokenParams` (`Audience`, `CBID`, `AudienceParams`).
+- **Data-rights orchestrator.** `PrivacyOrchestrator` and `SetPrivacyOrchestratorParams` gain `PartnerLinkID`, `SiteID` and `CancelDeletionOnSignIn`. `OutboundPartnerLink.Source` can be `registration`.
+- **Settings.** `ComplianceRetentionConfig` (`cancelDeletionOnSignIn`, `deletedUserGraceDays`, `erasureGraceDays`); `OperatorConfiguration` gains `Audiences` and `AccessTokenClaims`.
+- **Users.** `UserListParams.IncludeDeleted` lists soft-deleted users still in their scrub window.
+- **Errors.** `ErrCodeManagedWAFNotConfigured` (422, `Meta["action"]`).
+- **Sign in with Atlas grants.** `AtlasIDGrants.Lookup` and `Revoke` document that the matching platform routes also accept the managing instance's secret key.
+
 ## 0.18.0 — 2026-10-24
 
 ### Added

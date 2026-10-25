@@ -397,6 +397,24 @@ rotated, err := atlas.Webhooks.Endpoints.RotateSecretWithParams(ctx, endpointID,
 // rotated.PreviousSecretExpiresAt says when the old secret stops signing.
 ```
 
+## Partner platforms and per-call audiences (0.19)
+
+```go
+// This instance as the partner platform of another product. The partner token
+// is write-only: stored encrypted, never returned, redacted when printed.
+reg, _ := c.PartnerPlatforms.Registration(ctx, "acme")      // what to send the partner
+_, _ = c.PartnerPlatforms.StoreToken(ctx, "acme", atlas.StorePartnerPlatformTokenParams{Token: tok})
+deliveries, _ := c.PartnerPlatforms.Deliveries(ctx, "acme", 20)
+
+// An integration that mints for more than one audience.
+_, _ = c.Instance.SetIntegration(ctx, "acme", atlas.SetIntegrationParams{
+	PerCallAudience: &atlas.PerCallAudienceParams{Param: "tenant", Template: "acme:{tenant}", Allowed: []string{"t1"}}})
+tok2, _ := c.Sessions.GetIntegrationTokenFor(ctx, sessionID, "acme", atlas.IntegrationTokenParams{AudienceParams: map[string]string{"tenant": "t1"}})
+
+// Soft-deleted users still in their scrub window.
+users, _ := c.Users.List(ctx, atlas.UserListParams{IncludeDeleted: true})
+```
+
 ## Integrator platform (0.17)
 
 ```go

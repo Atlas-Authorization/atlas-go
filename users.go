@@ -273,6 +273,9 @@ type UserListParams struct {
 	OrderBy string
 	// IncludeTotalCount asks for total_count on the page.
 	IncludeTotalCount bool
+	// IncludeDeleted also lists soft-deleted users still in their scrub window
+	// (each with deleted_at set). Default false.
+	IncludeDeleted bool
 }
 
 func (p UserListParams) values() url.Values {
@@ -313,6 +316,9 @@ func (p UserListParams) values() url.Values {
 	}
 	if p.IncludeTotalCount {
 		v.Set("include_total_count", "true")
+	}
+	if p.IncludeDeleted {
+		v.Set("include_deleted", "true")
 	}
 	return v
 }

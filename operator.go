@@ -84,6 +84,10 @@ type OperatorConfiguration struct {
 	TokenExchangeEndpoint       string `json:"token_exchange_endpoint"`
 	TokenExchangeAudience       string `json:"token_exchange_audience"`
 	RootActionMaxMFAAgeSeconds  int    `json:"root_action_max_mfa_age_seconds"`
+	// Audiences are other products that accept Atlas operators.
+	Audiences []string `json:"audiences,omitempty"`
+	// AccessTokenClaims are the claims an operator access token carries.
+	AccessTokenClaims []string `json:"access_token_claims,omitempty"`
 }
 
 // OperatorDeviceAuthorization is the RFC 8628 device authorization response.
