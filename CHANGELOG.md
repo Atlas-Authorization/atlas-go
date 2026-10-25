@@ -4,6 +4,15 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.20.0 — 2026-10-25
+
+### Added
+
+- **Test and review accounts.** `Platform.AtlasIDApps.ProvisionedAccounts` (`List`, `Create`, `Get`, `Remove`, `RotatePassword`; `/v1/platform/atlas_id_apps/{id}/provisioned_accounts`) with typed `AtlasIDProvisionedAccount`. The password is returned once; with `WithSecretRecipient` it arrives as `SealedPassword`. It is redacted when the account or the create and rotate params are printed or formatted. Needs the `platform:atlas_id_apps:provision` scope or the per-app `atlas_id_apps:<app id>:provision` scope.
+- **Verified domains.** `Platform.Domains` (`List`, `Claim`, `Check`, `Verify`, `Remove`; `/v1/platform/domains`) with typed `AccountDomain`.
+- **Test sign-in mode.** `AtlasIDApp.TestMode` and `ProvisionedVerifiedDomainsOnly`, and `UpdateAtlasIDAppParams.TestMode` and `ProvisionedVerifiedDomainsOnly`.
+- **Errors.** `ErrCodeTestAccountRestricted` (403), `ErrCodeProvisionedAccountLimitReached` (409) and `ErrCodeDomainNotVerified` (422).
+
 ## 0.19.0 — 2026-10-25
 
 ### Added

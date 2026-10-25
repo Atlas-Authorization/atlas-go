@@ -288,6 +288,19 @@ overlap, archive, transfer, claim); `c.Platform.AtlasIDApps` manages Sign in wit
 Atlas apps (logout URIs, branding, page text, design, secret rotation, design
 preview); `c.Platform.DesignAssets` uploads and lists the images those designs use.
 
+Test and review accounts for a Sign in with Atlas app live under
+`c.Platform.AtlasIDApps.ProvisionedAccounts` (`List`, `Create`, `Get`, `Remove`,
+`RotatePassword`). They need the `platform:atlas_id_apps:provision` scope, or the
+per-app `atlas_id_apps:<app id>:provision` scope. The password comes back once, on
+`Create` and `RotatePassword`; build the client with `WithSecretRecipient` to
+receive it sealed (`SealedPassword`, open it with `OpenSealedSecret`). It is redacted
+when the value is printed. `c.Platform.Domains` (`List`, `Claim`, `Check`, `Remove`)
+manages the domains you verify by DNS; `UpdateAtlasIDAppParams.TestMode` (the fixed
+code 424242 for `+atlas_test` addresses on a verified domain) and
+`ProvisionedVerifiedDomainsOnly` use them. New error codes:
+`ErrCodeTestAccountRestricted` (403), `ErrCodeProvisionedAccountLimitReached` (409)
+and `ErrCodeDomainNotVerified` (422).
+
 ## Sign-in page design
 
 ```go
@@ -722,7 +735,7 @@ covered:
 | Referrals | `c.Referrals` | referral attribution settings, connection test, call log, retry, simulate, backfill, per-user result |
 | User hooks | `c.UserHooks` | the `before_user_create` hook: settings and test |
 | Tokens | `c.Tokens` | authoritative online verify |
-| Platform | `c.Platform` | `.Apps`, `.AtlasIDApps` (Sign in with Atlas), `.DesignAssets` (platform key) |
+| Platform | `c.Platform` | `.Apps`, `.AtlasIDApps` (Sign in with Atlas, incl. `.ProvisionedAccounts`), `.Domains`, `.DesignAssets` (platform key) |
 | Design | `c.Design` | instance + organization design, preview, catalog; `.Assets` image uploads |
 | Entitlement overrides | `c.EntitlementOverrides` | grant, list, revoke sales-led overrides |
 | Email addresses | `c.EmailAddresses` | verify, make primary |

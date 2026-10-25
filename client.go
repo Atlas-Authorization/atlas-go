@@ -352,7 +352,8 @@ func New(secretKey string, opts ...Option) *Client {
 	c.Platform = &PlatformService{
 		client:           c,
 		Apps:             &PlatformAppsService{client: c},
-		AtlasIDApps:      &AtlasIDAppsService{client: c},
+		AtlasIDApps:      &AtlasIDAppsService{client: c, ProvisionedAccounts: &AtlasIDProvisionedAccountsService{client: c}},
+		Domains:          &PlatformDomainsService{client: c},
 		DesignAssets:     &PlatformDesignAssetsService{client: c},
 		AtlasIDPublisher: &AtlasIDPublisherService{client: c},
 		Keys:             &PlatformKeysService{client: c},

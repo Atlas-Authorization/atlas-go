@@ -116,6 +116,15 @@ const (
 	// ErrCodePartnerLinkUnavailable: the partner-link credential an
 	// integration needs is not available on this instance.
 	ErrCodePartnerLinkUnavailable = "PARTNER_LINK_UNAVAILABLE"
+	// ErrCodeTestAccountRestricted: a Sign in with Atlas test or review
+	// account tried something outside the app(s) it is confined to (403).
+	ErrCodeTestAccountRestricted = "TEST_ACCOUNT_RESTRICTED"
+	// ErrCodeProvisionedAccountLimitReached: the account's test-account cap
+	// is reached (409).
+	ErrCodeProvisionedAccountLimitReached = "PROVISIONED_ACCOUNT_LIMIT_REACHED"
+	// ErrCodeDomainNotVerified: the setting or address needs a domain the
+	// account has verified (422).
+	ErrCodeDomainNotVerified = "DOMAIN_NOT_VERIFIED"
 )
 
 // APIError is returned by every SDK method on a non-2xx response. It carries the

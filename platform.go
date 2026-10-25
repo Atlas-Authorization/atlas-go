@@ -28,6 +28,9 @@ type PlatformService struct {
 	Keys *PlatformKeysService
 	// Audit is the account audit log (/v1/platform/audit_logs) and its streams.
 	Audit *PlatformAuditService
+	// Domains is /v1/platform/domains — domains the account verified by DNS;
+	// they gate test sign-in mode and the test-account domain restriction.
+	Domains *PlatformDomainsService
 }
 
 // --- Apps -------------------------------------------------------------------
@@ -432,7 +435,13 @@ func (s *PlatformAppsService) AcceptTransfer(ctx context.Context, transferToken 
 
 // AtlasIDAppsService is /v1/platform/atlas_id_apps: OpenID Connect clients on
 // https://atlasauth.net ("Sign in with Atlas") owned by the platform's account.
-type AtlasIDAppsService struct{ client *Client }
+type AtlasIDAppsService struct {
+	client *Client
+	// ProvisionedAccounts is the app's test and review accounts. Needs the
+	// platform:atlas_id_apps:provision scope, or the per-app
+	// atlas_id_apps:<app id>:provision scope.
+	ProvisionedAccounts *AtlasIDProvisionedAccountsService
+}
 
 // AtlasIDApp is a registered Sign in with Atlas app. It never carries the
 // client secret except on create and rotate (ClientSecret).
@@ -491,6 +500,12 @@ type AtlasIDApp struct {
 	SecretIssuedAt *int64 `json:"secret_issued_at,omitempty"`
 	// OverlapSeconds is, on a rotation, the overlap applied.
 	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
+	// TestMode is whether test sign-in mode is on: +atlas_test addresses on a
+	// verified domain sign in to this app with the fixed code 424242.
+	TestMode bool `json:"test_mode"`
+	// ProvisionedVerifiedDomainsOnly restricts test and review accounts to
+	// addresses on a domain you verified.
+	ProvisionedVerifiedDomainsOnly bool `json:"provisioned_verified_domains_only"`
 
 	ProvisioningFields
 
@@ -654,6 +669,14 @@ type UpdateAtlasIDAppParams struct {
 	// returns WebhookSecret once. Put "webhook_url" in Clear to remove it.
 	WebhookURL *string  `json:"webhook_url,omitempty"`
 	Clear      []string `json:"-"`
+	// TestMode turns test sign-in mode on or off for this app. Turning it on
+	// needs a verified domain (422 DOMAIN_NOT_VERIFIED). While on, anyone who
+	// knows the +atlas_test pattern can sign in as such an address on your
+	// verified domain without reading mail: a risk you opt into.
+	TestMode *bool `json:"test_mode,omitempty"`
+	// ProvisionedVerifiedDomainsOnly requires test and review accounts to use
+	// an address on a domain you verified.
+	ProvisionedVerifiedDomainsOnly *bool `json:"provisioned_verified_domains_only,omitempty"`
 	// Metadata replaces the provisioning tags.
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
