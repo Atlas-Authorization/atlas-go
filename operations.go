@@ -271,7 +271,10 @@ func (s *LegacyAuthService) Delete(ctx context.Context, opts ...RequestOption) (
 
 // OrgLDAPConnectionsService manages organization-owned LDAP / Active Directory
 // connections (one per organization). The bind password is write-only.
-type OrgLDAPConnectionsService struct{ client *Client }
+type OrgLDAPConnectionsService struct {
+	client   *Client
+	SyncRuns *OrgLDAPConnectionsSyncRunsService
+}
 
 // LDAPAttributeMapping maps directory attributes onto user fields; Email is
 // required.

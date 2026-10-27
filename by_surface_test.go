@@ -577,3 +577,33 @@ func TestIntrospectorCacheBoundsAndExpiry(t *testing.T) {
 		t.Error("cached answer outlived the token's exp")
 	}
 }
+
+// ── RSK-02: risk-event timeline, feedback, fraud lookup ─────────────────────
+
+func TestRiskEventsSurface(t *testing.T) {
+	ctx := context.Background()
+	c, rec := recordingClient(t, `{"object":"list","data":[{"object":"risk_event","id":"re_1","user_id":"usr_1","level":"high","score":80,"signals":["newDevice"],"action":"mfa","mode":"audit","ip":"1.2.3.4","feedback":null,"feedback_at":null,"created_at":"2026-01-01T00:00:00Z"}],"days":7,"total":3,"buckets":[{"level":"high","action":"mfa","mode":"audit","count":3}],"verdict":"challenge","reasons":["r"],"matched_rules":["fr_1"],"device_id":"d1"}`)
+	page, err := c.RiskBasedMFA.ListEvents(ctx, ListRiskEventsParams{UserID: "usr_1", Level: "high", Limit: 10, Before: "2026-02-01T00:00:00Z"})
+	rec.expect(t, "GET", "/v1/risk_events")
+	if err != nil || len(page.Data) != 1 || page.Data[0].ID != "re_1" || page.Data[0].Signals[0] != "newDevice" || page.Data[0].Feedback != nil {
+		t.Fatalf("ListEvents = %+v, %v", page, err)
+	}
+	if rec.Query != "before=2026-02-01T00%3A00%3A00Z&level=high&limit=10&user_id=usr_1" {
+		t.Errorf("query = %q", rec.Query)
+	}
+	m, err := c.RiskBasedMFA.EventMetrics(ctx, 14)
+	rec.expect(t, "GET", "/v1/risk_events/metrics")
+	if err != nil || rec.Query != "days=14" || m.Total != 3 || m.Buckets[0].Count != 3 {
+		t.Fatalf("EventMetrics = %+v (%q), %v", m, rec.Query, err)
+	}
+	_, err = c.RiskBasedMFA.EventFeedback(ctx, "re_1", "fraud")
+	rec.expect(t, "POST", "/v1/risk_events/re_1/feedback")
+	if err != nil || rec.Body["verdict"] != "fraud" {
+		t.Errorf("EventFeedback body=%v, %v", rec.Body, err)
+	}
+	fl, err := c.RiskBasedMFA.FraudLookup(ctx, FraudLookupParams{IP: "1.2.3.4", Email: "a@b.test"})
+	rec.expect(t, "POST", "/v1/fraud/lookup")
+	if err != nil || rec.Body["ip"] != "1.2.3.4" || rec.Body["email"] != "a@b.test" || fl.Verdict != "challenge" || fl.MatchedRules[0] != "fr_1" {
+		t.Errorf("FraudLookup body=%v out=%+v, %v", rec.Body, fl, err)
+	}
+}

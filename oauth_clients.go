@@ -9,7 +9,12 @@ import (
 type OAuthClientsService struct {
 	client *Client
 
-	Grants *OAuthClientGrantsService
+	Grants           *OAuthClientGrantsService
+	AppSettings      *OAuthClientsAppSettingsService
+	WorkloadIdentity *OAuthClientsWorkloadIdentityService
+	TrustedIssuers   *OAuthClientsTrustedIssuersService
+	LoginRequests    *OAuthClientsLoginRequestsService
+	ConsentRequests  *OAuthClientsConsentRequestsService
 }
 
 // OAuthClient is a registered OAuth client (relying party).
