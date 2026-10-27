@@ -1305,3 +1305,16 @@ func TestBackendAPIOperations(t *testing.T) {
 		}
 	}
 }
+
+// TestPreservedMethodSignatures pins the signatures of methods that existed
+// before the operation catch-up and share a name or a resource with new ones.
+func TestPreservedMethodSignatures(t *testing.T) {
+	var _ func(*UsersService, context.Context, UserListParams) (*UserSearchPage, error) = (*UsersService).Search
+	var _ func(*DeliveryService, context.Context, DeliveryHealthParams) (*DeliveryHealthList, error) = (*DeliveryService).Health
+	var _ func(*DeliveryService, context.Context) (*EgressIPs, error) = (*DeliveryService).EgressIPs
+	var _ func(*DeliveryService, context.Context, string, string, []string, ...RequestOption) (*DeliveryHealth, error) = (*DeliveryService).SetAlertContacts
+	c := New("sk_test")
+	if c.Users.Searches == nil {
+		t.Fatal("Users.Searches is not wired")
+	}
+}
