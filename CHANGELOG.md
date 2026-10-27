@@ -4,6 +4,16 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## Unreleased
+
+### Added
+
+- **Backend API catch-up (452 operations).** Typed methods and models for the operations the client did not yet cover, on new resource groups `AppCatalog`, `LDAPServerClients`, `Journeys`, `Groups` (with `Rules`), `Migrations` (with `Imports`), `ManagedGrants`, `LeastPrivilege`, `Flags`, `MfaFactors` (with `Yubikeys`, `SmartCardMappings`), `Marketing`, `AuditEventSchemas`, `DirectoryPullSources`, `RelayAgents`, `OAuthClientProfiles`, `PasskeyAPI`, `VC`, `Listen`, `AgentRegistration`, `Agents`, `AgentAccessRequests`, `Workflows`, `PageTemplates`, `ServiceConnectors`, `DesktopMfa`, `IdentityVerification`, `IGA` (entitlements, requests, grants, delegations, SoD, lifecycle, campaigns), `ScimProvisioningPresets`, `Vault`, `Connections`, `SSF`, `NetworkZones`, `AccessPolicies`, `ABAC`, `Resources`, `OrgRoleGrants`, `Devices`, `AuthzDecisions`, `PolicyBundles`, `ProxyApps` and `MCPGateways`, and added to `Users` (required actions, notes, guardians, saved searches), `Organizations` (webhook endpoints), `OAuthClients` (app settings, workload identity, trusted issuers, login and consent requests), `Analytics` (reports, alert rules), `OrgLDAPConnections` (sync runs), `Delivery`, `Instance`, `Integrations`, `Actions`, `FGA`, `OpenFGA`, `AttackProtection` and `RiskBasedMFA`.
+- The event stream (`Listen.StreamSession`) and the policy bundle archive (`PolicyBundles.Archive`) return the raw response bytes.
+- **Risk-event timeline.** `RiskBasedMFA.ListEvents` (`GET /v1/risk_events`), `EventMetrics` (`GET /v1/risk_events/metrics`) and `EventFeedback` (`POST /v1/risk_events/{id}/feedback`, verdict `legit` or `fraud`), with typed `RiskEvent` and `RiskEventMetrics`.
+- **Fraud lookup.** `RiskBasedMFA.FraudLookup` (`POST /v1/fraud/lookup`) with typed `FraudLookup`.
+- `RiskBasedMFA` and `UpdateRiskBasedMFAParams` gain `mode`, `level_actions`, `reputation`, `fraud`, `baseline` and `mid_session`.
+
 ## 0.20.0 — 2026-10-25
 
 ### Added

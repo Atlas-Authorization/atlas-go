@@ -10,12 +10,13 @@ import (
 type OrganizationsService struct {
 	client *Client
 
-	Memberships *OrgMembershipsService
-	Invitations *OrgInvitationsService
-	Domains     *OrgDomainsService
-	GroupRoles  *OrgGroupRolesService
-	Teams       *OrgTeamsService
-	Roles       *OrgRolesService
+	Memberships      *OrgMembershipsService
+	Invitations      *OrgInvitationsService
+	Domains          *OrgDomainsService
+	GroupRoles       *OrgGroupRolesService
+	Teams            *OrgTeamsService
+	Roles            *OrgRolesService
+	WebhookEndpoints *OrganizationsWebhookEndpointsService
 }
 
 // Organization is an organization as the BAPI serves it.

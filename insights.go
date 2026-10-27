@@ -338,7 +338,11 @@ func (s *DiagnosticsService) ConfigChangelog(ctx context.Context, params ConfigC
 // ── Analytics (/v1/events, /v1/usage) ───────────────────────────────────────
 
 // AnalyticsService reads the product activity feed and usage analytics.
-type AnalyticsService struct{ client *Client }
+type AnalyticsService struct {
+	client     *Client
+	Reports    *AnalyticsReportsService
+	AlertRules *AnalyticsAlertRulesService
+}
 
 // ActivityEvent is one entry in the activity feed.
 type ActivityEvent struct {

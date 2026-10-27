@@ -713,7 +713,7 @@ covered:
 | Attack protection | `c.AttackProtection` | get, update |
 | Managed WAF | `c.ManagedWAF` | config, status, provision/deprovision |
 | Bot signals | `c.BotSignals` | export signal lake + labels, add labels |
-| Risk-based MFA | `c.RiskBasedMFA` | get, update (adaptive MFA) |
+| Risk-based MFA | `c.RiskBasedMFA` | get, update (adaptive MFA); risk-event timeline (`ListEvents`, `EventMetrics`, `EventFeedback`); `FraudLookup` |
 | Rate-limit policy | `c.RateLimitPolicy` | get, update |
 | Policy acceptance | `c.Policies` / `c.PolicySource` | policies, versions (publish/retire), acceptances + CSV, user standing, `pol` claim setting; external source config, test, sync, deliveries |
 | Actor / Sign-in tokens | `c.ActorTokens` / `c.SignInTokens` | create, revoke |

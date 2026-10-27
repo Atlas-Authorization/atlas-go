@@ -5,7 +5,10 @@ import "context"
 // InstanceService is the /v1/instance namespace — §9.3 instance configuration.
 // The signing private key is never returned. JWT templates live under their own
 // JWTTemplates resource.
-type InstanceService struct{ client *Client }
+type InstanceService struct {
+	client       *Client
+	Integrations *InstanceIntegrationsService
+}
 
 // Instance is the tenant's environment configuration.
 type Instance struct {

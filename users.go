@@ -8,7 +8,13 @@ import (
 )
 
 // UsersService is the /v1/users namespace.
-type UsersService struct{ client *Client }
+type UsersService struct {
+	client          *Client
+	RequiredActions *UsersRequiredActionsService
+	Notes           *UsersNotesService
+	Guardians       *UsersGuardiansService
+	Searches        *UsersSearchesService
+}
 
 // User is a user as the BAPI serves it. private_metadata is never returned.
 type User struct {

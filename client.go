@@ -183,6 +183,48 @@ type Client struct {
 	// Delivery is outbound delivery health (/v1/delivery_health) and the
 	// fixed egress addresses (/v1/meta/egress_ips).
 	Delivery *DeliveryService
+
+	// Resource groups added after the first release of the client.
+	AppCatalog              *AppCatalogService
+	LDAPServerClients       *LDAPServerClientsService
+	Journeys                *JourneysService
+	Groups                  *GroupsService
+	Migrations              *MigrationsService
+	ManagedGrants           *ManagedGrantsService
+	LeastPrivilege          *LeastPrivilegeService
+	Flags                   *FlagsService
+	MFAFactors              *MFAFactorsService
+	Marketing               *MarketingService
+	AuditEventSchemas       *AuditEventSchemasService
+	DirectoryPullSources    *DirectoryPullSourcesService
+	RelayAgents             *RelayAgentsService
+	OAuthClientProfiles     *OAuthClientProfilesService
+	PasskeyAPI              *PasskeyAPIService
+	VC                      *VCService
+	Listen                  *ListenService
+	AgentRegistration       *AgentRegistrationService
+	Agents                  *AgentsService
+	AgentAccessRequests     *AgentAccessRequestsService
+	Workflows               *WorkflowsService
+	PageTemplates           *PageTemplatesService
+	ServiceConnectors       *ServiceConnectorsService
+	DesktopMFA              *DesktopMFAService
+	IdentityVerification    *IdentityVerificationService
+	IGA                     *IGAService
+	SCIMProvisioningPresets *SCIMProvisioningPresetsService
+	Vault                   *VaultService
+	Connections             *ConnectionsService
+	SSF                     *SSFService
+	NetworkZones            *NetworkZonesService
+	AccessPolicies          *AccessPoliciesService
+	ABAC                    *ABACService
+	Resources               *ResourcesService
+	OrgRoleGrants           *OrgRoleGrantsService
+	Devices                 *DevicesService
+	AuthzDecisions          *AuthzDecisionsService
+	PolicyBundles           *PolicyBundlesService
+	ProxyApps               *ProxyAppsService
+	MCPGateways             *MCPGatewaysService
 }
 
 // Option configures a Client at construction time.
@@ -373,6 +415,7 @@ func New(secretKey string, opts ...Option) *Client {
 	c.AuditExports = &AuditExportsService{client: c}
 	c.Status = &StatusService{client: c}
 	c.Delivery = &DeliveryService{client: c}
+	c.wireGenerated()
 	return c
 }
 
