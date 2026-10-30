@@ -106,6 +106,24 @@ func (s *TestingService) CreateTestingToken(ctx context.Context, opts ...Request
 	return out, s.client.post(ctx, "/v1/testing_tokens", nil, out, opts...)
 }
 
+// CreateSignInURLParams is the body of POST /v1/testing/sign_in_url.
+type CreateSignInURLParams struct {
+	UserID string `json:"user_id"`
+	// RedirectURL is where the browser lands: an allowed origin or localhost.
+	RedirectURL string `json:"redirect_url"`
+	// ExpiresInSeconds is 1 to 300 (0 = the default 60).
+	ExpiresInSeconds int `json:"expires_in_seconds,omitempty"`
+}
+
+// CreateSignInURL returns a ready one-time URL that signs a browser in as the
+// user and lands on RedirectURL (object testing_sign_in_url). Development
+// instances only (403 TESTING_UNAVAILABLE otherwise).
+// POST /v1/testing/sign_in_url.
+func (s *TestingService) CreateSignInURL(ctx context.Context, params CreateSignInURLParams, opts ...RequestOption) (*BrowserTicket, error) {
+	out := &BrowserTicket{}
+	return out, s.client.post(ctx, "/v1/testing/sign_in_url", params, out, opts...)
+}
+
 // ── MCP (/v1/mcp, /v1/mcp_connector) ────────────────────────────────────────
 
 // MCPService is the Model Context Protocol surface: the management MCP server

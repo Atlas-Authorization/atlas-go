@@ -131,6 +131,92 @@ func VerifyWebhook(body []byte, header http.Header, secret string, opts *Webhook
 	return out, nil
 }
 
+// Standard Webhooks header names, for application webhooks (matched
+// case-insensitively).
+const (
+	StandardWebhookHeaderID        = "Webhook-Id"
+	StandardWebhookHeaderTimestamp = "Webhook-Timestamp"
+	StandardWebhookHeaderSignature = "Webhook-Signature"
+)
+
+// ErrWebhookInvalidSecret is returned by VerifyStandardWebhook when the
+// secret is not whsec_<base64>.
+var ErrWebhookInvalidSecret = errors.New("atlas webhook: secret is not whsec_<base64>")
+
+// VerifyStandardWebhook verifies an APPLICATION webhook (the events an app
+// publishes to its customers' endpoints through AppEvents): Standard Webhooks.
+// webhook-id, webhook-timestamp (decimal epoch SECONDS) and webhook-signature
+// ("v1,<base64>", several space-separated during a secret rotation), an
+// HMAC-SHA256 over "<id>.<timestamp>.<raw body>" keyed with the
+// base64-decoded part of the whsec_ secret. Returns the same VerifiedWebhook
+// as VerifyWebhook, with Timestamp in seconds. Matches verifyStandardWebhook
+// in @atlasauth/backend.
+func VerifyStandardWebhook(body []byte, header http.Header, secret string, opts *WebhookVerifyOptions) (*VerifiedWebhook, error) {
+	id := header.Get(StandardWebhookHeaderID)
+	tsRaw := strings.TrimSpace(header.Get(StandardWebhookHeaderTimestamp))
+	sig := header.Get(StandardWebhookHeaderSignature)
+	if id == "" || tsRaw == "" || sig == "" {
+		return nil, ErrWebhookMissingHeaders
+	}
+	provided := webhookSignatures(sig)
+	if len(provided) == 0 {
+		return nil, ErrWebhookMalformedSignature
+	}
+	for _, r := range tsRaw {
+		if r < '0' || r > '9' {
+			return nil, ErrWebhookStaleTimestamp
+		}
+	}
+	ts, err := strconv.ParseInt(tsRaw, 10, 64)
+	if err != nil {
+		return nil, ErrWebhookStaleTimestamp
+	}
+	now := time.Now()
+	tolerance := WebhookReplayTolerance
+	if opts != nil {
+		if !opts.Now.IsZero() {
+			now = opts.Now
+		}
+		if opts.Tolerance > 0 {
+			tolerance = opts.Tolerance
+		}
+	}
+	diff := now.Unix() - ts
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff > int64(tolerance/time.Second) {
+		return nil, ErrWebhookStaleTimestamp
+	}
+	// Padding optional, as in the Node verifier.
+	key, err := base64.RawStdEncoding.DecodeString(strings.TrimRight(strings.TrimPrefix(secret, "whsec_"), "="))
+	if err != nil || len(key) == 0 {
+		return nil, ErrWebhookInvalidSecret
+	}
+
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(id + "." + strconv.FormatInt(ts, 10) + "."))
+	mac.Write(body)
+	expected := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	// Compare every entry (no early exit), each in constant time.
+	matched := false
+	for _, candidate := range provided {
+		if hmac.Equal([]byte(expected), []byte(candidate)) {
+			matched = true
+		}
+	}
+	if !matched {
+		return nil, ErrWebhookSignatureMismatch
+	}
+
+	out := &VerifiedWebhook{DeliveryID: id, Timestamp: ts}
+	var event WebhookEvent
+	if json.Unmarshal(body, &event) == nil {
+		out.Event = &event
+	}
+	return out, nil
+}
+
 // webhookSignatures returns the v1 signatures in an atlas-signature header: one
 // "v1,<base64>" entry, or several separated by spaces (while an endpoint secret
 // rotates, Atlas signs with the old and the new secret). Entries of another

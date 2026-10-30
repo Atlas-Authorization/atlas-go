@@ -90,6 +90,10 @@ type ImportUserRow struct {
 	PhoneNumbers []ImportPhoneNumber `json:"phone_numbers,omitempty"`
 	// OrganizationMemberships seats the user in organizations.
 	OrganizationMemberships []ImportOrganizationMembership `json:"organization_memberships,omitempty"`
+	// ImageURL is the profile picture: an https URL, stored as given.
+	// ProfileImageURL is an alias.
+	ImageURL        string `json:"image_url,omitempty"`
+	ProfileImageURL string `json:"profile_image_url,omitempty"`
 }
 
 // ImportPhoneNumber is one imported phone number.

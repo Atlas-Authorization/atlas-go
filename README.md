@@ -410,6 +410,46 @@ rotated, err := atlas.Webhooks.Endpoints.RotateSecretWithParams(ctx, endpointID,
 // rotated.PreviousSecretExpiresAt says when the old secret stops signing.
 ```
 
+## Application webhooks (0.21)
+
+Send your app's own events to endpoints your customers (organizations) register. Atlas signs them with
+Standard Webhooks, retries, tracks health and keeps the delivery log with redeliver and replay.
+
+```go
+_, _ = c.AppEvents.Types.Create(ctx, atlas.CreateAppEventTypeParams{Type: "call.completed"})
+ep, _ := c.AppEvents.Endpoints.Create(ctx, "org_1", atlas.AppWebhookEndpointParams{URL: "https://acme.example.com/hooks"})
+// ep.Secret (whsec_...) is shown once; hand it to the organization.
+ev, err := c.AppEvents.Publish(ctx, atlas.PublishAppEventParams{
+	OrganizationID: "org_1",
+	Type:           "call.completed",
+	Data:           map[string]interface{}{"call_id": "c1"},
+	IdempotencyKey: "c1", // a repeat returns the first event (IdempotentReplay) and queues nothing
+})
+```
+
+The receiver verifies with `VerifyStandardWebhook` (`webhook-id`, `webhook-timestamp` in seconds,
+`webhook-signature`; several signatures during a rotation):
+
+```go
+hook, err := atlas.VerifyStandardWebhook(body, r.Header, "whsec_...", nil)
+```
+
+## Browser tickets and test sign-in URLs (0.21)
+
+`Sessions.CreateBrowserTicket` mints a one-time ticket that signs a browser in as a user (support
+handoffs, end-to-end tests); with `RedirectURL` the response carries a ready `URL`. It replaces the
+deprecated `SignInTokens` (sunset 2027-04-01). On development instances, `Testing.CreateSignInURL`
+returns the same in one call, and the ticket exchange may be repeated by the same client for 10 seconds
+(development instances only).
+
+```go
+t, err := c.Sessions.CreateBrowserTicket(ctx, atlas.CreateBrowserTicketParams{UserID: "user_1", RedirectURL: "https://app.example.com/"})
+```
+
+`Instance.GetSignInWithAtlas` / `UpdateSignInWithAtlas`, `Instance.GetHostedPages` / `UpdateHostedPages`
+and `Privacy.GetIntegration` / `ConnectIntegration` cover the new instance settings. `Instance.Update`
+and `Referrals.Update` results carry `Warnings`.
+
 ## Partner platforms and per-call audiences (0.19)
 
 ```go
@@ -693,7 +733,8 @@ covered:
 | Service | Field | Highlights |
 | --- | --- | --- |
 | Users | `c.Users` | CRUD, ban/unban, lock/unlock, MFA, sessions, emails, OAuth tokens, identities, grants |
-| Sessions | `c.Sessions` | create (mint), list (by user), get, revoke |
+| Sessions | `c.Sessions` | create (mint), browser tickets, list (by user), get, revoke |
+| App events | `c.AppEvents` | publish, list, get; `.Types` (catalog), `.Endpoints` (per-organization endpoints) |
 | Organizations | `c.Organizations` | CRUD, metadata, policy, parent/hierarchy, entitlements; `.Memberships`, `.Invitations`, `.Domains`, `.GroupRoles` |
 | Invitations | `c.Invitations` | list, create, revoke |
 | Roles / Permissions | `c.Roles` / `c.Permissions` | CRUD, `SetPermissions`, delete-with-reassign |

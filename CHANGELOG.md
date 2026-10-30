@@ -4,15 +4,32 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
-## Unreleased
+## 0.21.0 — 2026-10-30
 
 ### Added
 
+- **Application webhooks.** `Client.AppEvents` (`Publish`, `List`, `Get`; `/v1/app_events`) with typed `AppEvent` and `PublishedAppEvent` (`IdempotentReplay`, `DeliveriesQueued`, `EndpointIDs`); `AppEvents.Types` (`List`, `Create`, `Get`, `Update`, `Delete` by `aet_` id or type name; `/v1/app_event_types`) with typed `AppEventType`; `AppEvents.Endpoints` (one organization's endpoints: `List`, `Create`, `Get`, `Update`, `Delete`, `RotateSecret`, `RevealSecret`, `Test` (with `wait`), `Deliveries`, `Redeliver`, `Replay`, and `AppEventTypes` for the picker list at `/v1/organizations/{id}/app_event_types`).
+- **Standard Webhooks verifier.** `VerifyStandardWebhook` for application webhooks (`webhook-id`, `webhook-timestamp` in seconds, space-separated `v1,<base64>` signatures, `whsec_` base64 key, constant-time compare); `ErrWebhookInvalidSecret`.
+- **Browser tickets.** `Sessions.CreateBrowserTicket` (`POST /v1/sessions` with `mode: "browser_ticket"`) returning `BrowserTicket`; `CreateSessionParams` gains `Mode`, `RedirectURL`, `ExpiresInSeconds`. The ticket exchange's 10 s same-client replay applies to development instances only.
+- **Test sign-in URL.** `Testing.CreateSignInURL` (`POST /v1/testing/sign_in_url`, development instances only).
+- **Instance settings.** `Instance.GetSignInWithAtlas` / `UpdateSignInWithAtlas` (`/v1/instance/sign_in_with_atlas`), `Instance.GetHostedPages` / `UpdateHostedPages` (`/v1/instance/hosted_pages`), `Privacy.GetIntegration` / `ConnectIntegration` (`/v1/instance/privacy_integrations`). `InstanceUpdateResult.Warnings` and `ReferralSettings.Warnings`. `/v1/instance/secret_keys` is the same route as `SecretKeys`.
+- **API keys.** `APIKeyLimitPeriodSecond` and `APIKeyLimitPeriodMinute`; `APIKeyVerification.EffectiveScopes`; `APIKey.Scopes`; `CreateAPIKeyParams.Import` (bring over a key by its hash). `DeclaredCookie.Purposes` and `LifetimeRange`.
+- **Users.** `ImageURL` and the `ProfileImageURL` alias on `CreateUserParams`, `UpdateUserParams` (`ClearImageURL` sends null) and `ImportUserRow`; `User.ExternalAccounts` with typed `UserExternalAccount`.
+- **Webhook endpoints.** `CreateWebhookEndpointParams.Active`.
+- **Managed email.** `ManagedEmail.DNS` is now `ManagedEmailDNSAutomation` (`Status`, `LastError`, `Attempts`, `NextCheckAt`, `StartedAt`); a create with DNS may answer 202. `FeedbackWebhookID` and `FeedbackWebhookError`.
 - **Backend API catch-up (452 operations).** Typed methods and models for the operations the client did not yet cover, on new resource groups `AppCatalog`, `LDAPServerClients`, `Journeys`, `Groups` (with `Rules`), `Migrations` (with `Imports`), `ManagedGrants`, `LeastPrivilege`, `Flags`, `MfaFactors` (with `Yubikeys`, `SmartCardMappings`), `Marketing`, `AuditEventSchemas`, `DirectoryPullSources`, `RelayAgents`, `OAuthClientProfiles`, `PasskeyAPI`, `VC`, `Listen`, `AgentRegistration`, `Agents`, `AgentAccessRequests`, `Workflows`, `PageTemplates`, `ServiceConnectors`, `DesktopMfa`, `IdentityVerification`, `IGA` (entitlements, requests, grants, delegations, SoD, lifecycle, campaigns), `ScimProvisioningPresets`, `Vault`, `Connections`, `SSF`, `NetworkZones`, `AccessPolicies`, `ABAC`, `Resources`, `OrgRoleGrants`, `Devices`, `AuthzDecisions`, `PolicyBundles`, `ProxyApps` and `MCPGateways`, and added to `Users` (required actions, notes, guardians, saved searches), `Organizations` (webhook endpoints), `OAuthClients` (app settings, workload identity, trusted issuers, login and consent requests), `Analytics` (reports, alert rules), `OrgLDAPConnections` (sync runs), `Delivery`, `Instance`, `Integrations`, `Actions`, `FGA`, `OpenFGA`, `AttackProtection` and `RiskBasedMFA`.
 - The event stream (`Listen.StreamSession`) and the policy bundle archive (`PolicyBundles.Archive`) return the raw response bytes.
 - **Risk-event timeline.** `RiskBasedMFA.ListEvents` (`GET /v1/risk_events`), `EventMetrics` (`GET /v1/risk_events/metrics`) and `EventFeedback` (`POST /v1/risk_events/{id}/feedback`, verdict `legit` or `fraud`), with typed `RiskEvent` and `RiskEventMetrics`.
 - **Fraud lookup.** `RiskBasedMFA.FraudLookup` (`POST /v1/fraud/lookup`) with typed `FraudLookup`.
 - `RiskBasedMFA` and `UpdateRiskBasedMFAParams` gain `mode`, `level_actions`, `reputation`, `fraud`, `baseline` and `mid_session`.
+
+### Changed
+
+- `SignInTokens.Create` and `Revoke` are deprecated (sunset 2027-04-01); use `Sessions.CreateBrowserTicket`.
+
+### Removed
+
+- `ManagedEmail.DNSResult`: the server no longer returns `dns_result`.
 
 ## 0.20.0 — 2026-10-25
 

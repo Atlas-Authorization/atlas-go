@@ -217,9 +217,15 @@ type ManagedEmail struct {
 	Backend string `json:"backend,omitempty"`
 	// ProviderID is your email provider (mode managed_domain) that holds the key.
 	ProviderID *string `json:"provider_id,omitempty"`
-	// FeedbackWebhook is, on a Brevo create, registered or not_registered.
-	FeedbackWebhook string  `json:"feedback_webhook,omitempty"`
-	Region          *string `json:"region"`
+	// FeedbackWebhook is whether the bounce / complaint webhook is registered
+	// on your Resend or Brevo account: registered or not_registered.
+	FeedbackWebhook string `json:"feedback_webhook,omitempty"`
+	// FeedbackWebhookID is that webhook's id on your account.
+	FeedbackWebhookID *string `json:"feedback_webhook_id,omitempty"`
+	// FeedbackWebhookError is why the last registration failed; nil once it is
+	// registered.
+	FeedbackWebhookError *string `json:"feedback_webhook_error,omitempty"`
+	Region               *string `json:"region"`
 	// Status is not_started, pending, verified, failed or temporary_failure.
 	Status   string               `json:"status"`
 	Verified bool                 `json:"verified"`
@@ -239,16 +245,30 @@ type ManagedEmail struct {
 	} `json:"usage"`
 	// Reputation is your_provider_account.
 	Reputation string `json:"reputation"`
-	// DNS is the DNS automation (the token is never returned), or nil.
-	DNS           *CustomDomainDNS `json:"dns"`
-	FailureReason *string          `json:"failure_reason"`
-	LastCheckedAt *int64           `json:"last_checked_at"`
-	VerifiedAt    *int64           `json:"verified_at"`
-	CreatedAt     int64            `json:"created_at"`
-	UpdatedAt     int64            `json:"updated_at"`
-	// DNSResult is set on create with DNS: the zone and the records written.
-	DNSResult map[string]interface{} `json:"dns_result,omitempty"`
-	NextStep  string                 `json:"next_step,omitempty"`
+	// DNS is the DNS automation (the token is never returned), or nil. It runs
+	// in the background: a create with DNS answers at once (202) and DNS.Status
+	// tracks the progress.
+	DNS           *ManagedEmailDNSAutomation `json:"dns"`
+	FailureReason *string                    `json:"failure_reason"`
+	LastCheckedAt *int64                     `json:"last_checked_at"`
+	VerifiedAt    *int64                     `json:"verified_at"`
+	CreatedAt     int64                      `json:"created_at"`
+	UpdatedAt     int64                      `json:"updated_at"`
+	NextStep      string                     `json:"next_step,omitempty"`
+}
+
+// ManagedEmailDNSAutomation is managed email's background DNS automation.
+type ManagedEmailDNSAutomation struct {
+	CustomDomainDNS
+	// Status is pending (records not written yet), verifying, verified or
+	// failed (Atlas stopped; see LastError). Empty from older servers.
+	Status string `json:"status,omitempty"`
+	// LastError is the last DNS write or provider check error, "CODE: message".
+	LastError *string `json:"last_error,omitempty"`
+	Attempts  int     `json:"attempts,omitempty"`
+	// NextCheckAt is epoch ms of the next background step; nil when nothing is due.
+	NextCheckAt *int64 `json:"next_check_at,omitempty"`
+	StartedAt   *int64 `json:"started_at,omitempty"`
 }
 
 // CreateManagedEmailParams is the body of POST /v1/messaging_providers/email/managed.
@@ -369,7 +389,9 @@ func (s *MessagingService) ManagedEmail(ctx context.Context) (*ManagedEmail, err
 
 // CreateManagedEmail sets your sending domain up on your own Resend or Brevo
 // account (Transport + Config, or ProviderID) and returns the DNS records to
-// publish. POST /v1/messaging_providers/email/managed.
+// publish. With DNS set on an unverified domain it answers 202 at once and
+// writes the records in the background (follow DNS.Status with
+// ManagedEmail). POST /v1/messaging_providers/email/managed.
 func (s *MessagingService) CreateManagedEmail(ctx context.Context, params CreateManagedEmailParams, opts ...RequestOption) (*ManagedEmail, error) {
 	out := &ManagedEmail{}
 	return out, s.client.post(ctx, "/v1/messaging_providers/email/managed", params, out, opts...)
