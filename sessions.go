@@ -64,6 +64,47 @@ type CreateSessionParams struct {
 	Actor  *SessionActor `json:"actor,omitempty"`
 	// CustomData attaches custom per-session data (a JSON object, at most 2 KB).
 	CustomData map[string]interface{} `json:"custom_data,omitempty"`
+	// Mode is session (the default) or browser_ticket. With browser_ticket the
+	// response is a BrowserTicket, not a MintedSession: use CreateBrowserTicket.
+	Mode string `json:"mode,omitempty"`
+	// RedirectURL and ExpiresInSeconds apply to mode browser_ticket.
+	RedirectURL      string `json:"redirect_url,omitempty"`
+	ExpiresInSeconds int    `json:"expires_in_seconds,omitempty"`
+}
+
+// Session create modes.
+const (
+	SessionModeSession       = "session"
+	SessionModeBrowserTicket = "browser_ticket"
+)
+
+// CreateBrowserTicketParams is the input of CreateBrowserTicket.
+type CreateBrowserTicketParams struct {
+	// UserID is the user the browser signs in as.
+	UserID string
+	// RedirectURL is where the ready URL lands (one of the instance's allowed
+	// origins). Without it the response has no URL.
+	RedirectURL string
+	// ExpiresInSeconds is the ticket lifetime, 1 to 300 (0 = the default 60).
+	ExpiresInSeconds int
+}
+
+// BrowserTicket is a one-time browser sign-in ticket. Redeem Ticket with
+// POST /v1/client/sign_ins {strategy:"ticket"}, or open URL in the browser.
+// On development instances only, the exchange of one ticket is replayable by
+// the same client for 10 seconds.
+type BrowserTicket struct {
+	// Object is browser_ticket (testing_sign_in_url from
+	// TestingService.CreateSignInURL).
+	Object      string  `json:"object"`
+	ID          string  `json:"id"`
+	UserID      string  `json:"user_id"`
+	Ticket      string  `json:"ticket"`
+	URL         *string `json:"url"`
+	RedirectURL *string `json:"redirect_url"`
+	ExpiresIn   int     `json:"expires_in"`
+	// ExpiresAt is ISO 8601.
+	ExpiresAt string `json:"expires_at"`
 }
 
 // MintedSession is a freshly-minted session. Unlike a listed Session it carries
@@ -84,6 +125,15 @@ type MintedSession struct {
 func (s *SessionsService) Create(ctx context.Context, params CreateSessionParams, opts ...RequestOption) (*MintedSession, error) {
 	out := &MintedSession{}
 	return out, s.client.post(ctx, "/v1/sessions", params, out, opts...)
+}
+
+// CreateBrowserTicket mints a one-time ticket that signs a browser in as the
+// user (support handoffs, E2E). No session is minted here. Successor of
+// SignInTokensService.Create. POST /v1/sessions with mode browser_ticket.
+func (s *SessionsService) CreateBrowserTicket(ctx context.Context, params CreateBrowserTicketParams, opts ...RequestOption) (*BrowserTicket, error) {
+	out := &BrowserTicket{}
+	body := CreateSessionParams{UserID: params.UserID, Mode: SessionModeBrowserTicket, RedirectURL: params.RedirectURL, ExpiresInSeconds: params.ExpiresInSeconds}
+	return out, s.client.post(ctx, "/v1/sessions", body, out, opts...)
 }
 
 // List returns the sessions for one user. GET /v1/sessions?user_id=. The BAPI

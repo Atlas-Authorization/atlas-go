@@ -339,3 +339,63 @@ func PrivacyRequestFromEvent(ev *WebhookEvent) (*PrivacyRequest, error) {
 	}
 	return out, nil
 }
+
+// PrivacyIntegration is the consent manager, orchestrator, completion webhook
+// and executor key in one view (/v1/instance/privacy_integrations).
+type PrivacyIntegration struct {
+	Object string  `json:"object"`
+	Preset *string `json:"preset"`
+	// Connected is banner on, orchestrator and its completion webhook set,
+	// executor key live.
+	Connected           bool                   `json:"connected"`
+	CookieConsent       map[string]interface{} `json:"cookie_consent"`
+	PrivacyOrchestrator *PrivacyOrchestrator   `json:"privacy_orchestrator"`
+	DSRWebhook          map[string]interface{} `json:"dsr_webhook"`
+	// ExecutorKey carries secret only on the connect that minted it, and
+	// idempotent_replay on a re-run; nil when there is none.
+	ExecutorKey map[string]interface{} `json:"executor_key"`
+	// Warnings is, on connect, the consent-manager site check.
+	Warnings []PrivacyIntegrationWarning `json:"warnings,omitempty"`
+}
+
+// PrivacyIntegrationWarning is one entry of PrivacyIntegration.Warnings.
+type PrivacyIntegrationWarning struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// ConnectPrivacyIntegrationParams is the body of
+// POST /v1/instance/privacy_integrations/connect.
+type ConnectPrivacyIntegrationParams struct {
+	// Preset is an orchestrator preset (cookiemunch) or custom.
+	Preset string `json:"preset"`
+	// SiteID is the orchestrator-side site; required by the cookiemunch preset.
+	SiteID string `json:"site_id,omitempty"`
+	// APIKey is the key the orchestrator issued to Atlas (optional on a re-run).
+	APIKey               string `json:"api_key,omitempty"`
+	PartnerLinkID        string `json:"partner_link_id,omitempty"`
+	CompletionWebhookURL string `json:"completion_webhook_url,omitempty"`
+	// CookieConsent overrides PUT /v1/instance/cookie_consent (merged over the
+	// preset), or false to leave it alone.
+	CookieConsent interface{} `json:"cookie_consent,omitempty"`
+	// Orchestrator holds further orchestrator fields (name, case_url, ...).
+	Orchestrator map[string]interface{} `json:"orchestrator,omitempty"`
+	// Key is the executor key: name, scopes (privacy:* only), expires_at,
+	// allowed_ips, allowed_origins.
+	Key map[string]interface{} `json:"key,omitempty"`
+}
+
+// GetIntegration reads the privacy integration.
+// GET /v1/instance/privacy_integrations.
+func (s *PrivacyService) GetIntegration(ctx context.Context) (*PrivacyIntegration, error) {
+	out := &PrivacyIntegration{}
+	return out, s.client.get(ctx, "/v1/instance/privacy_integrations", nil, out)
+}
+
+// ConnectIntegration wires the consent manager, orchestrator, completion
+// webhook and executor key in one idempotent call; the executor key's secret
+// comes back once. POST /v1/instance/privacy_integrations/connect.
+func (s *PrivacyService) ConnectIntegration(ctx context.Context, params ConnectPrivacyIntegrationParams, opts ...RequestOption) (*PrivacyIntegration, error) {
+	out := &PrivacyIntegration{}
+	return out, s.client.post(ctx, "/v1/instance/privacy_integrations/connect", params, out, opts...)
+}

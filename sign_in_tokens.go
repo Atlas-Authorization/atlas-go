@@ -7,9 +7,10 @@ import (
 
 // SignInTokensService is the /v1/sign_in_tokens namespace.
 //
-// Deprecated: POST /v1/sign_in_tokens is deprecated (Sunset 2026-04-01). Use
-// SessionsService.Create (POST /v1/sessions), which mints a real redeemable
-// session in one call.
+// Deprecated: /v1/sign_in_tokens is deprecated (Sunset 2027-04-01). Use
+// SessionsService.CreateBrowserTicket (POST /v1/sessions with mode
+// browser_ticket) to sign a browser in, or SessionsService.Create to mint a
+// session server-side.
 type SignInTokensService struct{ client *Client }
 
 // SignInToken is a one-time sign-in token.
@@ -30,6 +31,8 @@ type CreateSignInTokenParams struct {
 }
 
 // Create mints a sign-in token. POST /v1/sign_in_tokens.
+//
+// Deprecated: Sunset 2027-04-01. Use SessionsService.CreateBrowserTicket.
 func (s *SignInTokensService) Create(ctx context.Context, params CreateSignInTokenParams, opts ...RequestOption) (*SignInToken, error) {
 	out := &SignInToken{}
 	return out, s.client.post(ctx, "/v1/sign_in_tokens", params, out, opts...)
@@ -46,7 +49,7 @@ type SignInTokenRevocation struct {
 // POST /v1/sign_in_tokens/:id/revoke.
 //
 // Deprecated: part of the deprecated /v1/sign_in_tokens surface (Sunset
-// 2027-04-01). Use SessionsService.Create (POST /v1/sessions).
+// 2027-04-01). Use SessionsService.CreateBrowserTicket.
 func (s *SignInTokensService) Revoke(ctx context.Context, id string, opts ...RequestOption) (*SignInTokenRevocation, error) {
 	out := &SignInTokenRevocation{}
 	return out, s.client.post(ctx, "/v1/sign_in_tokens/"+url.PathEscape(id)+"/revoke", nil, out, opts...)

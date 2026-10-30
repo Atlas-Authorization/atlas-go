@@ -45,6 +45,20 @@ type DeclaredCookie struct {
 	WrittenWhen     string `json:"written_when"`
 	// SetBy is atlas_frontend_api or atlas_sdk.
 	SetBy string `json:"set_by"`
+	// Purposes is Purpose per locale (locale -> text), when translated.
+	Purposes map[string]string `json:"purposes,omitempty"`
+	// LifetimeRange is, for a cookie whose lifetime follows a setting, the
+	// setting and its bounds.
+	LifetimeRange *DeclaredCookieLifetimeRange `json:"lifetime_range,omitempty"`
+}
+
+// DeclaredCookieLifetimeRange is the configurable lifetime of a declared cookie.
+type DeclaredCookieLifetimeRange struct {
+	// Setting is the instance setting that decides the lifetime.
+	Setting        string `json:"setting"`
+	MinSeconds     int64  `json:"min_seconds"`
+	MaxSeconds     int64  `json:"max_seconds"`
+	DefaultSeconds int64  `json:"default_seconds"`
 }
 
 // Cookie settings link presets: the CMP whose preferences dialog the link

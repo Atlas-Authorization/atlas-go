@@ -107,11 +107,13 @@ type WebhookDelivery struct {
 }
 
 // CreateWebhookEndpointParams is the body of POST /v1/webhook_endpoints. Each
-// enabled event is "*" or a known event name.
+// enabled event is "*" or a known event name. Active=false creates the
+// endpoint switched off (nothing is delivered until it is enabled); nil = on.
 type CreateWebhookEndpointParams struct {
 	// URL is required unless Destination is an event destination.
 	URL           string   `json:"url,omitempty"`
 	EnabledEvents []string `json:"enabled_events,omitempty"`
+	Active        *bool    `json:"active,omitempty"`
 	WebhookEndpointSettings
 	ProvisioningInput
 }

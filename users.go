@@ -48,6 +48,28 @@ type User struct {
 	ReferralCode *string `json:"referral_code,omitempty"`
 	// ReferralLink is the user's own referral link, when they are a referrer.
 	ReferralLink *string `json:"referral_link,omitempty"`
+	// ExternalAccounts is every linked provider identity (sign-in, connect,
+	// imported); nil from servers older than this field.
+	ExternalAccounts []UserExternalAccount `json:"external_accounts,omitempty"`
+}
+
+// UserExternalAccount is a provider identity linked to a user. Tokens are
+// never included.
+type UserExternalAccount struct {
+	Object         string `json:"object"`
+	ID             string `json:"id"`
+	Provider       string `json:"provider"`
+	ProviderUserID string `json:"provider_user_id"`
+	// ProviderEmail is the provider's address at the last sign-in or import: a
+	// snapshot, not proof of ownership.
+	ProviderEmail *string `json:"provider_email"`
+	EmailVerified bool    `json:"email_verified"`
+	FirstName     *string `json:"first_name,omitempty"`
+	LastName      *string `json:"last_name,omitempty"`
+	// ImageURL is the provider's avatar for this identity.
+	ImageURL *string `json:"image_url,omitempty"`
+	// ConnectedAt is epoch milliseconds.
+	ConnectedAt int64 `json:"connected_at"`
 }
 
 // UserReferral is where a user's inbound referral stands and, once
@@ -193,6 +215,10 @@ type CreateUserParams struct {
 	// ReferralCode is the user's own referral code, unique per instance (409
 	// REFERRAL_CODE_TAKEN).
 	ReferralCode string `json:"referral_code,omitempty"`
+	// ImageURL is the profile picture: an https URL, stored as given.
+	// ProfileImageURL is an alias.
+	ImageURL        string `json:"image_url,omitempty"`
+	ProfileImageURL string `json:"profile_image_url,omitempty"`
 }
 
 // UpdateUserParams is the body of PATCH /v1/users/:id.
@@ -211,10 +237,15 @@ type UpdateUserParams struct {
 	ExternalID string `json:"external_id,omitempty"`
 	// ClearExternalID sends external_id: null.
 	ClearExternalID bool `json:"-"`
+	// ImageURL is the profile picture: an https URL. ProfileImageURL is an
+	// alias. ClearImageURL sends image_url: null (removes it).
+	ImageURL        string `json:"image_url,omitempty"`
+	ProfileImageURL string `json:"profile_image_url,omitempty"`
+	ClearImageURL   bool   `json:"-"`
 }
 
-// MarshalJSON sends referral_code / external_id: null when ClearReferralCode /
-// ClearExternalID is set.
+// MarshalJSON sends referral_code / external_id / image_url: null when
+// ClearReferralCode / ClearExternalID / ClearImageURL is set.
 func (p UpdateUserParams) MarshalJSON() ([]byte, error) {
 	type plain UpdateUserParams
 	extra := map[string]interface{}{}
@@ -223,6 +254,9 @@ func (p UpdateUserParams) MarshalJSON() ([]byte, error) {
 	}
 	if p.ClearExternalID {
 		extra["external_id"] = nil
+	}
+	if p.ClearImageURL {
+		extra["image_url"] = nil
 	}
 	if len(extra) == 0 {
 		return json.Marshal(plain(p))

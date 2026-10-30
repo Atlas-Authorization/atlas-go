@@ -289,6 +289,23 @@ type ReferralSettings struct {
 	Inbound   *ReferralInboundStatus `json:"inbound,omitempty"`
 	Providers []ReferralProvider     `json:"providers"`
 	UpdatedAt *int64                 `json:"updated_at"`
+	// Warnings is, on Update, what the write stored differently from what was
+	// sent: renamed (a retired provider name, stored under its new one) and
+	// defaulted (a newly picked platform's tracking cookies filled in).
+	Warnings []ReferralSettingsWarning `json:"warnings,omitempty"`
+}
+
+// ReferralSettingsWarning is one entry of ReferralSettings.Warnings.
+type ReferralSettingsWarning struct {
+	// Code is renamed or defaulted.
+	Code    string `json:"code"`
+	Field   string `json:"field"`
+	Message string `json:"message"`
+	// From is, for renamed, the name that was sent.
+	From string `json:"from,omitempty"`
+	// To is the stored value: a string for renamed, a list of strings for
+	// defaulted.
+	To interface{} `json:"to,omitempty"`
 }
 
 // UpdateReferralSettingsParams is the body of PATCH /v1/instance/referrals:

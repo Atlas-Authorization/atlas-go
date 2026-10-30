@@ -22,6 +22,8 @@ type APIKey struct {
 	Name        *string                `json:"name"`
 	Prefix      string                 `json:"prefix"`
 	Claims      map[string]interface{} `json:"claims"`
+	// Scopes are the delegated-token / verify scopes on the key; nil when none are set.
+	Scopes []string `json:"scopes,omitempty"`
 	// Limits are the key's spend caps; nil when it has none.
 	Limits []APIKeyLimit `json:"limits"`
 	// Usage is each cap with its current-window usage (empty without caps).
@@ -54,10 +56,13 @@ const (
 	APIKeyRefusalUsageExhausted    = "usage_exhausted"
 )
 
-// API key spend-cap periods. Request caps a single debit; day and month are
-// UTC calendar windows; total never resets.
+// API key spend-cap periods. Request caps a single debit; second and minute
+// are fixed rate windows aligned to the UTC clock; day and month are UTC
+// calendar windows; total never resets.
 const (
 	APIKeyLimitPeriodRequest = "request"
+	APIKeyLimitPeriodSecond  = "second"
+	APIKeyLimitPeriodMinute  = "minute"
 	APIKeyLimitPeriodDay     = "day"
 	APIKeyLimitPeriodMonth   = "month"
 	APIKeyLimitPeriodTotal   = "total"
@@ -69,7 +74,7 @@ type APIKeyLimit struct {
 	Unit string `json:"unit"`
 	// Amount is the cap, in Unit.
 	Amount int64 `json:"amount"`
-	// Period is request, day, month or total.
+	// Period is request, second, minute, day, month or total.
 	Period string `json:"period"`
 }
 
@@ -91,7 +96,7 @@ type APIKeyLimitState struct {
 // APIKeyUsageCounter is a raw usage counter for one unit in its current window.
 type APIKeyUsageCounter struct {
 	Unit string `json:"unit"`
-	// Period is day, month or total.
+	// Period is second, minute, day, month or total.
 	Period      string `json:"period"`
 	Used        int64  `json:"used"`
 	WindowStart int64  `json:"window_start"`
@@ -173,6 +178,17 @@ type CreateAPIKeyParams struct {
 	Scopes []string `json:"scopes,omitempty"`
 	// Limits are per-key spend caps, metered with RecordUsage.
 	Limits []APIKeyLimit `json:"limits,omitempty"`
+	// Import registers an existing key by its hash instead of minting one: the
+	// response has no secret, and the original secret verifies from then on.
+	Import *APIKeyImport `json:"import,omitempty"`
+}
+
+// APIKeyImport is the import body of CreateAPIKeyParams.
+type APIKeyImport struct {
+	SecretHash string `json:"secret_hash"`
+	// HashAlgorithm is sha256 (default) or sha256_hex.
+	HashAlgorithm string `json:"hash_algorithm,omitempty"`
+	Prefix        string `json:"prefix"`
 }
 
 // UpdateAPIKeyParams is the body of PATCH /v1/api_keys/:id. Set Limits to
@@ -242,7 +258,10 @@ type APIKeyVerification struct {
 	Name        *string                `json:"name,omitempty"`
 	Claims      map[string]interface{} `json:"claims,omitempty"`
 	Scopes      []string               `json:"scopes,omitempty"`
-	Constraints map[string]interface{} `json:"constraints,omitempty"`
+	// EffectiveScopes are the held scopes expanded through the instance scope
+	// implications; RequiredScopes is checked against this set.
+	EffectiveScopes []string               `json:"effective_scopes,omitempty"`
+	Constraints     map[string]interface{} `json:"constraints,omitempty"`
 	// Limits are the key's spend caps (nil when none).
 	Limits []APIKeyLimit `json:"limits,omitempty"`
 	// Usage is each cap with its current-window usage.

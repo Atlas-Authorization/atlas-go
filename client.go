@@ -165,6 +165,9 @@ type Client struct {
 	// Privacy is the data-rights executor protocol (/v1/privacy) and the
 	// instance's own orchestrator connection.
 	Privacy *PrivacyService
+	// AppEvents is application webhooks: your app's own events, sent to the
+	// endpoints your organizations register (/v1/app_events).
+	AppEvents *AppEventsService
 	// Integrations is the integration-facing surface (/v1/integrations/*).
 	Integrations *IntegrationsService
 	// Entitlements is /v1/entitlements: the standard entitlements document.
@@ -407,6 +410,7 @@ func New(secretKey string, opts ...Option) *Client {
 	c.PartnerPlatforms = &PartnerPlatformsService{client: c}
 	c.AtlasIDGrants = &AtlasIDGrantsService{client: c}
 	c.Privacy = &PrivacyService{client: c, Orchestrator: &PrivacyOrchestratorService{client: c}}
+	c.AppEvents = &AppEventsService{client: c, Types: &AppEventTypesService{client: c}, Endpoints: &AppWebhookEndpointsService{client: c}}
 	c.Integrations = &IntegrationsService{client: c}
 	c.Entitlements = &EntitlementsService{client: c}
 	c.Notices = &NoticesService{client: c}

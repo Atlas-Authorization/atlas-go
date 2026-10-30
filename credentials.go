@@ -136,7 +136,8 @@ type RotateSecretKeyParams struct {
 	KeyFormat      string `json:"key_format,omitempty"`
 }
 
-// SecretKeysService is /v1/secret_keys.
+// SecretKeysService is /v1/secret_keys (also served as /v1/instance/secret_keys,
+// the same route).
 type SecretKeysService struct{ client *Client }
 
 // Create mints a scoped secret key; the secret is in this response only.
