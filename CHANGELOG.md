@@ -4,6 +4,25 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.22.0 — 2026-11-01
+
+### Added
+
+- **Tenant organizations.** `CreateOrganizationParams` gains `ExternalID`, `PublicMetadata`, `PrivateMetadata`, `OwnerEmail` and `RoleMappings`, and `CreatedBy` is now optional (a backend-created organization with no members yet). `UpdateOrganizationParams` gains `ExternalID` and `RoleMappings` (`ClearExternalID` / `ClearRoleMappings` send null). `Organization` gains `ExternalID`, `RoleMappings`, `OwnerInvitation` and, on `Get`, the `SSO` block (`Connections`, `ScimBaseURL`); `CreatedBy` is "" for an organization created without a creator.
+- `Organizations.ListFiltered` (`external_id`, `metadata[key]=value`), `Organizations.FindByDomain` (`GET /v1/organizations/by_domain/{domain}`, also takes an email address; `includeUnverified`) and `Organizations.GetPolicy` (`GET /v1/organizations/{id}/policy`).
+- **Domain verification methods.** `Organizations.Domains.VerifyWith` (`method` dns_txt, well_known or email, and `code`; `Verify` still sends no body, the DNS check) and `SendVerificationEmail` (a code to an administrative mailbox at the domain, sent through your own email provider). `OrgDomain` gains `VerificationMethods`, `VerificationMethod` and `SentTo`.
+- **Trusted-JWT connections.** `Client.JWTConnections` (`List`, `Get`, `Create`, `Update`, `Delete`; `/v1/jwt_connections`) with typed `JWTConnection` (`LoginURL`).
+- **SSO.** `SsoConnection` / `CreateSsoConnectionParams` gain `SAMLACSPath` (a custom ACS path) and `GitHubAccess` (allowed GitHub organizations and teams). Organization LDAP connections gain `GroupRoleMappings` (`ClearGroupRoleMappings` sends null) and `LDAPAttributeMapping.Groups`.
+- **Setup links.** `ReturnURL` on SSO onboarding profiles and tickets (create and read), `IssuedSSOOnboardingTicket.EffectiveReturnURL`, `SSOOnboardingProfile.Intents`, and `SSOOnboarding.ListByName`.
+- **SCIM tokens.** `ScimTokenWithSecret.ScimBaseURL` and `Warnings` (`no_sso_connection`).
+- **Webhook endpoints.** `CreateWebhookEndpointParams.Secret` and `RotateWebhookSecretParams.Secret` (your own `whsec_` signing secret); `WebhookTestResult.EventType` and `ErrorKind` (non_2xx, redirect, timeout, tls, dns, connection_refused, network, url_blocked).
+- **Users.** `CreateUserParams` gains `PasswordHash`, `PasswordDigest`, `PasswordHashAlgorithm`, `PasswordHashParams`, `PasswordSalt` and `PasswordHasher`; `ImportUserRow` gains `PasswordHashAlgorithm` and `PasswordHashParams`, for hashes that do not describe themselves.
+- **Platform apps.** `Platform.Apps.RevealInitialSecret` (`POST /v1/platform/apps/{id}/initial_secret/reveal`: the new app's secrets once more within 10 minutes; `WithDryRun` checks without using it). `PlatformAppProvisioned` gains `InitialSecretReveal` and `SecretRedacted` (an Idempotency-Key replay never carries the secrets).
+- **Referrals.** `ReferralSettings` / `UpdateReferralSettingsParams` gain `ReportLinkedAtlasIDSignups` and `PartnerPortalURL`. `UserReferralAttributedEvent` gains `Source`, `AtlasIDSub` and `AtlasIDAppID` (Sign in with Atlas sign-ups).
+- **Path-mount domains.** `CreateDomainParams` gains `Method` (`path`), `Hostname` and `BasePath`; `CustomDomain` gains `Method`, `BasePath`, `Routing`, `FrontendAPIURL`, `Verification` and `Instructions`, and `Verify` returns `Verified` and `Issuer`.
+- **Previous issuers.** `AtlasBackendOptions.PreviousIssuers`: tokens from the instance's earlier issuer still verify while it moves to a custom domain or path mount (discovery lists them in `atlas_previous_issuers`).
+- **Cookie consent.** `CookieConsent.HostAliases`, `SetCookieConsentParams.HostAliases` and `Instance.SetCookieConsentHostAliases`.
+
 ## 0.21.0 — 2026-10-30
 
 ### Added

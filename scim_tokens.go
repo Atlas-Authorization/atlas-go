@@ -33,7 +33,17 @@ type ScimTokenWithSecret struct {
 	SealedFields
 	ScimToken
 	Secret string `json:"secret"`
-	Note   string `json:"note"`
+	// ScimBaseURL is the SCIM 2.0 base URL to give the identity provider with this token.
+	ScimBaseURL string `json:"scim_base_url"`
+	// Warnings: code no_sso_connection = the organization has no SSO connection yet.
+	Warnings []ScimTokenWarning `json:"warnings,omitempty"`
+	Note     string             `json:"note"`
+}
+
+// ScimTokenWarning is one entry of ScimTokenWithSecret.Warnings.
+type ScimTokenWarning struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 // CreateScimTokenParams is the body of POST /v1/scim_tokens.

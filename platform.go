@@ -90,6 +90,40 @@ type PlatformAppWithSecret struct {
 type PlatformAppProvisioned struct {
 	PlatformAppWithSecret
 	SiblingInstance *PlatformAppWithSecret `json:"sibling_instance,omitempty"`
+	// InitialSecretReveal is the one extra look at this response's secrets
+	// (primary and sibling), for a caller that lost them: RevealInitialSecret.
+	InitialSecretReveal *PlatformInitialSecretReveal `json:"initial_secret_reveal,omitempty"`
+	// SecretRedacted is true on an Idempotency-Key replay: the secrets are
+	// empty because they are never stored for replay.
+	SecretRedacted bool `json:"secret_redacted,omitempty"`
+}
+
+// PlatformInitialSecretReveal is PlatformAppProvisioned.InitialSecretReveal.
+type PlatformInitialSecretReveal struct {
+	// Path is where to POST once to get both secrets again.
+	Path string `json:"path"`
+	// ExpiresAt (epoch ms) is 10 minutes after the create.
+	ExpiresAt int64 `json:"expires_at"`
+}
+
+// PlatformInitialSecret is the result of RevealInitialSecret. Secret is nil
+// when the key was rotated or revoked since. Available and ExpiresAt are set on
+// a dry run only.
+type PlatformInitialSecret struct {
+	Object          string  `json:"object"`
+	AppID           string  `json:"app_id"`
+	InstanceID      string  `json:"instance_id,omitempty"`
+	KeyID           string  `json:"key_id,omitempty"`
+	Secret          *string `json:"secret"`
+	SiblingInstance *struct {
+		InstanceID string  `json:"instance_id"`
+		KeyID      string  `json:"key_id"`
+		Secret     *string `json:"secret"`
+		Note       string  `json:"note,omitempty"`
+	} `json:"sibling_instance,omitempty"`
+	Available *bool  `json:"available,omitempty"`
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	Note      string `json:"note,omitempty"`
 }
 
 // CreatePlatformAppParams is the body of POST /v1/platform/apps.
@@ -305,6 +339,16 @@ type PlatformAppTransfer struct {
 func (s *PlatformAppsService) Create(ctx context.Context, params CreatePlatformAppParams, opts ...RequestOption) (*PlatformAppProvisioned, error) {
 	out := &PlatformAppProvisioned{}
 	return out, s.client.platPost(ctx, "/v1/platform/apps", params, out, opts...)
+}
+
+// RevealInitialSecret shows a newly created app's secret keys (primary and
+// development sibling) once more: it works once, within 10 minutes of Create,
+// then answers 410. Needs platform:secrets:write and a fresh MFA; WithDryRun
+// checks availability without using it.
+// POST /v1/platform/apps/:id/initial_secret/reveal.
+func (s *PlatformAppsService) RevealInitialSecret(ctx context.Context, id string, opts ...RequestOption) (*PlatformInitialSecret, error) {
+	out := &PlatformInitialSecret{}
+	return out, s.client.platPost(ctx, "/v1/platform/apps/"+url.PathEscape(id)+"/initial_secret/reveal", nil, out, opts...)
 }
 
 // List returns the platform's apps. GET /v1/platform/apps.

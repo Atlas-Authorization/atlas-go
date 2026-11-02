@@ -322,6 +322,11 @@ type AtlasBackendOptions struct {
 	// Issuer is the expected iss. Required — an unchecked issuer accepts any
 	// Atlas instance's tokens.
 	Issuer string
+	// PreviousIssuers are earlier issuers of THIS instance, also accepted: its
+	// old sign-in host while it moves to a new one (a custom domain or a path
+	// mount going active). The keys are the instance's own. Discovery lists
+	// them in atlas_previous_issuers with an accepted_until; remove them after.
+	PreviousIssuers []string
 	// AuthorizedParties, when set, refuses a token minted for a different origin
 	// (§7.3 azp allowlist).
 	AuthorizedParties []string
@@ -470,7 +475,7 @@ func (b *AtlasBackend) Verify(ctx context.Context, token string) (*SessionClaims
 	_ = json.Unmarshal(payloadRaw, &claims.Raw)
 
 	nowSec := b.now().Unix()
-	if claims.Iss != b.opts.Issuer {
+	if !b.issuerAccepted(claims.Iss) {
 		return nil, ErrInvalidToken
 	}
 	if claims.Exp != 0 && nowSec > claims.Exp+ClockSkewSeconds {
@@ -611,6 +616,20 @@ func jwkToPublicKey(k jwk) (*rsa.PublicKey, error) {
 func contains(hay []string, needle string) bool {
 	for _, h := range hay {
 		if h == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// issuerAccepted reports whether iss is the configured issuer or one of the
+// instance's PreviousIssuers.
+func (b *AtlasBackend) issuerAccepted(iss string) bool {
+	if iss == b.opts.Issuer {
+		return true
+	}
+	for _, p := range b.opts.PreviousIssuers {
+		if p != "" && iss == p {
 			return true
 		}
 	}

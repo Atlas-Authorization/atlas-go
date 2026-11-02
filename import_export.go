@@ -85,6 +85,13 @@ type ImportUserRow struct {
 	// PasswordSalt is the per-user salt for a hash whose parameters are given
 	// job-wide in ImportUsersParams.PasswordHashConfig (Firebase scrypt).
 	PasswordSalt string `json:"password_salt,omitempty"`
+	// PasswordHashAlgorithm names a hash that does not describe itself
+	// (scrypt, pbkdf2, md5, sha1, sha256, sha512, their _salted forms,
+	// hmac_sha256, …); PasswordHashParams carries its parameters (scrypt n or
+	// log_n / r / p / key_length; pbkdf2 digest / iterations / key_length; md5
+	// and sha* salt_position; encoding and salt_encoding).
+	PasswordHashAlgorithm string                 `json:"password_hash_algorithm,omitempty"`
+	PasswordHashParams    map[string]interface{} `json:"password_hash_params,omitempty"`
 	// PhoneNumber is one E.164 number; PhoneNumbers several with their state.
 	PhoneNumber  string              `json:"phone_number,omitempty"`
 	PhoneNumbers []ImportPhoneNumber `json:"phone_numbers,omitempty"`

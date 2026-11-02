@@ -301,25 +301,36 @@ type LDAPAttributeMapping struct {
 	FirstName string `json:"firstName,omitempty"`
 	LastName  string `json:"lastName,omitempty"`
 	Username  string `json:"username,omitempty"`
+	// Groups is the groups attribute read for GroupRoleMappings (default memberOf).
+	Groups string `json:"groups,omitempty"`
+}
+
+// OrgLDAPGroupRoleMapping maps a directory group DN to an organization role key.
+type OrgLDAPGroupRoleMapping struct {
+	Group string `json:"group"`
+	Role  string `json:"role"`
 }
 
 // OrgLDAPConnection is an organization-owned LDAP connection. Status is
 // draft, active or disabled.
 type OrgLDAPConnection struct {
-	Object          string               `json:"object"`
-	ID              string               `json:"id"`
-	OrganizationID  string               `json:"organization_id"`
-	Status          string               `json:"status"`
-	URL             string               `json:"url"`
-	BindDN          string               `json:"bind_dn"`
-	BaseDN          string               `json:"base_dn"`
-	UserFilter      string               `json:"user_filter"`
-	StartTLS        bool                 `json:"start_tls"`
-	Attributes      LDAPAttributeMapping `json:"attributes"`
-	HasBindPassword bool                 `json:"has_bind_password"`
-	DefaultRoleID   *string              `json:"default_role_id"`
-	CreatedAt       int64                `json:"created_at"`
-	UpdatedAt       int64                `json:"updated_at"`
+	Object         string               `json:"object"`
+	ID             string               `json:"id"`
+	OrganizationID string               `json:"organization_id"`
+	Status         string               `json:"status"`
+	URL            string               `json:"url"`
+	BindDN         string               `json:"bind_dn"`
+	BaseDN         string               `json:"base_dn"`
+	UserFilter     string               `json:"user_filter"`
+	StartTLS       bool                 `json:"start_tls"`
+	Attributes     LDAPAttributeMapping `json:"attributes"`
+	// GroupRoleMappings: the first mapping whose group the person is in picks
+	// their role when they are seated.
+	GroupRoleMappings []OrgLDAPGroupRoleMapping `json:"group_role_mappings"`
+	HasBindPassword   bool                      `json:"has_bind_password"`
+	DefaultRoleID     *string                   `json:"default_role_id"`
+	CreatedAt         int64                     `json:"created_at"`
+	UpdatedAt         int64                     `json:"updated_at"`
 }
 
 // OrgLDAPConnectionParams is the body of create (POST) and update (PATCH).
@@ -337,20 +348,30 @@ type OrgLDAPConnectionParams struct {
 	BindPassword       string                `json:"bind_password,omitempty"`
 	DefaultRoleID      string                `json:"default_role_id,omitempty"`
 	ClearDefaultRoleID bool                  `json:"-"`
+	// GroupRoleMappings maps directory groups to organization roles;
+	// ClearGroupRoleMappings sends group_role_mappings: null.
+	GroupRoleMappings      []OrgLDAPGroupRoleMapping `json:"group_role_mappings,omitempty"`
+	ClearGroupRoleMappings bool                      `json:"-"`
 }
 
-// MarshalJSON renders default_role_id: null when ClearDefaultRoleID is set.
+// MarshalJSON renders default_role_id / group_role_mappings: null when
+// ClearDefaultRoleID / ClearGroupRoleMappings is set.
 func (p OrgLDAPConnectionParams) MarshalJSON() ([]byte, error) {
 	type alias OrgLDAPConnectionParams
 	raw, err := json.Marshal(alias(p))
-	if err != nil || !p.ClearDefaultRoleID {
+	if err != nil || !(p.ClearDefaultRoleID || p.ClearGroupRoleMappings) {
 		return raw, err
 	}
 	var m map[string]interface{}
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return nil, err
 	}
-	m["default_role_id"] = nil
+	if p.ClearDefaultRoleID {
+		m["default_role_id"] = nil
+	}
+	if p.ClearGroupRoleMappings {
+		m["group_role_mappings"] = nil
+	}
 	return json.Marshal(m)
 }
 

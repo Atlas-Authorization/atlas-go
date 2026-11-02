@@ -18,8 +18,12 @@ type SSOOnboardingProfile struct {
 	OrganizationID         *string  `json:"organization_id"`
 	CompanyName            *string  `json:"company_name"`
 	AllowSCIM              bool     `json:"allow_scim"`
-	CreatedAt              int64    `json:"created_at"`
-	UpdatedAt              int64    `json:"updated_at"`
+	// Intents are the Admin Portal tasks this profile's tickets may perform.
+	Intents []string `json:"intents,omitempty"`
+	// ReturnURL is where "Finish" on the hosted setup page sends the admin.
+	ReturnURL *string `json:"return_url"`
+	CreatedAt int64   `json:"created_at"`
+	UpdatedAt int64   `json:"updated_at"`
 }
 
 // SSOOnboardingTicket is a one-time, expiring ticket for a specific org.
@@ -30,9 +34,11 @@ type SSOOnboardingTicket struct {
 	OrganizationID  string  `json:"organization_id"`
 	SSOConnectionID *string `json:"sso_connection_id"`
 	Status          string  `json:"status"`
-	ExpiresAt       int64   `json:"expires_at"`
-	CreatedAt       int64   `json:"created_at"`
-	CompletedAt     *int64  `json:"completed_at"`
+	// ReturnURL is this ticket's return_url (nil = the profile's applies).
+	ReturnURL   *string `json:"return_url"`
+	ExpiresAt   int64   `json:"expires_at"`
+	CreatedAt   int64   `json:"created_at"`
+	CompletedAt *int64  `json:"completed_at"`
 }
 
 // IssuedSSOOnboardingTicket adds the once-only token and hosted URL.
@@ -41,6 +47,9 @@ type IssuedSSOOnboardingTicket struct {
 	Token     string `json:"token"`
 	URL       string `json:"url"`
 	ExpiresIn int64  `json:"expires_in"`
+	// EffectiveReturnURL is where "Finish" will send the admin: the ticket's
+	// return_url, else the profile's.
+	EffectiveReturnURL *string `json:"effective_return_url"`
 }
 
 // CreateSSOOnboardingProfileParams is the body of POST /v1/sso_onboarding_profiles.
@@ -50,12 +59,17 @@ type CreateSSOOnboardingProfileParams struct {
 	OrganizationID         *string  `json:"organization_id,omitempty"`
 	CompanyName            *string  `json:"company_name,omitempty"`
 	AllowSCIM              *bool    `json:"allow_scim,omitempty"`
+	Intents                []string `json:"intents,omitempty"`
+	// ReturnURL must be https, on one of your allowed origins.
+	ReturnURL *string `json:"return_url,omitempty"`
 }
 
 // CreateSSOOnboardingTicketParams is the body of POST .../tickets.
 type CreateSSOOnboardingTicketParams struct {
 	OrganizationID   *string `json:"organization_id,omitempty"`
 	ExpiresInSeconds *int    `json:"expires_in_seconds,omitempty"`
+	// ReturnURL overrides the profile's return_url for this ticket.
+	ReturnURL *string `json:"return_url,omitempty"`
 }
 
 // TicketRevokeResult acknowledges a ticket revoke.
@@ -69,6 +83,13 @@ type TicketRevokeResult struct {
 func (s *SSOOnboardingService) List(ctx context.Context) (*ListPage[SSOOnboardingProfile], error) {
 	out := &ListPage[SSOOnboardingProfile]{}
 	return out, s.client.get(ctx, "/v1/sso_onboarding_profiles", nil, out)
+}
+
+// ListByName returns only the profiles with exactly this name (find or create).
+// GET /v1/sso_onboarding_profiles?name=.
+func (s *SSOOnboardingService) ListByName(ctx context.Context, name string) (*ListPage[SSOOnboardingProfile], error) {
+	out := &ListPage[SSOOnboardingProfile]{}
+	return out, s.client.get(ctx, "/v1/sso_onboarding_profiles", url.Values{"name": {name}}, out)
 }
 
 // Get returns one profile. GET /v1/sso_onboarding_profiles/:id.

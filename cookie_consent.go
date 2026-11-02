@@ -25,6 +25,8 @@ type CookieConsent struct {
 	// DeclaredCookies is every cookie and browser-storage key Atlas writes for
 	// this instance, for your cookie policy (all strictly necessary).
 	DeclaredCookies []DeclaredCookie `json:"declared_cookies,omitempty"`
+	// HostAliases are the declared host aliases (see SetCookieConsentHostAliases).
+	HostAliases []string `json:"host_aliases,omitempty"`
 }
 
 // DeclaredCookie is one cookie or browser-storage key Atlas writes.
@@ -111,6 +113,8 @@ type SetCookieConsentParams struct {
 	// Culture is page (default: the CMP tag carries the page language) or
 	// browser (no attribute; the CMP picks its own language).
 	Culture string `json:"culture,omitempty"`
+	// HostAliases: see SetCookieConsentHostAliases.
+	HostAliases []string `json:"host_aliases,omitempty"`
 }
 
 // CookieConsent reads the hosted pages' cookie-consent setting.
@@ -132,4 +136,18 @@ func (s *InstanceService) SetCookieConsent(ctx context.Context, params SetCookie
 func (s *InstanceService) DeleteCookieConsent(ctx context.Context, opts ...RequestOption) (*CookieConsent, error) {
 	out := &CookieConsent{}
 	return out, s.client.del(ctx, "/v1/instance/cookie_consent", out, opts...)
+}
+
+// SetCookieConsentHostAliases sets only the host aliases (up to 10 bare
+// hostnames) and keeps the CMP setting: hosts the hosted pages are served on
+// that your consent manager's site is knowingly not registered for (typically
+// the instance's default frontend API host). A Cookie Munch site check reads
+// as ok on them. An empty list clears them.
+// PUT /v1/instance/cookie_consent with { host_aliases }.
+func (s *InstanceService) SetCookieConsentHostAliases(ctx context.Context, hosts []string, opts ...RequestOption) (*CookieConsent, error) {
+	if hosts == nil {
+		hosts = []string{}
+	}
+	out := &CookieConsent{}
+	return out, s.client.put(ctx, "/v1/instance/cookie_consent", map[string][]string{"host_aliases": hosts}, out, opts...)
 }

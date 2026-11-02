@@ -136,6 +136,12 @@ type UserReferralAttributedEvent struct {
 	// SignedUpAt is epoch ms.
 	SignedUpAt int64 `json:"signed_up_at"`
 	UpdatedAt  int64 `json:"updated_at"`
+	// Source is sign_in_with_atlas for a Sign in with Atlas sign-up
+	// (report_linked_atlas_id_signups): UserID is then the sub the app sees,
+	// AtlasIDSub repeats it and AtlasIDAppID is the app. Empty otherwise.
+	Source       string `json:"source,omitempty"`
+	AtlasIDSub   string `json:"atlas_id_sub,omitempty"`
+	AtlasIDAppID string `json:"atlas_id_app_id,omitempty"`
 }
 
 // UserReferralResolvedEvent is the data of a user.referral_resolved webhook:
@@ -198,14 +204,27 @@ type OAuthAccessToken struct {
 
 // CreateUserParams is the body of POST /v1/users.
 type CreateUserParams struct {
-	EmailAddress    string   `json:"email_address"`
-	Password        string   `json:"password,omitempty"`
-	FirstName       string   `json:"first_name,omitempty"`
-	LastName        string   `json:"last_name,omitempty"`
-	EmailVerified   *bool    `json:"email_verified,omitempty"`
-	PublicMetadata  Metadata `json:"public_metadata,omitempty"`
-	PrivateMetadata Metadata `json:"private_metadata,omitempty"`
-	UnsafeMetadata  Metadata `json:"unsafe_metadata,omitempty"`
+	EmailAddress string `json:"email_address"`
+	Password     string `json:"password,omitempty"`
+	// PasswordHash (alias PasswordDigest) is an existing hash. A self-describing
+	// one (Argon2id, bcrypt, Django / passlib PBKDF2 and scrypt, …) is stored as
+	// given; any other is named with PasswordHashAlgorithm (scrypt, pbkdf2, md5,
+	// sha1, sha256, sha512, hmac_sha256, …) plus PasswordHashParams (e.g.
+	// scrypt n, r, p, key_length, salt_encoding) and PasswordSalt.
+	// PasswordHasher is the Clerk name, used only when the hash does not
+	// describe itself. Upgraded to Argon2id on the first sign-in.
+	PasswordHash          string                 `json:"password_hash,omitempty"`
+	PasswordDigest        string                 `json:"password_digest,omitempty"`
+	PasswordHashAlgorithm string                 `json:"password_hash_algorithm,omitempty"`
+	PasswordHashParams    map[string]interface{} `json:"password_hash_params,omitempty"`
+	PasswordSalt          string                 `json:"password_salt,omitempty"`
+	PasswordHasher        string                 `json:"password_hasher,omitempty"`
+	FirstName             string                 `json:"first_name,omitempty"`
+	LastName              string                 `json:"last_name,omitempty"`
+	EmailVerified         *bool                  `json:"email_verified,omitempty"`
+	PublicMetadata        Metadata               `json:"public_metadata,omitempty"`
+	PrivateMetadata       Metadata               `json:"private_metadata,omitempty"`
+	UnsafeMetadata        Metadata               `json:"unsafe_metadata,omitempty"`
 	// Notify says whether the create may notify the user. Unset or false
 	// guarantees no email, SMS or push is sent as a consequence of the create.
 	Notify *bool `json:"notify,omitempty"`

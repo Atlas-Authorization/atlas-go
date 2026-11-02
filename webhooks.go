@@ -113,7 +113,12 @@ type CreateWebhookEndpointParams struct {
 	// URL is required unless Destination is an event destination.
 	URL           string   `json:"url,omitempty"`
 	EnabledEvents []string `json:"enabled_events,omitempty"`
-	Active        *bool    `json:"active,omitempty"`
+	// Active false creates the endpoint switched off: nothing is delivered
+	// until an update sets it true; Test still works on it.
+	Active *bool `json:"active,omitempty"`
+	// Secret is your own signing secret instead of a generated one: whsec_
+	// followed by 32–256 of [A-Za-z0-9+/=_-] (HTTPS endpoints only).
+	Secret string `json:"secret,omitempty"`
 	WebhookEndpointSettings
 	ProvisioningInput
 }
@@ -230,6 +235,9 @@ type RotateWebhookSecretParams struct {
 	// default); at most 604800 (7 days). Set it only once every receiver
 	// verifies with a verifier that accepts several signatures (0.7.0+).
 	OverlapSeconds *int `json:"overlap_seconds,omitempty"`
+	// Secret rotates to a secret you chose (whsec_ + at least 32 characters,
+	// different from the current one).
+	Secret string `json:"secret,omitempty"`
 }
 
 // WebhookDispatch acknowledges a test send or a redelivery.
@@ -284,7 +292,7 @@ func (s *WebhookEndpointsService) RotateSecret(ctx context.Context, id string, o
 // holding either passes. POST /v1/webhook_endpoints/:id/rotate_secret.
 func (s *WebhookEndpointsService) RotateSecretWithParams(ctx context.Context, id string, params RotateWebhookSecretParams, opts ...RequestOption) (*WebhookSecret, error) {
 	out := &WebhookSecret{}
-	if params.OverlapSeconds == nil {
+	if params.OverlapSeconds == nil && params.Secret == "" {
 		// No body, as before: the server default (no overlap).
 		return out, s.client.post(ctx, "/v1/webhook_endpoints/"+url.PathEscape(id)+"/rotate_secret", nil, out, opts...)
 	}

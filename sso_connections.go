@@ -46,6 +46,12 @@ type SsoConnection struct {
 	// SAMLRequireEncryptedAssertions refuses assertions not encrypted to the
 	// connection's key.
 	SAMLRequireEncryptedAssertions bool `json:"saml_require_encrypted_assertions,omitempty"`
+	// SAMLACSPath is a custom ACS path on your own frontend API domain (SAML
+	// migration); nil = the standard ACS.
+	SAMLACSPath *string `json:"saml_acs_path,omitempty"`
+	// GitHubAccess (GitHub as the identity provider): only members of these
+	// GitHub orgs / teams ("org/team-slug") sign in.
+	GitHubAccess *GitHubAccess `json:"github_access,omitempty"`
 	// HasSAMLEncryptionKey is true when an SP encryption key pair is set up;
 	// HasPreviousSAMLEncryptionKey while a rotation is in progress.
 	HasSAMLEncryptionKey         bool   `json:"has_saml_encryption_key,omitempty"`
@@ -124,6 +130,12 @@ type CreateSsoConnectionParams struct {
 	// SAMLRequireEncryptedAssertions needs an encryption key first (see
 	// CreateSAMLEncryptionKey).
 	SAMLRequireEncryptedAssertions *bool `json:"saml_require_encrypted_assertions,omitempty"`
+	// SAMLACSPath is a custom ACS path on your own frontend API domain, e.g.
+	// /saml/acs/acme (needs a custom frontend API host; unique per instance).
+	SAMLACSPath string `json:"saml_acs_path,omitempty"`
+	// GitHubAccess restricts a GitHub (oidc type) connection to members of
+	// these GitHub orgs / teams; OIDCIssuer may then be left out.
+	GitHubAccess *GitHubAccess `json:"github_access,omitempty"`
 	// OIDC relying-party settings: declarative profile mapping (see
 	// ProfileMapping), token-endpoint client authentication (private_key_jwt
 	// needs no secret), RP-initiated / back-channel logout and third-party
@@ -234,4 +246,12 @@ func (s *SSOConnectionsService) RetirePreviousSAMLEncryptionKey(ctx context.Cont
 func (s *SSOConnectionsService) DeleteSAMLEncryptionKey(ctx context.Context, id string, opts ...RequestOption) (*SamlEncryptionKey, error) {
 	out := &SamlEncryptionKey{}
 	return out, s.client.del(ctx, ssoPath(id)+"/saml_encryption_key", out, opts...)
+}
+
+// GitHubAccess is the github_access block of a GitHub SSO connection. A person
+// must be an active member of an allowed organization or team; a refusal is a
+// 403 with reason github_team_required.
+type GitHubAccess struct {
+	AllowedOrganizations []string `json:"allowed_organizations,omitempty"`
+	AllowedTeams         []string `json:"allowed_teams,omitempty"`
 }

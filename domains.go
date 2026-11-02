@@ -10,13 +10,17 @@ type DomainsService struct{ client *Client }
 
 // CustomDomain is a FAPI/accounts custom domain.
 type CustomDomain struct {
-	Object               string  `json:"object"`
-	ID                   string  `json:"id"`
-	Role                 string  `json:"role"`
-	Host                 string  `json:"host"`
-	Status               string  `json:"status"`
-	Action               string  `json:"action"`
-	Live                 bool    `json:"live"`
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	Role   string `json:"role"`
+	Host   string `json:"host"`
+	Status string `json:"status"`
+	Action string `json:"action"`
+	Live   bool   `json:"live"`
+	// Method is cname, or path: a path mount on your own host, proven by an
+	// https file (no DNS).
+	Method string `json:"method,omitempty"`
+	// CNAMETarget is "" for a path mount (no CNAME).
 	CNAMETarget          string  `json:"cname_target"`
 	LastCheckedAt        *int64  `json:"last_checked_at"`
 	LastObservedTarget   *string `json:"last_observed_target"`
@@ -26,6 +30,33 @@ type CustomDomain struct {
 	// DNS is the DNS automation provider for this host (the token is never
 	// returned), or nil.
 	DNS *CustomDomainDNS `json:"dns,omitempty"`
+	// BasePath (path mount) is the prefix the Frontend API is served under.
+	BasePath *string `json:"base_path,omitempty"`
+	// Routing (path mount, once verified) is atlas_ingress or customer_proxy.
+	Routing *string `json:"routing,omitempty"`
+	// FrontendAPIURL (path mount) is https://<host><base_path>: the Frontend
+	// API and, once verified, the issuer.
+	FrontendAPIURL string `json:"frontend_api_url,omitempty"`
+	// Verification (path mount): publish Content at URL (status 200, no
+	// redirect), then Verify.
+	Verification *CustomDomainFileVerification `json:"verification,omitempty"`
+	// Instructions (path mount, once verified): nothing to add, or the
+	// reverse-proxy rule (headers, nginx / Caddy / Traefik snippets).
+	Instructions map[string]interface{} `json:"instructions,omitempty"`
+	// Verified and Issuer are set by Verify; Issuer on a verified path mount
+	// is the issuer tokens now carry.
+	Verified *bool  `json:"verified,omitempty"`
+	Issuer   string `json:"issuer,omitempty"`
+}
+
+// CustomDomainFileVerification is the https file that proves a path mount.
+type CustomDomainFileVerification struct {
+	// Method is https_file.
+	Method       string `json:"method"`
+	URL          string `json:"url"`
+	Token        string `json:"token"`
+	Content      string `json:"content"`
+	Instructions string `json:"instructions"`
 }
 
 // CustomDomainDNS reports a domain's DNS automation.
@@ -60,8 +91,14 @@ type ListDomainsResponse struct {
 
 // CreateDomainParams is the body of POST /v1/domains.
 type CreateDomainParams struct {
-	Host string `json:"host"`
-	Role string `json:"role,omitempty"`
+	// Host is the hostname (Hostname is an alias).
+	Host     string `json:"host,omitempty"`
+	Hostname string `json:"hostname,omitempty"`
+	Role     string `json:"role,omitempty"`
+	// Method is cname (default) or path: the Frontend API under BasePath
+	// (default /__atlas) on a host you already run, proven by an https file.
+	Method   string `json:"method,omitempty"`
+	BasePath string `json:"base_path,omitempty"`
 	// DNS has Atlas write the record (optional).
 	DNS *CustomDomainDNSParams `json:"dns,omitempty"`
 }

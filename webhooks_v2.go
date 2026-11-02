@@ -139,14 +139,18 @@ type WebhookEndpointUpserted struct {
 
 // WebhookTestResult is the inline result of TestNow.
 type WebhookTestResult struct {
-	Object              string  `json:"object"`
-	DeliveryID          string  `json:"delivery_id"`
-	EventID             string  `json:"event_id"`
-	Status              string  `json:"status"`
-	HTTPStatus          *int    `json:"http_status"`
-	LatencyMS           *int64  `json:"latency_ms"`
-	ResponseSnippet     *string `json:"response_snippet"`
-	Error               *string `json:"error"`
+	Object          string  `json:"object"`
+	DeliveryID      string  `json:"delivery_id"`
+	EventID         string  `json:"event_id"`
+	EventType       string  `json:"event_type"`
+	Status          string  `json:"status"`
+	HTTPStatus      *int    `json:"http_status"`
+	LatencyMS       *int64  `json:"latency_ms"`
+	ResponseSnippet *string `json:"response_snippet"`
+	Error           *string `json:"error"`
+	// ErrorKind says why the attempt failed: non_2xx, redirect, timeout, tls,
+	// dns, connection_refused, network or url_blocked; nil on success.
+	ErrorKind           *string `json:"error_kind"`
 	SignatureHeaderSent *string `json:"signature_header_sent"`
 	WillRetry           bool    `json:"will_retry"`
 }

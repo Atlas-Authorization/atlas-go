@@ -115,6 +115,7 @@ type Client struct {
 	DataSubjectRequests *DataSubjectRequestsService
 	RadiusClients       *RadiusClientsService
 	LTIPlatforms        *LTIPlatformsService
+	JWTConnections      *JWTConnectionsService
 	Instance            *InstanceService
 	InstanceSecurity    *InstanceSecurityService
 	Referrals           *ReferralsService
@@ -362,6 +363,7 @@ func New(secretKey string, opts ...Option) *Client {
 	c.DataSubjectRequests = &DataSubjectRequestsService{client: c}
 	c.RadiusClients = &RadiusClientsService{client: c}
 	c.LTIPlatforms = &LTIPlatformsService{client: c}
+	c.JWTConnections = &JWTConnectionsService{client: c}
 	c.Instance = &InstanceService{client: c}
 	c.InstanceSecurity = &InstanceSecurityService{client: c}
 	c.Referrals = &ReferralsService{client: c}

@@ -281,6 +281,12 @@ type ReferralSettings struct {
 	// IncludeReferralClaims adds the user's own code as a referral_code claim
 	// to session tokens and ID tokens.
 	IncludeReferralClaims bool `json:"include_referral_claims,omitempty"`
+	// ReportLinkedAtlasIDSignups reports the first sign-in of an Atlas ID
+	// account to a Sign in with Atlas app this instance manages as a sign-up.
+	ReportLinkedAtlasIDSignups bool `json:"report_linked_atlas_id_signups,omitempty"`
+	// PartnerPortalURL is linked from the hosted account page's "Refer a
+	// friend" panel.
+	PartnerPortalURL *string `json:"partner_portal_url"`
 	// Missing lists what the chosen provider still needs before referrals can be enabled.
 	Missing    []string                  `json:"missing"`
 	Connection *ReferralConnectionStatus `json:"connection"`
@@ -353,11 +359,15 @@ type UpdateReferralSettingsParams struct {
 	// browser_sources to go back to the provider's default.
 	BrowserSources []string `json:"browser_sources,omitempty"`
 	// ConsentProvider is auto, one consent manager, or app.
-	ConsentProvider        string   `json:"consent_provider,omitempty"`
-	ForwardLifecycle       *bool    `json:"forward_lifecycle,omitempty"`
-	MirrorToPublicMetadata *bool    `json:"mirror_to_public_metadata,omitempty"`
-	IncludeReferralClaims  *bool    `json:"include_referral_claims,omitempty"`
-	Clear                  []string `json:"-"`
+	ConsentProvider        string `json:"consent_provider,omitempty"`
+	ForwardLifecycle       *bool  `json:"forward_lifecycle,omitempty"`
+	MirrorToPublicMetadata *bool  `json:"mirror_to_public_metadata,omitempty"`
+	IncludeReferralClaims  *bool  `json:"include_referral_claims,omitempty"`
+	// ReportLinkedAtlasIDSignups: see ReferralSettings.
+	ReportLinkedAtlasIDSignups *bool `json:"report_linked_atlas_id_signups,omitempty"`
+	// PartnerPortalURL is an https URL (clear partner_portal_url to remove it).
+	PartnerPortalURL string   `json:"partner_portal_url,omitempty"`
+	Clear            []string `json:"-"`
 }
 
 // MarshalJSON sends the Clear keys as null.
