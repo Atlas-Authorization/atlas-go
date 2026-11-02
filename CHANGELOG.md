@@ -4,6 +4,21 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.23.0 — 2026-11-02
+
+### Added
+
+- **Back-channel sign-out from your backend.** `OAuthClients.Logout(ctx, id, sid)` (`POST /v1/oauth_clients/{id}/logout`) signs the user out of your app and of Atlas in one call; typed `OAuthClientLogout` (`Session`: `revoked` / `already_ended`, `GrantsRevoked`, `BackchannelLogouts`).
+- OAuth clients: `RefreshTouchesSession` (first-party; a refresh keeps the Atlas session alive and fails once it has ended) on `OAuthClient`, `CreateOAuthClientParams` and `UpdateOAuthClientParams`; write-only `AddRedirectOrigins` on create and update, with the response's `AddedOrigins`.
+- `SetCaptchaSecretParams.SiteKey`: storing the secret and switching `auth_config.captcha` to that provider happen in one atomic write. `CaptchaSecretResult` gains `Switched` and `Captcha`.
+- **Preflight acknowledgements.** `Instance.PreflightAcks`, `Instance.AcknowledgePreflight(ctx, code, AcknowledgePreflightParams{Reason, ExpiresAt})` and `Instance.DeletePreflightAck` (`GET/PUT/DELETE /v1/instance/preflight/acks[/{code}]`); `PreflightFinding.Acknowledged` marks a known, accepted warning or info finding (do not count it).
+- OAuth clients: `OAuthClients.RevealSecret` (`POST /v1/oauth_clients/{id}/secret/reveal`, once within 10 minutes) and `OAuthClientWithSecret.ClientSecretReveal {Path, ExpiresAt}`; `CreateOAuthClientParams.ClientSecret` (your own secret); `RequireVerifiedEmail` on create, update and read.
+- Webhook event constants `WebhookEventSessionExpired` (`SessionExpiredReason*`) and `WebhookEventInvitationCreated` / `Accepted` / `Revoked`; `User.Status` (`UserStatusActive` / `Suspended` / `Banned`, also on user.* payloads).
+- `WebhookTestResult.URL` and `WebhookDispatch.URL` (the exact URL tried); `MessagingTestResult` gains `Accepted`, `Provider`, `ProviderMessageID`, `ProviderResponse`.
+- `ListPlatformAppsParams` gains `Name`, `NamePrefix`, `ExternalRef` and paging (`ListParams`); `ListPage.NextCursor`.
+- `CreateInvitationParams.ExpiresAt` / `ExpiresInDays`; before_user_create hook `FailClosed` (and a test answer's `Deny` / `Reason`).
+- Password import docs: `password_hash_algorithm` `scrypt_node` / `scrypt_django` and `salt_encoding` in `PasswordHashParams`.
+
 ## 0.22.0 — 2026-11-01
 
 ### Added

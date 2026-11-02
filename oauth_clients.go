@@ -40,6 +40,17 @@ type OAuthClient struct {
 	// ends the session and redirects straight back (with state) without the
 	// confirmation page. First-party clients only.
 	SkipLogoutConfirmation bool `json:"skip_logout_confirmation"`
+	// RefreshTouchesSession is true when a refresh_token grant also keeps the
+	// Atlas session it came from alive, and fails (invalid_grant) once that
+	// session has ended. First-party clients only.
+	RefreshTouchesSession bool `json:"refresh_touches_session"`
+	// AddedOrigins, on create and update responses only, lists the origins the
+	// write added to the instance's allowed_origins (AddRedirectOrigins, or
+	// automatically for a client a connected integration signs users in with).
+	AddedOrigins []string `json:"added_origins,omitempty"`
+	// RequireVerifiedEmail is true when no authorization code is issued for a
+	// user whose primary email is not verified.
+	RequireVerifiedEmail bool `json:"require_verified_email"`
 	// Disabled refuses every OAuth flow for the client without deleting it.
 	Disabled bool `json:"disabled"`
 	// RequirePKCE forces PKCE for this confidential client too.
@@ -93,6 +104,29 @@ type OAuthClientWithSecret struct {
 	// OverlapSeconds is, on a rotation, how long the previous secret keeps
 	// working (echoed).
 	OverlapSeconds int `json:"overlap_seconds,omitempty"`
+	// ClientSecretReveal says where and until when a generated secret can be
+	// fetched once more (RevealSecret). Absent for a caller-chosen secret.
+	ClientSecretReveal *OAuthClientSecretRevealHint `json:"client_secret_reveal,omitempty"`
+}
+
+// OAuthClientSecretRevealHint is the client_secret_reveal object on create and
+// rotate responses.
+type OAuthClientSecretRevealHint struct {
+	Path string `json:"path"`
+	// ExpiresAt is epoch ms.
+	ExpiresAt int64 `json:"expires_at"`
+}
+
+// OAuthClientSecretReveal is the result of RevealSecret: the secret the latest
+// create or rotate generated.
+type OAuthClientSecretReveal struct {
+	Object                string  `json:"object"`
+	ID                    string  `json:"id"`
+	ClientID              string  `json:"client_id"`
+	ClientSecret          string  `json:"client_secret"`
+	SecretPrefix          *string `json:"secret_prefix"`
+	ClientSecretExpiresAt *int64  `json:"client_secret_expires_at"`
+	Note                  string  `json:"note"`
 }
 
 // RotateOAuthClientSecretParams is the body of
@@ -138,9 +172,22 @@ type CreateOAuthClientParams struct {
 	// third-party client the API answers 422 VALIDATION_FAILED (param
 	// skip_logout_confirmation).
 	SkipLogoutConfirmation *bool `json:"skip_logout_confirmation,omitempty"`
+	// RefreshTouchesSession, when true, makes each refresh keep the Atlas
+	// session alive and refuses the refresh (invalid_grant) once it has ended.
+	// First-party clients only (422 VALIDATION_FAILED otherwise).
+	RefreshTouchesSession *bool `json:"refresh_touches_session,omitempty"`
+	// AddRedirectOrigins also adds the redirect URIs' origins to the
+	// instance's allowed_origins (append only; listed in AddedOrigins).
+	AddRedirectOrigins bool `json:"add_redirect_origins,omitempty"`
 	// SecretExpiresInSeconds gives the issued secret a lifetime (reported as
 	// client_secret_expires_at); nil issues one that does not expire.
 	SecretExpiresInSeconds *int64 `json:"secret_expires_in_seconds,omitempty"`
+	// ClientSecret is your own secret (32-256 random printable characters);
+	// empty and Atlas generates one.
+	ClientSecret string `json:"client_secret,omitempty"`
+	// RequireVerifiedEmail issues no authorization code for a user whose
+	// primary email is not verified. Default false.
+	RequireVerifiedEmail *bool `json:"require_verified_email,omitempty"`
 	// SubjectType is "public" (default) or "pairwise" (a per-sector sub).
 	SubjectType string `json:"subject_type,omitempty"`
 	// SectorIdentifierURI is an https URL listing every redirect_uri; required
@@ -171,9 +218,19 @@ type UpdateOAuthClientParams struct {
 	// third-party client the API answers 422 VALIDATION_FAILED (param
 	// skip_logout_confirmation).
 	SkipLogoutConfirmation *bool `json:"skip_logout_confirmation,omitempty"`
+	// RefreshTouchesSession, when true, makes each refresh keep the Atlas
+	// session alive and refuses the refresh (invalid_grant) once it has ended.
+	// First-party clients only (422 VALIDATION_FAILED otherwise).
+	RefreshTouchesSession *bool `json:"refresh_touches_session,omitempty"`
+	// AddRedirectOrigins also adds the redirect URIs' origins to the
+	// instance's allowed_origins (append only; listed in AddedOrigins).
+	AddRedirectOrigins bool `json:"add_redirect_origins,omitempty"`
 	// SecretExpiresInSeconds gives the issued secret a lifetime (reported as
 	// client_secret_expires_at); nil issues one that does not expire.
 	SecretExpiresInSeconds *int64 `json:"secret_expires_in_seconds,omitempty"`
+	// RequireVerifiedEmail issues no authorization code for a user whose
+	// primary email is not verified.
+	RequireVerifiedEmail *bool `json:"require_verified_email,omitempty"`
 	// SubjectType is "public" (default) or "pairwise" (a per-sector sub).
 	SubjectType string `json:"subject_type,omitempty"`
 	// SectorIdentifierURI is an https URL listing every redirect_uri; required
@@ -263,6 +320,41 @@ func (s *OAuthClientsService) RotateSecret(ctx context.Context, id string, opts 
 func (s *OAuthClientsService) RotateSecretWithParams(ctx context.Context, id string, params RotateOAuthClientSecretParams, opts ...RequestOption) (*OAuthClientWithSecret, error) {
 	out := &OAuthClientWithSecret{}
 	return out, s.client.post(ctx, "/v1/oauth_clients/"+url.PathEscape(id)+"/rotate_secret", params, out, opts...)
+}
+
+// RevealSecret returns the secret the latest create or rotate generated, once
+// more: within 10 minutes, a single time, while it is still current (410
+// afterwards; rotate instead). POST /v1/oauth_clients/:id/secret/reveal.
+func (s *OAuthClientsService) RevealSecret(ctx context.Context, id string, opts ...RequestOption) (*OAuthClientSecretReveal, error) {
+	out := &OAuthClientSecretReveal{}
+	return out, s.client.post(ctx, "/v1/oauth_clients/"+url.PathEscape(id)+"/secret/reveal", nil, out, opts...)
+}
+
+// OAuthClientLogout is the result of Logout.
+type OAuthClientLogout struct {
+	Object   string `json:"object"`
+	ClientID string `json:"client_id"`
+	SID      string `json:"sid"`
+	// Session is "revoked" (this call ended the Atlas session) or
+	// "already_ended".
+	Session string `json:"session"`
+	// GrantsRevoked counts this client's refresh grants under the sid that were
+	// revoked (offline_access included).
+	GrantsRevoked int `json:"grants_revoked"`
+	// BackchannelLogouts counts the back-channel logouts queued, to this client
+	// and every other app signed in through the session.
+	BackchannelLogouts int `json:"backchannel_logouts"`
+}
+
+// Logout signs a user out of this app AND of Atlas in one call: it revokes
+// this client's grants under sid and the Atlas session itself (every other app
+// gets a back-channel logout). id is the client id or its public client_id;
+// sid is the id_token's sid. Needs oauth_clients:write and sessions:write; no
+// browser redirect to /oauth2/logout is needed afterwards.
+// POST /v1/oauth_clients/:id/logout.
+func (s *OAuthClientsService) Logout(ctx context.Context, id, sid string, opts ...RequestOption) (*OAuthClientLogout, error) {
+	out := &OAuthClientLogout{}
+	return out, s.client.post(ctx, "/v1/oauth_clients/"+url.PathEscape(id)+"/logout", map[string]string{"sid": sid}, out, opts...)
 }
 
 // Delete removes an OAuth client. DELETE /v1/oauth_clients/:id.

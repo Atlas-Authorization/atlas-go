@@ -48,6 +48,10 @@ type CaptchaSecretResult struct {
 	Deleted  bool   `json:"deleted,omitempty"`
 	// FlowsTurnedOff lists the captcha flows a forced delete switched off.
 	FlowsTurnedOff []string `json:"flows_turned_off,omitempty"`
+	// Switched is true when a set with SiteKey switched auth_config.captcha to
+	// this provider; Captcha is then the resulting captcha config.
+	Switched bool                   `json:"switched,omitempty"`
+	Captcha  map[string]interface{} `json:"captcha,omitempty"`
 }
 
 // SetCaptchaSecretParams are the options of SetCaptchaSecretWithParams.
@@ -57,6 +61,11 @@ type SetCaptchaSecretParams struct {
 	// configured one). Captcha is bring-your-own-keys: store the secret before
 	// turning captcha on.
 	Provider string `json:"provider,omitempty"`
+	// SiteKey is the provider's public site key. With it, auth_config.captcha
+	// switches to Provider with this site key in the same atomic write (e.g.
+	// from the built-in atlas captcha to Turnstile). Refused for secret-only
+	// providers.
+	SiteKey string `json:"site_key,omitempty"`
 }
 
 // DeleteCaptchaSecretParams are the options of DeleteCaptchaSecretWithParams.

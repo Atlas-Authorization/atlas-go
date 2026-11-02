@@ -169,6 +169,51 @@ skip := true
 _, err := c.OAuthClients.Update(ctx, clientID, atlas.UpdateOAuthClientParams{SkipLogoutConfirmation: &skip})
 ```
 
+## Signing a user out of your app and Atlas
+
+`OAuthClients.Logout` ends the user's Atlas session from your backend (`sid`
+is the id_token's `sid`): it revokes this client's grants under that sid, ends
+the session and queues a back-channel logout to every other app signed in
+through it. No browser redirect to `/oauth2/logout` is needed. Needs
+`oauth_clients:write` and `sessions:write`.
+
+```go
+out, err := c.OAuthClients.Logout(ctx, clientID, sid)
+// out.Session is "revoked" or "already_ended"; out.GrantsRevoked, out.BackchannelLogouts
+```
+
+A first-party client with `RefreshTouchesSession` keeps the Atlas session
+alive on every refresh, and its refresh fails (`invalid_grant`) once that
+session has ended. `AddRedirectOrigins: true` on create / update also adds the
+redirect URIs' origins to the instance's `allowed_origins`; the response lists
+them in `AddedOrigins`.
+
+A generated client secret can be fetched once more within 10 minutes of the
+create or rotate (`ClientSecretReveal` says where and until when); a secret you
+chose (`CreateOAuthClientParams.ClientSecret`) never is:
+
+```go
+sec, err := c.OAuthClients.RevealSecret(ctx, clientID) // 410 afterwards: rotate instead
+```
+
+`RequireVerifiedEmail: &yes` issues no authorization code for a user whose
+primary email is not verified.
+
+## Acknowledging preflight findings
+
+A warning or info finding you know about and accept can be acknowledged: it is
+still listed, with `Acknowledged`, and stops counting. Errors are never
+acknowledged (422).
+
+```go
+_, err := c.Instance.AcknowledgePreflight(ctx, "pkce_not_required", atlas.AcknowledgePreflightParams{
+	Reason:    "legacy desktop client",
+	ExpiresAt: "2027-01-01T00:00:00Z", // or epoch ms; omit for no expiry
+})
+acks, _ := c.Instance.PreflightAcks(ctx)
+_, _ = c.Instance.DeletePreflightAck(ctx, "pkce_not_required")
+```
+
 ## Cookie settings link
 
 Add a "cookie settings" link to the hosted pages that reopens your consent

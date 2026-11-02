@@ -6,8 +6,10 @@ import "context"
 // hook. Just before Atlas creates a user from a self-service sign-up, it sends
 // your endpoint a signed POST (the webhook headers; verify it with
 // VerifyWebhook) of type user.before_create, with data {user, strategy,
-// referral}, and stamps the external_id and metadata you answer. A slow or
-// failing hook never blocks a sign-up. The signing secret is write-only.
+// referral}, and stamps the external_id and metadata you answer, or refuses the
+// sign-up when you answer {deny: true, reason} (or HTTP 403: 403
+// SIGN_UP_DENIED, no user kept). A slow or failing hook does not block a
+// sign-up unless the hook is FailClosed. The signing secret is write-only.
 type UserHooksService struct{ client *Client }
 
 // BeforeUserCreateHookLastCall is the last call Atlas made to the hook.
@@ -27,9 +29,12 @@ type BeforeUserCreateHook struct {
 	// SigningSecretSet says whether a signing secret is stored (it is never returned).
 	SigningSecretSet bool `json:"signing_secret_set"`
 	// TimeoutMS is 500-5000, default 3000.
-	TimeoutMS int                           `json:"timeout_ms"`
-	LastCall  *BeforeUserCreateHookLastCall `json:"last_call"`
-	UpdatedAt *int64                        `json:"updated_at"`
+	TimeoutMS int `json:"timeout_ms"`
+	// FailClosed refuses the sign-up when the hook times out, errors or
+	// answers badly. Default false.
+	FailClosed bool                          `json:"fail_closed"`
+	LastCall   *BeforeUserCreateHookLastCall `json:"last_call"`
+	UpdatedAt  *int64                        `json:"updated_at"`
 }
 
 // UpdateBeforeUserCreateHookParams is the body of PATCH
@@ -43,8 +48,11 @@ type UpdateBeforeUserCreateHookParams struct {
 	// SigningSecret is write-only, 16-512 characters.
 	SigningSecret string `json:"signing_secret,omitempty"`
 	// TimeoutMS is 500-5000.
-	TimeoutMS int      `json:"timeout_ms,omitempty"`
-	Clear     []string `json:"-"`
+	TimeoutMS int `json:"timeout_ms,omitempty"`
+	// FailClosed refuses the sign-up when the hook times out, errors or
+	// answers badly.
+	FailClosed *bool    `json:"fail_closed,omitempty"`
+	Clear      []string `json:"-"`
 }
 
 // MarshalJSON sends the Clear keys as null.
@@ -62,6 +70,9 @@ func (p UpdateBeforeUserCreateHookParams) MarshalJSON() ([]byte, error) {
 
 // BeforeUserCreateHookAnswer is what the hook answered to a test.
 type BeforeUserCreateHookAnswer struct {
+	// Deny is set when the hook denied the sample sign-up (Reason says why).
+	Deny               bool                   `json:"deny,omitempty"`
+	Reason             *string                `json:"reason,omitempty"`
 	ExternalID         *string                `json:"external_id"`
 	PublicMetadata     map[string]interface{} `json:"public_metadata"`
 	PrivateMetadataSet bool                   `json:"private_metadata_set"`

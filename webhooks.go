@@ -245,9 +245,36 @@ type WebhookDispatch struct {
 	Object  string `json:"object"`
 	ID      string `json:"id"`
 	EventID string `json:"event_id"`
-	Status  string `json:"status"`
-	Note    string `json:"note"`
+	// URL is the URL the worker will POST to (only on a test).
+	URL    string `json:"url,omitempty"`
+	Status string `json:"status"`
+	Note   string `json:"note"`
 }
+
+// Webhook event types for session expiry and instance invitations.
+const (
+	// WebhookEventSessionExpired: a session idled out (data.reason
+	// idle_expired) or reached its absolute lifetime (expired). Once per session.
+	WebhookEventSessionExpired = "session.expired"
+	// WebhookEventInvitationCreated / Accepted / Revoked: an instance invitation
+	// (POST /v1/invitations). On accepted, data.user_id is the new user.
+	WebhookEventInvitationCreated  = "invitation.created"
+	WebhookEventInvitationAccepted = "invitation.accepted"
+	WebhookEventInvitationRevoked  = "invitation.revoked"
+)
+
+// Session expiry reasons (data.reason on session.expired).
+const (
+	SessionExpiredReasonIdle     = "idle_expired"
+	SessionExpiredReasonLifetime = "expired"
+)
+
+// User statuses (User.Status and user.* webhook payloads).
+const (
+	UserStatusActive    = "active"
+	UserStatusSuspended = "suspended"
+	UserStatusBanned    = "banned"
+)
 
 // ListDetailed returns the endpoints with their health, the subscribable event
 // types and the retry schedule. GET /v1/webhook_endpoints.

@@ -30,6 +30,9 @@ type ListPage[T any] struct {
 	Object  string `json:"object"`
 	Data    []T    `json:"data"`
 	HasMore bool   `json:"has_more"`
+	// NextCursor is the starting_after for the next page, on the list routes
+	// that page with limit (nil otherwise or on the last page).
+	NextCursor *string `json:"next_cursor,omitempty"`
 }
 
 // ListParams carries the common cursor-pagination inputs. The server clamps

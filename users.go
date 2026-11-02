@@ -33,6 +33,9 @@ type User struct {
 	// ban or no ban.
 	BanExpiresAt *int64 `json:"ban_expires_at,omitempty"`
 	Locked       bool   `json:"locked"`
+	// Status is the one account state: active, suspended or banned (the ID
+	// token's account_status; deactivation is a ban). Also on user.* webhooks.
+	Status string `json:"status,omitempty"`
 	// LastSignInAt is epoch milliseconds, or nil if never signed in.
 	LastSignInAt *int64 `json:"last_sign_in_at"`
 	CreatedAt    int64  `json:"created_at"`
@@ -210,7 +213,11 @@ type CreateUserParams struct {
 	// one (Argon2id, bcrypt, Django / passlib PBKDF2 and scrypt, …) is stored as
 	// given; any other is named with PasswordHashAlgorithm (scrypt, pbkdf2, md5,
 	// sha1, sha256, sha512, hmac_sha256, …) plus PasswordHashParams (e.g.
-	// scrypt n, r, p, key_length, salt_encoding) and PasswordSalt.
+	// scrypt n, r, p, key_length, salt_encoding) and PasswordSalt. A Node
+	// crypto.scrypt string (scrypt$N$r$p$salt$key) whose salt is all digits is
+	// also a valid Django one: name it scrypt_node or scrypt_django (400 until
+	// you do); scrypt_node takes salt_encoding in PasswordHashParams (default
+	// utf8, the salt text as written).
 	// PasswordHasher is the Clerk name, used only when the hash does not
 	// describe itself. Upgraded to Argon2id on the first sign-in.
 	PasswordHash          string                 `json:"password_hash,omitempty"`

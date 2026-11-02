@@ -139,10 +139,12 @@ type WebhookEndpointUpserted struct {
 
 // WebhookTestResult is the inline result of TestNow.
 type WebhookTestResult struct {
-	Object          string  `json:"object"`
-	DeliveryID      string  `json:"delivery_id"`
-	EventID         string  `json:"event_id"`
-	EventType       string  `json:"event_type"`
+	Object     string `json:"object"`
+	DeliveryID string `json:"delivery_id"`
+	EventID    string `json:"event_id"`
+	EventType  string `json:"event_type"`
+	// URL is the exact URL the attempt was POSTed to.
+	URL             string  `json:"url"`
 	Status          string  `json:"status"`
 	HTTPStatus      *int    `json:"http_status"`
 	LatencyMS       *int64  `json:"latency_ms"`

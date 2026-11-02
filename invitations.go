@@ -24,6 +24,12 @@ type Invitation struct {
 type CreateInvitationParams struct {
 	EmailAddress   string   `json:"email_address"`
 	PublicMetadata Metadata `json:"public_metadata,omitempty"`
+	// ExpiresAt is when it expires: epoch ms (int64) or an ISO 8601 string, at
+	// most 365 days ahead. Default 7 days.
+	ExpiresAt interface{} `json:"expires_at,omitempty"`
+	// ExpiresInDays is the alternative to ExpiresAt: 1 to 365 days from now.
+	// Send one or the other.
+	ExpiresInDays int `json:"expires_in_days,omitempty"`
 }
 
 // List returns one cursor page of invitations. GET /v1/invitations.

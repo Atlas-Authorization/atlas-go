@@ -176,6 +176,15 @@ type ListPlatformAppsParams struct {
 	Tag      string
 	// Metadata keeps only apps whose provisioning metadata matches every pair.
 	Metadata map[string]interface{}
+	// Name keeps apps with exactly this name, ignoring case.
+	Name string
+	// NamePrefix keeps apps whose name starts with this text, ignoring case.
+	NamePrefix string
+	// ExternalRef keeps the app created with this external_ref (zero or one).
+	ExternalRef string
+	// ListParams pages: without Limit every matching app is returned; with it
+	// (up to 500) pass the previous page's NextCursor as StartingAfter.
+	ListParams
 }
 
 func (p ListPlatformAppsParams) values() url.Values {
@@ -189,6 +198,16 @@ func (p ListPlatformAppsParams) values() url.Values {
 	if p.Tag != "" {
 		v.Set("tag", p.Tag)
 	}
+	if p.Name != "" {
+		v.Set("name", p.Name)
+	}
+	if p.NamePrefix != "" {
+		v.Set("name_prefix", p.NamePrefix)
+	}
+	if p.ExternalRef != "" {
+		v.Set("external_ref", p.ExternalRef)
+	}
+	p.ListParams.apply(v)
 	for k, vals := range MetadataQuery(p.Metadata) {
 		v[k] = vals
 	}

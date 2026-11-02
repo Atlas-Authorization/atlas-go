@@ -35,6 +35,46 @@ type PreflightFinding struct {
 	// apply to how the instance integrates (SuppressedReason says why).
 	Suppressed       bool   `json:"suppressed,omitempty"`
 	SuppressedReason string `json:"suppressed_reason,omitempty"`
+	// Acknowledged is set when the code is acknowledged as known and accepted
+	// (never on an error). Do not count such a finding.
+	Acknowledged *PreflightAckSummary `json:"acknowledged,omitempty"`
+}
+
+// PreflightAckSummary is the acknowledgement carried on a finding.
+type PreflightAckSummary struct {
+	Reason string `json:"reason"`
+	// By is the API key or dashboard user that acknowledged it.
+	By *string `json:"by"`
+	// At is epoch ms.
+	At int64 `json:"at"`
+	// ExpiresAt is epoch ms; nil = until removed.
+	ExpiresAt *int64 `json:"expires_at"`
+}
+
+// PreflightAck is a stored preflight acknowledgement.
+type PreflightAck struct {
+	Object string `json:"object"`
+	Code   string `json:"code"`
+	PreflightAckSummary
+	// Active is false once ExpiresAt has passed: the finding counts again.
+	Active bool `json:"active"`
+}
+
+// AcknowledgePreflightParams is the body of
+// PUT /v1/instance/preflight/acks/:code.
+type AcknowledgePreflightParams struct {
+	// Reason says why the finding is accepted (required, at most 500 characters).
+	Reason string `json:"reason"`
+	// ExpiresAt is when it lapses: epoch ms (int64) or an ISO 8601 string, in
+	// the future. nil = no expiry.
+	ExpiresAt interface{} `json:"expires_at,omitempty"`
+}
+
+// DeletedPreflightAck is the result of DeletePreflightAck.
+type DeletedPreflightAck struct {
+	Object  string `json:"object"`
+	Code    string `json:"code"`
+	Deleted bool   `json:"deleted"`
 }
 
 // PreflightSuppressedFinding is a finding that does not apply to how the
@@ -157,6 +197,29 @@ func (s *InstanceService) PreflightWithParams(ctx context.Context, params Prefli
 		q.Set("include_suppressed", "true")
 	}
 	return out, s.client.get(ctx, "/v1/instance/preflight", q, out)
+}
+
+// PreflightAcks lists every preflight acknowledgement, lapsed ones included
+// (Active false). GET /v1/instance/preflight/acks.
+func (s *InstanceService) PreflightAcks(ctx context.Context) (*ListPage[PreflightAck], error) {
+	out := &ListPage[PreflightAck]{}
+	return out, s.client.get(ctx, "/v1/instance/preflight/acks", nil, out)
+}
+
+// AcknowledgePreflight marks every warning or info finding with code as known
+// and accepted: it is still reported, with Acknowledged, and stops counting.
+// Replaces an earlier acknowledgement of the code. A code that can be an error
+// is refused (422). PUT /v1/instance/preflight/acks/:code.
+func (s *InstanceService) AcknowledgePreflight(ctx context.Context, code string, params AcknowledgePreflightParams, opts ...RequestOption) (*PreflightAck, error) {
+	out := &PreflightAck{}
+	return out, s.client.put(ctx, "/v1/instance/preflight/acks/"+url.PathEscape(code), params, out, opts...)
+}
+
+// DeletePreflightAck removes an acknowledgement: the findings with code count
+// again (404 when there is none). DELETE /v1/instance/preflight/acks/:code.
+func (s *InstanceService) DeletePreflightAck(ctx context.Context, code string, opts ...RequestOption) (*DeletedPreflightAck, error) {
+	out := &DeletedPreflightAck{}
+	return out, s.client.del(ctx, "/v1/instance/preflight/acks/"+url.PathEscape(code), out, opts...)
 }
 
 // UnknownFieldReportRow is one unknown body field your writes sent, aggregated

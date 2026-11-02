@@ -89,7 +89,9 @@ type ImportUserRow struct {
 	// (scrypt, pbkdf2, md5, sha1, sha256, sha512, their _salted forms,
 	// hmac_sha256, …); PasswordHashParams carries its parameters (scrypt n or
 	// log_n / r / p / key_length; pbkdf2 digest / iterations / key_length; md5
-	// and sha* salt_position; encoding and salt_encoding).
+	// and sha* salt_position; encoding and salt_encoding). A Node
+	// crypto.scrypt string whose salt is all digits is also a valid Django one:
+	// name it scrypt_node (takes salt_encoding, default utf8) or scrypt_django.
 	PasswordHashAlgorithm string                 `json:"password_hash_algorithm,omitempty"`
 	PasswordHashParams    map[string]interface{} `json:"password_hash_params,omitempty"`
 	// PhoneNumber is one E.164 number; PhoneNumbers several with their state.

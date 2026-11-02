@@ -83,7 +83,15 @@ type MessagingTestResult struct {
 	Object  string `json:"object"`
 	Channel string `json:"channel"`
 	SentTo  string `json:"sent_to"`
-	OK      bool   `json:"ok"`
+	// OK is always true: a provider refusal is a 502 error whose meta says
+	// what the provider answered.
+	OK       bool `json:"ok"`
+	Accepted bool `json:"accepted"`
+	// Provider is the transport that accepted it (resend, smtp, twilio, ...).
+	Provider          string  `json:"provider"`
+	ProviderMessageID *string `json:"provider_message_id"`
+	// ProviderResponse is, for SMTP, the server reply line (carries the queue id).
+	ProviderResponse string `json:"provider_response,omitempty"`
 }
 
 // DeletedMessagingProvider acknowledges a channel deletion.
