@@ -64,6 +64,18 @@ type CreateSSOOnboardingProfileParams struct {
 	ReturnURL *string `json:"return_url,omitempty"`
 }
 
+// UpdateSSOOnboardingProfileParams is the body of
+// PATCH /v1/sso_onboarding_profiles/:id; only the fields set change.
+type UpdateSSOOnboardingProfileParams struct {
+	Name                   *string  `json:"name,omitempty"`
+	AllowedConnectionTypes []string `json:"allowed_connection_types,omitempty"`
+	OrganizationID         *string  `json:"organization_id,omitempty"`
+	CompanyName            *string  `json:"company_name,omitempty"`
+	AllowSCIM              *bool    `json:"allow_scim,omitempty"`
+	Intents                []string `json:"intents,omitempty"`
+	ReturnURL              *string  `json:"return_url,omitempty"`
+}
+
 // CreateSSOOnboardingTicketParams is the body of POST .../tickets.
 type CreateSSOOnboardingTicketParams struct {
 	OrganizationID   *string `json:"organization_id,omitempty"`
@@ -102,6 +114,12 @@ func (s *SSOOnboardingService) Get(ctx context.Context, id string) (*SSOOnboardi
 func (s *SSOOnboardingService) Create(ctx context.Context, params CreateSSOOnboardingProfileParams, opts ...RequestOption) (*SSOOnboardingProfile, error) {
 	out := &SSOOnboardingProfile{}
 	return out, s.client.post(ctx, "/v1/sso_onboarding_profiles", params, out, opts...)
+}
+
+// Update changes an onboarding profile. PATCH /v1/sso_onboarding_profiles/:id.
+func (s *SSOOnboardingService) Update(ctx context.Context, id string, params UpdateSSOOnboardingProfileParams, opts ...RequestOption) (*SSOOnboardingProfile, error) {
+	out := &SSOOnboardingProfile{}
+	return out, s.client.do(ctx, "PATCH", "/v1/sso_onboarding_profiles/"+url.PathEscape(id), nil, params, out, opts...)
 }
 
 // Delete removes a profile. DELETE /v1/sso_onboarding_profiles/:id.

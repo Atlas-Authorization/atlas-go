@@ -2,6 +2,7 @@ package atlas
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"strconv"
 )
@@ -23,6 +24,10 @@ type WebhookEndpoint struct {
 	// FailingSince is the start of the current failure streak (epoch ms), or
 	// nil when the last delivery succeeded.
 	FailingSince *int64 `json:"failing_since"`
+	// ManagedBy names the connected platform that owns this endpoint (for
+	// example "cookiemunch"), or nil for your own. Config export and plan list
+	// it as the platform's, never as drift.
+	ManagedBy *string `json:"managed_by"`
 	// LastFailingSince is when the most recent failure streak began (epoch
 	// ms). It is kept after the endpoint recovers or is re-enabled, so
 	// SinceFailingSince still resolves on replay.
@@ -119,6 +124,10 @@ type CreateWebhookEndpointParams struct {
 	// Secret is your own signing secret instead of a generated one: whsec_
 	// followed by 32–256 of [A-Za-z0-9+/=_-] (HTTPS endpoints only).
 	Secret string `json:"secret,omitempty"`
+	// ManagedBy marks an endpoint you create for a connected platform as that
+	// platform's ("cookiemunch", "chatly", "forumulate", "referalli"); the URL
+	// must be an https URL on that platform's API host.
+	ManagedBy string `json:"managed_by,omitempty"`
 	WebhookEndpointSettings
 	ProvisioningInput
 }
@@ -207,9 +216,29 @@ type UpdateWebhookEndpointParams struct {
 	URL           string   `json:"url,omitempty"`
 	EnabledEvents []string `json:"enabled_events,omitempty"`
 	Active        *bool    `json:"active,omitempty"`
+	// ManagedBy marks the endpoint as a connected platform's (see
+	// CreateWebhookEndpointParams.ManagedBy); ClearManagedBy sends null and
+	// hands it back to you.
+	ManagedBy      string `json:"managed_by,omitempty"`
+	ClearManagedBy bool   `json:"-"`
 	WebhookEndpointSettings
 	// Metadata replaces the provisioning tags.
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// MarshalJSON renders managed_by as null when ClearManagedBy is set.
+func (p UpdateWebhookEndpointParams) MarshalJSON() ([]byte, error) {
+	type alias UpdateWebhookEndpointParams
+	raw, err := json.Marshal(alias(p))
+	if err != nil || !p.ClearManagedBy {
+		return raw, err
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil, err
+	}
+	m["managed_by"] = nil
+	return json.Marshal(m)
 }
 
 // WebhookSecret is an endpoint's signing secret (whsec_...).

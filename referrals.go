@@ -197,6 +197,21 @@ type ReferralConnectionStatus struct {
 	// RetryingCalls counts calls waiting for a retry.
 	RetryingCalls int    `json:"retrying_calls"`
 	LastSuccessAt *int64 `json:"last_success_at"`
+	// RejectedCallKinds are call kinds the platform refuses while the signed
+	// ping passes (the secret is fine); always present, empty when none.
+	RejectedCallKinds []ReferralRejectedCallKind `json:"rejected_call_kinds"`
+}
+
+// ReferralRejectedCallKind is one call kind the platform currently refuses.
+type ReferralRejectedCallKind struct {
+	Kind       string  `json:"kind"`
+	URL        *string `json:"url"`
+	HTTPStatus *int    `json:"http_status"`
+	// At is when it was rejected (epoch ms).
+	At     int64  `json:"at"`
+	CallID string `json:"call_id"`
+	// Suppressed is true when Atlas stops sending this kind until the secret or API key changes.
+	Suppressed bool `json:"suppressed"`
 }
 
 // ReferralInboundEvent is the latest event a platform sent to the inbound URL.

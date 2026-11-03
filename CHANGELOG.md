@@ -4,6 +4,14 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.24.0 — 2026-11-02
+
+### Added
+
+- `WebhookEndpoint.ManagedBy`: the connected platform that owns an endpoint (nil for your own). `CreateWebhookEndpointParams.ManagedBy` and `UpdateWebhookEndpointParams.ManagedBy` mark an endpoint you created for a platform as that platform's (the URL must be on its API host); `ClearManagedBy` hands it back.
+- `ReferralConnectionStatus.RejectedCallKinds` (`ReferralRejectedCallKind`): call kinds the referral platform refuses while the signed ping passes; always present, empty when none.
+- `SSOOnboarding.Update` (`PATCH /v1/sso_onboarding_profiles/{id}`) with `UpdateSSOOnboardingProfileParams`.
+
 ## 0.23.0 — 2026-11-02
 
 ### Added
