@@ -76,6 +76,17 @@ type UpdateSSOOnboardingProfileParams struct {
 	ReturnURL              *string  `json:"return_url,omitempty"`
 }
 
+// UpsertSSOOnboardingProfileParams is the body of
+// PUT /v1/sso_onboarding_profiles/by_name/:name: the create fields minus name.
+type UpsertSSOOnboardingProfileParams struct {
+	AllowedConnectionTypes []string `json:"allowed_connection_types,omitempty"`
+	OrganizationID         *string  `json:"organization_id,omitempty"`
+	CompanyName            *string  `json:"company_name,omitempty"`
+	AllowSCIM              *bool    `json:"allow_scim,omitempty"`
+	Intents                []string `json:"intents,omitempty"`
+	ReturnURL              *string  `json:"return_url,omitempty"`
+}
+
 // CreateSSOOnboardingTicketParams is the body of POST .../tickets.
 type CreateSSOOnboardingTicketParams struct {
 	OrganizationID   *string `json:"organization_id,omitempty"`
@@ -114,6 +125,14 @@ func (s *SSOOnboardingService) Get(ctx context.Context, id string) (*SSOOnboardi
 func (s *SSOOnboardingService) Create(ctx context.Context, params CreateSSOOnboardingProfileParams, opts ...RequestOption) (*SSOOnboardingProfile, error) {
 	out := &SSOOnboardingProfile{}
 	return out, s.client.post(ctx, "/v1/sso_onboarding_profiles", params, out, opts...)
+}
+
+// UpsertByName creates the profile with exactly this name (201) or updates it
+// in place (200). 409 IDENTIFIER_EXISTS when two profiles already share the name.
+// PUT /v1/sso_onboarding_profiles/by_name/:name.
+func (s *SSOOnboardingService) UpsertByName(ctx context.Context, name string, params UpsertSSOOnboardingProfileParams, opts ...RequestOption) (*SSOOnboardingProfile, error) {
+	out := &SSOOnboardingProfile{}
+	return out, s.client.put(ctx, "/v1/sso_onboarding_profiles/by_name/"+url.PathEscape(name), params, out, opts...)
 }
 
 // Update changes an onboarding profile. PATCH /v1/sso_onboarding_profiles/:id.

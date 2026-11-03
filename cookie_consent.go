@@ -27,6 +27,19 @@ type CookieConsent struct {
 	DeclaredCookies []DeclaredCookie `json:"declared_cookies,omitempty"`
 	// HostAliases are the declared host aliases (see SetCookieConsentHostAliases).
 	HostAliases []string `json:"host_aliases,omitempty"`
+	// FrontendMode is how the Frontend API is served (present on the read).
+	FrontendMode *CookieConsentFrontendMode `json:"frontend_mode,omitempty"`
+}
+
+// CookieConsentFrontendMode says where the Frontend API (and so its cookies) lives.
+type CookieConsentFrontendMode struct {
+	// Type is default (the shared Atlas host), custom_domain (a CNAME) or
+	// path_mount (BasePath on your own host).
+	Type string `json:"type"`
+	// Host is the bare host the cookies live on.
+	Host string `json:"host"`
+	// BasePath is the path_mount prefix (e.g. /__atlas); nil otherwise.
+	BasePath *string `json:"base_path"`
 }
 
 // DeclaredCookie is one cookie or browser-storage key Atlas writes.
@@ -38,6 +51,9 @@ type DeclaredCookie struct {
 	// Store is cookie, localStorage, sessionStorage or indexedDB.
 	Store  string `json:"store"`
 	Domain string `json:"domain"`
+	// Path is the cookie's Path (on a path mount every Atlas cookie but
+	// __session and __atlas_uat moves under the base path); nil for storage.
+	Path *string `json:"path"`
 	// LifetimeSeconds is nil for a browser session (cookie) or until cleared.
 	LifetimeSeconds *int64 `json:"lifetime_seconds"`
 	Lifetime        string `json:"lifetime"`

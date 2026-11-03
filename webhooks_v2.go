@@ -144,7 +144,9 @@ type WebhookTestResult struct {
 	EventID    string `json:"event_id"`
 	EventType  string `json:"event_type"`
 	// URL is the exact URL the attempt was POSTed to.
-	URL             string  `json:"url"`
+	URL string `json:"url"`
+	// OK is true when the receiver answered 2xx.
+	OK              *bool   `json:"ok"`
 	Status          string  `json:"status"`
 	HTTPStatus      *int    `json:"http_status"`
 	LatencyMS       *int64  `json:"latency_ms"`

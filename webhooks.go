@@ -278,6 +278,11 @@ type WebhookDispatch struct {
 	URL    string `json:"url,omitempty"`
 	Status string `json:"status"`
 	Note   string `json:"note"`
+	// OK, HTTPStatus and LatencyMS are the shared test-call fields; all nil
+	// while a test is only queued (Status pending).
+	OK         *bool  `json:"ok"`
+	HTTPStatus *int   `json:"http_status"`
+	LatencyMS  *int64 `json:"latency_ms"`
 }
 
 // Webhook event types for session expiry and instance invitations.

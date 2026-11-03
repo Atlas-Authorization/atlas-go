@@ -44,15 +44,26 @@ const DefaultTTLMS = 3_600_000
 // SessionClaims is the decoded payload of a verified Atlas session JWT. Known
 // claims are typed; everything else is available in Raw.
 type SessionClaims struct {
-	Iss            string   `json:"iss"`
-	Sub            string   `json:"sub"`
-	Sid            string   `json:"sid"`
-	Exp            int64    `json:"exp"`
-	Nbf            int64    `json:"nbf"`
-	Iat            int64    `json:"iat"`
-	Azp            string   `json:"azp"`
-	Sv             int64    `json:"sv"`
-	MFA            bool     `json:"mfa"`
+	Iss string `json:"iss"`
+	Sub string `json:"sub"`
+	Sid string `json:"sid"`
+	Exp int64  `json:"exp"`
+	Nbf int64  `json:"nbf"`
+	Iat int64  `json:"iat"`
+	Azp string `json:"azp"`
+	Sv  int64  `json:"sv"`
+	MFA bool   `json:"mfa"`
+	// MFASatisfied is the server's verdict on the second factor (an MFA
+	// challenge, a step-up, or a trusted enterprise SSO sign-in); nil on tokens
+	// minted before the claim existed. Read it through MFASatisfied(claims).
+	MFASatisfied *bool `json:"mfa_satisfied,omitempty"`
+	// LastActiveAt is the session's last activity when the token was minted,
+	// epoch seconds (0 when absent), for idle checks.
+	LastActiveAt int64 `json:"last_active_at,omitempty"`
+	// Acr is urn:atlas:acr:basic, urn:atlas:acr:mfa or urn:atlas:acr:step_up.
+	Acr string `json:"acr,omitempty"`
+	// Amr lists the RFC 8176 authentication methods (pwd, otp, mfa, ...).
+	Amr            []string `json:"amr,omitempty"`
 	OrgID          string   `json:"org_id"`
 	OrgSlug        string   `json:"org_slug"`
 	OrgRole        string   `json:"org_role"`
@@ -67,6 +78,28 @@ type SessionClaims struct {
 
 	// Raw is the full claim set, including any not modelled above.
 	Raw map[string]interface{} `json:"-"`
+}
+
+// MFASatisfied reports whether the session satisfies a "requires MFA" rule.
+// The token's mfa_satisfied claim is final whenever present (true or false);
+// older tokens fall back to mfa == true, acr == urn:atlas:acr:mfa, amr
+// containing "mfa", or an enterprise SSO sign-in (sso_connection_id set).
+func MFASatisfied(c *SessionClaims) bool {
+	if c == nil {
+		return false
+	}
+	if c.MFASatisfied != nil {
+		return *c.MFASatisfied
+	}
+	if c.MFA || c.Acr == "urn:atlas:acr:mfa" || c.SSOConnectionID != "" {
+		return true
+	}
+	for _, m := range c.Amr {
+		if m == "mfa" {
+			return true
+		}
+	}
+	return false
 }
 
 // HasRole reports whether the session's org_role equals role.

@@ -364,6 +364,48 @@ type PrivacyIntegrationWarning struct {
 	Message string `json:"message"`
 }
 
+// PrivacyDSRWebhook is the typed view of PrivacyIntegration.DSRWebhook.
+type PrivacyDSRWebhook struct {
+	WebhookEndpointID string   `json:"webhook_endpoint_id"`
+	URL               string   `json:"url"`
+	Active            bool     `json:"active"`
+	EnabledEvents     []string `json:"enabled_events"`
+	// Source (connect only) is where the URL came from this call:
+	// executor_connection, completion_webhook_url or unchanged.
+	Source string `json:"source,omitempty"`
+	// SecretDestination (connect only, with ExecutorConnectionID) says where
+	// the completion webhook's signing secret must be set; nil otherwise.
+	SecretDestination *PrivacyDSRWebhookSecretDestination `json:"secret_destination,omitempty"`
+}
+
+// PrivacyDSRWebhookSecretDestination says where to set the completion
+// webhook's signing secret at the orchestrator; Atlas does not send it (Sent false).
+type PrivacyDSRWebhookSecretDestination struct {
+	ExecutorConnectionID string `json:"executor_connection_id"`
+	// ConnectionURL is the connection to PATCH with {Field: secret}.
+	ConnectionURL string `json:"connection_url"`
+	Field         string `json:"field"`
+	Sent          bool   `json:"sent"`
+	// Secret names the answer field holding the secret
+	// (privacy_orchestrator.completion_webhook_secret), or nil when the
+	// endpoint already existed and its secret is not shown again.
+	Secret       *string `json:"secret"`
+	Instructions string  `json:"instructions"`
+}
+
+// DSRWebhookTyped decodes DSRWebhook; nil when there is none.
+func (p *PrivacyIntegration) DSRWebhookTyped() (*PrivacyDSRWebhook, error) {
+	if p == nil || p.DSRWebhook == nil {
+		return nil, nil
+	}
+	b, err := json.Marshal(p.DSRWebhook)
+	if err != nil {
+		return nil, err
+	}
+	out := &PrivacyDSRWebhook{}
+	return out, json.Unmarshal(b, out)
+}
+
 // ConnectPrivacyIntegrationParams is the body of
 // POST /v1/instance/privacy_integrations/connect.
 type ConnectPrivacyIntegrationParams struct {
@@ -375,6 +417,11 @@ type ConnectPrivacyIntegrationParams struct {
 	APIKey               string `json:"api_key,omitempty"`
 	PartnerLinkID        string `json:"partner_link_id,omitempty"`
 	CompletionWebhookURL string `json:"completion_webhook_url,omitempty"`
+	// ExecutorConnectionID (preset cookiemunch only, instead of
+	// CompletionWebhookURL) is this instance's executor connection at the
+	// orchestrator (exc_...); Atlas reads its webhook URL with the credential it
+	// holds (needs dsar:read there).
+	ExecutorConnectionID string `json:"executor_connection_id,omitempty"`
 	// CookieConsent overrides PUT /v1/instance/cookie_consent (merged over the
 	// preset), or false to leave it alone.
 	CookieConsent interface{} `json:"cookie_consent,omitempty"`

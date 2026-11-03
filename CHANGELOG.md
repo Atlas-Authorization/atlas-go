@@ -4,6 +4,18 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.25.0 — 2026-11-03
+
+### Added
+
+- `Organizations.UpsertByExternalID` (`PUT /v1/organizations/by_external_id/{external_id}`) and `SSOOnboarding.UpsertByName` (`PUT /v1/sso_onboarding_profiles/by_name/{name}`): race-safe create-or-update.
+- Session claims `MFASatisfied`, `LastActiveAt`, `Acr`, `Amr`, and the `MFASatisfied(claims)` rule (the server's verdict is final when present; older tokens fall back to `mfa`, `acr`/`amr`, then SSO).
+- Webhook and hook test results carry `OK`, `Status`, `HTTPStatus`, `LatencyMS`.
+- Cookie consent `FrontendMode` and a `Path` on every declared cookie.
+- Privacy integrations connect `ExecutorConnectionID` (Cookie Munch) and the `DSRWebhook` source / secret destination; identity integration `Warnings`.
+- Sign in with Atlas apps: list `Used`/`Limit`/`Health` (`IncludeHealth`), `RedirectURIEnvironments`, `RedirectURIsDetail`, `TestModeExpiresAt`, `TestSignIn`, `EffectiveLegalURLs`; publisher `SetDefaultLegalURLs` and the default legal link fields.
+- Staged signing-key rotation: `RotateSigningKeyParams.Staged` / `ActivatesAt`, `SigningKey.ActivatesAt` (status `next`), `CancelStagedSigningKey`, `GetSigningKeyPolicy`, `SetSigningKeyPolicy`.
+
 ## 0.24.0 — 2026-11-02
 
 ### Added

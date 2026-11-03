@@ -82,9 +82,13 @@ type BeforeUserCreateHookAnswer struct {
 // BeforeUserCreateHookTest is POST /v1/instance/hooks/before_user_create/test:
 // a sample draft sent to the hook; nothing is stored.
 type BeforeUserCreateHookTest struct {
-	OK        bool                        `json:"ok"`
-	LatencyMS int                         `json:"latency_ms"`
-	Answer    *BeforeUserCreateHookAnswer `json:"answer,omitempty"`
+	OK bool `json:"ok"`
+	// Status is success or failed (the shared test-call fields, as on a webhook test).
+	Status string `json:"status"`
+	// HTTPStatus is what the hook answered with; nil when no answer came.
+	HTTPStatus *int                        `json:"http_status"`
+	LatencyMS  int                         `json:"latency_ms"`
+	Answer     *BeforeUserCreateHookAnswer `json:"answer,omitempty"`
 	// Error.Code is timeout, error, invalid_response or not_configured.
 	Error *ReferralTestError `json:"error,omitempty"`
 }

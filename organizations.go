@@ -182,6 +182,22 @@ type CreateOrganizationParams struct {
 	RoleMappings map[string]string `json:"role_mappings,omitempty"`
 }
 
+// UpsertOrganizationParams is the body of
+// PUT /v1/organizations/by_external_id/:external_id: the create fields minus
+// external_id (taken from the path). Name is required when the call creates;
+// on an update only the fields set change and CreatedBy / OwnerEmail are ignored.
+type UpsertOrganizationParams struct {
+	Name                  string            `json:"name,omitempty"`
+	Slug                  string            `json:"slug,omitempty"`
+	ImageURL              string            `json:"image_url,omitempty"`
+	CreatedBy             string            `json:"created_by,omitempty"`
+	MaxAllowedMemberships *int              `json:"max_allowed_memberships,omitempty"`
+	PublicMetadata        Metadata          `json:"public_metadata,omitempty"`
+	PrivateMetadata       Metadata          `json:"private_metadata,omitempty"`
+	OwnerEmail            string            `json:"owner_email,omitempty"`
+	RoleMappings          map[string]string `json:"role_mappings,omitempty"`
+}
+
 // UpdateOrganizationParams is the body of PATCH /v1/organizations/:id.
 type UpdateOrganizationParams struct {
 	Name                  string   `json:"name,omitempty"`
@@ -277,6 +293,14 @@ func (s *OrganizationsService) Create(ctx context.Context, params CreateOrganiza
 func (s *OrganizationsService) Update(ctx context.Context, id string, params UpdateOrganizationParams, opts ...RequestOption) (*Organization, error) {
 	out := &Organization{}
 	return out, s.client.patch(ctx, "/v1/organizations/"+url.PathEscape(id), params, out, opts...)
+}
+
+// UpsertByExternalID creates the organization with this external_id (201) or
+// updates it (200). Parallel calls for one id create exactly one organization.
+// PUT /v1/organizations/by_external_id/:external_id.
+func (s *OrganizationsService) UpsertByExternalID(ctx context.Context, externalID string, params UpsertOrganizationParams, opts ...RequestOption) (*Organization, error) {
+	out := &Organization{}
+	return out, s.client.put(ctx, "/v1/organizations/by_external_id/"+url.PathEscape(externalID), params, out, opts...)
 }
 
 // Delete removes an organization. DELETE /v1/organizations/:id.

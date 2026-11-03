@@ -22,6 +22,9 @@ type SigningKey struct {
 	// Provider is, on the current main key, "local" or the KMS holding its
 	// private half (aws_kms, gcp_kms, azure_key_vault).
 	Provider string `json:"provider,omitempty"`
+	// ActivatesAt (epoch ms) is set on a staged key (Status "next"): it is in
+	// the JWKS already and starts signing at this time.
+	ActivatesAt *int64 `json:"activates_at,omitempty"`
 }
 
 // SigningKeyList is GET /v1/instance/signing_keys.
@@ -35,10 +38,17 @@ type SigningKeyList struct {
 // GracePeriodSeconds keeps the previous key published (default 86400, at most
 // 2592000); Emergency publishes ONLY the new key (old tokens stop verifying at
 // once) and is required for a second rotation inside a grace window.
+//
+// Staged true pre-publishes the new key: it joins the JWKS now and starts
+// signing at ActivatesAt (an ISO 8601 string or epoch ms, 1 hour to 90 days
+// ahead; default the instance policy's prepublish_days, else 14 days). With a
+// policy set, Staged false forces an immediate rotation.
 type RotateSigningKeyParams struct {
-	Alg                string `json:"alg,omitempty"`
-	GracePeriodSeconds *int64 `json:"grace_period_seconds,omitempty"`
-	Emergency          bool   `json:"emergency,omitempty"`
+	Alg                string      `json:"alg,omitempty"`
+	GracePeriodSeconds *int64      `json:"grace_period_seconds,omitempty"`
+	Emergency          bool        `json:"emergency,omitempty"`
+	Staged             *bool       `json:"staged,omitempty"`
+	ActivatesAt        interface{} `json:"activates_at,omitempty"`
 }
 
 // SigningKeyRotation is the result of a rotation.
@@ -49,6 +59,16 @@ type SigningKeyRotation struct {
 	PreviousKid       *string `json:"previous_kid"`
 	PreviousRetiresAt *int64  `json:"previous_retires_at"`
 	Emergency         bool    `json:"emergency"`
+	// Staged and ActivatesAt (epoch ms) are set on a staged rotation.
+	Staged      bool   `json:"staged,omitempty"`
+	ActivatesAt *int64 `json:"activates_at,omitempty"`
+}
+
+// SigningKeyPolicy is the staged-rotation policy: PrepublishDays (1..90)
+// stages every ordinary rotation that many days ahead; nil = off.
+type SigningKeyPolicy struct {
+	Object         string `json:"object"`
+	PrepublishDays *int   `json:"prepublish_days"`
 }
 
 // ListSigningKeys lists the published signing keys, newest first.
@@ -63,6 +83,27 @@ func (s *InstanceSecurityService) ListSigningKeys(ctx context.Context) (*Signing
 func (s *InstanceSecurityService) RotateSigningKey(ctx context.Context, params RotateSigningKeyParams, opts ...RequestOption) (*SigningKeyRotation, error) {
 	out := &SigningKeyRotation{}
 	return out, s.client.post(ctx, "/v1/instance/signing_keys/rotate", params, out, opts...)
+}
+
+// CancelStagedSigningKey unpublishes the staged key before it ever signs
+// (404 when none is staged). DELETE /v1/instance/signing_keys/next.
+func (s *InstanceSecurityService) CancelStagedSigningKey(ctx context.Context, opts ...RequestOption) (*SigningKey, error) {
+	out := &SigningKey{}
+	return out, s.client.del(ctx, "/v1/instance/signing_keys/next", out, opts...)
+}
+
+// GetSigningKeyPolicy reads the staged-rotation policy.
+// GET /v1/instance/signing_key_policy.
+func (s *InstanceSecurityService) GetSigningKeyPolicy(ctx context.Context) (*SigningKeyPolicy, error) {
+	out := &SigningKeyPolicy{}
+	return out, s.client.get(ctx, "/v1/instance/signing_key_policy", nil, out)
+}
+
+// SetSigningKeyPolicy sets prepublish_days (1..90; nil or 0 turns staging off).
+// PATCH /v1/instance/signing_key_policy.
+func (s *InstanceSecurityService) SetSigningKeyPolicy(ctx context.Context, prepublishDays *int, opts ...RequestOption) (*SigningKeyPolicy, error) {
+	out := &SigningKeyPolicy{}
+	return out, s.client.patch(ctx, "/v1/instance/signing_key_policy", map[string]*int{"prepublish_days": prepublishDays}, out, opts...)
 }
 
 // --- Signing keys held in your own KMS --------------------------------------

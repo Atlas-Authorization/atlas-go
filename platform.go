@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"strconv"
 )
 
 // PlatformService is the platform surface (/v1/platform/*), signed with a
@@ -583,6 +584,60 @@ type AtlasIDApp struct {
 	// HomepageIncludesScript is whether the app's homepage references the
 	// button script (nil = could not check).
 	HomepageIncludesScript *bool `json:"homepage_includes_script,omitempty"`
+	// Health is the app preflight without its network checks (List only;
+	// absent with IncludeHealth false). GET .../preflight has the full report.
+	Health *AtlasIDAppHealth `json:"health,omitempty"`
+	// RedirectURIEnvironments are the explicit environment tags only
+	// (redirect URI -> development | production).
+	RedirectURIEnvironments map[string]string `json:"redirect_uri_environments,omitempty"`
+	// RedirectURIsDetail is every redirect URI with its environment, tagged or inferred.
+	RedirectURIsDetail []AtlasIDRedirectURIDetail `json:"redirect_uris_detail,omitempty"`
+	// TestModeExpiresAt is when test sign-in mode turns itself off (epoch
+	// ms); nil = it stays on until turned off.
+	TestModeExpiresAt *int64 `json:"test_mode_expires_at,omitempty"`
+	// TestSignIn is TestMode and TestModeExpiresAt as one object.
+	TestSignIn *AtlasIDTestSignIn `json:"test_sign_in,omitempty"`
+	// EffectiveLegalURLs are the legal links the pages show: the app's own,
+	// else the account-wide default, else none.
+	EffectiveLegalURLs *AtlasIDEffectiveLegalURLs `json:"effective_legal_urls,omitempty"`
+}
+
+// AtlasIDAppHealth is an app's offline preflight summary.
+type AtlasIDAppHealth struct {
+	// Status is ok, warning or error.
+	Status   string                    `json:"status"`
+	Findings []AtlasIDAppHealthFinding `json:"findings"`
+}
+
+// AtlasIDAppHealthFinding is one preflight finding (severity error, warning or info).
+type AtlasIDAppHealthFinding struct {
+	Code     string `json:"code"`
+	Severity string `json:"severity"`
+}
+
+// AtlasIDRedirectURIDetail is one redirect URI with its environment.
+type AtlasIDRedirectURIDetail struct {
+	URI string `json:"uri"`
+	// Environment is development or production.
+	Environment string `json:"environment"`
+	// Inferred is true when no tag was set and the environment comes from the host.
+	Inferred bool `json:"inferred"`
+}
+
+// AtlasIDTestSignIn is the test sign-in setting as one object.
+type AtlasIDTestSignIn struct {
+	Enabled bool `json:"enabled"`
+	// ExpiresAt is epoch ms, or nil for no expiry.
+	ExpiresAt *int64 `json:"expires_at"`
+}
+
+// AtlasIDEffectiveLegalURLs are the legal links an app's pages show. Each
+// source is app, account_default or nil (none).
+type AtlasIDEffectiveLegalURLs struct {
+	PrivacyPolicyURL        *string `json:"privacy_policy_url"`
+	PrivacyPolicyURLSource  *string `json:"privacy_policy_url_source"`
+	TermsOfServiceURL       *string `json:"terms_of_service_url"`
+	TermsOfServiceURLSource *string `json:"terms_of_service_url_source"`
 }
 
 // AtlasIDOriginSeen is a page origin the button (or the fallback link) was
@@ -637,7 +692,18 @@ type AtlasIDAppList struct {
 	Data         []AtlasIDApp `json:"data"`
 	Issuer       string       `json:"issuer"`
 	DiscoveryURL string       `json:"discovery_url"`
-	Limit        int          `json:"limit"`
+	// Limit is how many apps the account may register; Used is how many count
+	// against it (an instance toggle's app does not).
+	Limit int `json:"limit"`
+	Used  int `json:"used"`
+}
+
+// ListAtlasIDAppsParams filters GET /v1/platform/atlas_id_apps.
+type ListAtlasIDAppsParams struct {
+	// IncludeHealth false leaves out each app's Health (nil = server default, included).
+	IncludeHealth *bool
+	// Metadata keeps only apps whose provisioning metadata matches every pair.
+	Metadata map[string]interface{}
 }
 
 // AtlasIDAppBrandingParams sets an app's branding. On update each field merges
@@ -742,6 +808,35 @@ type UpdateAtlasIDAppParams struct {
 	ProvisionedVerifiedDomainsOnly *bool `json:"provisioned_verified_domains_only,omitempty"`
 	// Metadata replaces the provisioning tags.
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	// TestModeExpiresAt turns test sign-in mode off at this time: an ISO 8601
+	// string or epoch ms (int64), at most 90 days out. Put
+	// "test_mode_expires_at" in Clear for no expiry.
+	TestModeExpiresAt interface{} `json:"test_mode_expires_at,omitempty"`
+	// TestSignIn sets test_mode and test_mode_expires_at as one object; send
+	// it or TestMode / TestModeExpiresAt, not both (400).
+	TestSignIn *AtlasIDTestSignInParams `json:"test_sign_in,omitempty"`
+	// RedirectURIEnvironments tags redirect URIs development or production
+	// (every key must be one of the app's redirect URIs); it replaces the
+	// stored map. Put "redirect_uri_environments" in Clear to clear it.
+	RedirectURIEnvironments map[string]string `json:"redirect_uri_environments,omitempty"`
+}
+
+// AtlasIDTestSignInParams is the test_sign_in object of UpdateAtlasIDAppParams.
+type AtlasIDTestSignInParams struct {
+	Enabled *bool `json:"enabled,omitempty"`
+	// ExpiresAt is an ISO 8601 string or epoch ms; NoExpiry sends null instead.
+	ExpiresAt interface{} `json:"expires_at,omitempty"`
+	NoExpiry  bool        `json:"-"`
+}
+
+// MarshalJSON sends expires_at: null when NoExpiry is set.
+func (p AtlasIDTestSignInParams) MarshalJSON() ([]byte, error) {
+	type plain AtlasIDTestSignInParams
+	var extra map[string]interface{}
+	if p.NoExpiry {
+		extra = map[string]interface{}{"expires_at": nil}
+	}
+	return marshalWithExtra(plain(p), extra)
 }
 
 // MarshalJSON omits a nil PostLogoutRedirectURIs (an empty slice clears) and
@@ -784,6 +879,17 @@ type AtlasIDAppDesignPreviewParams struct {
 func (s *AtlasIDAppsService) List(ctx context.Context) (*AtlasIDAppList, error) {
 	out := &AtlasIDAppList{}
 	return out, s.client.platGet(ctx, "/v1/platform/atlas_id_apps", nil, out)
+}
+
+// ListWith returns the apps, optionally without health or filtered by
+// provisioning metadata. GET /v1/platform/atlas_id_apps.
+func (s *AtlasIDAppsService) ListWith(ctx context.Context, params ListAtlasIDAppsParams) (*AtlasIDAppList, error) {
+	q := MetadataQuery(params.Metadata)
+	if params.IncludeHealth != nil {
+		q.Set("include_health", strconv.FormatBool(*params.IncludeHealth))
+	}
+	out := &AtlasIDAppList{}
+	return out, s.client.platGet(ctx, "/v1/platform/atlas_id_apps", q, out)
 }
 
 // Create registers a Sign in with Atlas app. A confidential app's ClientSecret

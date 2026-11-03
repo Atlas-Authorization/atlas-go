@@ -262,3 +262,36 @@ func TestJWKSCacheThrottlesKidMiss(t *testing.T) {
 		t.Errorf("LastOutcome = %q, want throttled", b.JWKS().LastOutcome)
 	}
 }
+
+func TestMFASatisfied(t *testing.T) {
+	cases := []struct {
+		name, claims string
+		want         bool
+	}{
+		{"server verdict true", `{"mfa_satisfied":true}`, true},
+		{"server verdict false wins over fallbacks", `{"mfa_satisfied":false,"mfa":true,"acr":"urn:atlas:acr:mfa","amr":["mfa"],"sso_connection_id":"ssoc_1"}`, false},
+		{"legacy mfa flag", `{"mfa":true}`, true},
+		{"acr mfa", `{"acr":"urn:atlas:acr:mfa"}`, true},
+		{"acr step_up alone is not enough", `{"acr":"urn:atlas:acr:step_up"}`, false},
+		{"amr mfa", `{"amr":["pwd","mfa"]}`, true},
+		{"enterprise sso", `{"sso_connection_id":"ssoc_1"}`, true},
+		{"nothing", `{"amr":["pwd"],"acr":"urn:atlas:acr:basic"}`, false},
+	}
+	for _, tc := range cases {
+		var c SessionClaims
+		if err := json.Unmarshal([]byte(tc.claims), &c); err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if got := MFASatisfied(&c); got != tc.want {
+			t.Errorf("%s: MFASatisfied = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+	if MFASatisfied(nil) {
+		t.Error("nil claims must not satisfy MFA")
+	}
+	var c SessionClaims
+	_ = json.Unmarshal([]byte(`{"last_active_at":1700000000}`), &c)
+	if c.LastActiveAt != 1700000000 {
+		t.Errorf("LastActiveAt = %d", c.LastActiveAt)
+	}
+}

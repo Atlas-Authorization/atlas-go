@@ -130,8 +130,21 @@ type Integration struct {
 	// DryRun is present on a ?dry_run=true answer.
 	DryRun bool               `json:"dry_run,omitempty"`
 	Health *IntegrationHealth `json:"health,omitempty"`
+	// Warnings (PUT only) report what on the connected service already
+	// replaces the Atlas sign-in button; report only, never blocks the save.
+	Warnings []IntegrationWarning `json:"warnings,omitempty"`
 	// Raw is the whole response object, including the preset-specific fields.
 	Raw map[string]interface{} `json:"-"`
+}
+
+// IntegrationWarning is one entry of Integration.Warnings.
+type IntegrationWarning struct {
+	// Code is existing_sign_in_url_overrides or atlas_reader_provider_missing.
+	Code     string   `json:"code"`
+	Message  string   `json:"message"`
+	SpaceIDs []string `json:"space_ids"`
+	// SignInURL is the overriding sign-in page (existing_sign_in_url_overrides).
+	SignInURL string `json:"sign_in_url,omitempty"`
 }
 
 // UnmarshalJSON decodes the typed fields and keeps the full object in Raw.

@@ -226,6 +226,11 @@ type AtlasIDPublisher struct {
 	UpdatedAt     int64  `json:"updated_at"`
 	// RecordFound is set by Verify: whether the TXT record matched.
 	RecordFound *bool `json:"record_found,omitempty"`
+	// DefaultPrivacyPolicyURL and DefaultTermsOfServiceURL are the account-wide
+	// legal links every app without its own uses (nil = none). They work
+	// without a publisher claim.
+	DefaultPrivacyPolicyURL  *string `json:"default_privacy_policy_url"`
+	DefaultTermsOfServiceURL *string `json:"default_terms_of_service_url"`
 }
 
 // SetAtlasIDPublisherParams is the body of PUT /v1/platform/atlas_id_publisher.
@@ -254,6 +259,18 @@ func (s *AtlasIDPublisherService) Set(ctx context.Context, params SetAtlasIDPubl
 func (s *AtlasIDPublisherService) SetSkipConsent(ctx context.Context, skipConsent bool, opts ...RequestOption) (*AtlasIDPublisher, error) {
 	out := &AtlasIDPublisher{}
 	body := map[string]bool{"skip_consent": skipConsent}
+	return out, s.client.platPatch(ctx, "/v1/platform/atlas_id_publisher", body, out, opts...)
+}
+
+// SetDefaultLegalURLs sets the account-wide default privacy policy and terms
+// links (https) used by every app that sets none of its own; nil clears one.
+// PATCH /v1/platform/atlas_id_publisher.
+func (s *AtlasIDPublisherService) SetDefaultLegalURLs(ctx context.Context, privacyPolicyURL, termsOfServiceURL *string, opts ...RequestOption) (*AtlasIDPublisher, error) {
+	out := &AtlasIDPublisher{}
+	body := map[string]*string{
+		"default_privacy_policy_url":   privacyPolicyURL,
+		"default_terms_of_service_url": termsOfServiceURL,
+	}
 	return out, s.client.platPatch(ctx, "/v1/platform/atlas_id_publisher", body, out, opts...)
 }
 
