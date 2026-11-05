@@ -370,6 +370,8 @@ type OAuthClientGrantsService struct{ client *Client }
 type CreateClientGrantParams struct {
 	ResourceServerID string   `json:"resource_server_id"`
 	Scopes           []string `json:"scopes,omitempty"`
+	// ScopePresets names the resource server's scope_presets, unioned with Scopes.
+	ScopePresets []string `json:"scope_presets,omitempty"`
 }
 
 // List lists a client's grants.

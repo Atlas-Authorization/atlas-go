@@ -16,13 +16,16 @@ type ResourceServerScope struct {
 
 // ResourceServer is an API audience with its scopes and token settings.
 type ResourceServer struct {
-	Object          string                `json:"object"`
-	ID              string                `json:"id"`
-	Identifier      string                `json:"identifier"`
-	Name            string                `json:"name"`
-	Scopes          []ResourceServerScope `json:"scopes"`
-	TokenTTLSeconds int                   `json:"token_ttl_seconds"`
-	SigningAlg      string                `json:"signing_alg"`
+	Object     string                `json:"object"`
+	ID         string                `json:"id"`
+	Identifier string                `json:"identifier"`
+	Name       string                `json:"name"`
+	Scopes     []ResourceServerScope `json:"scopes"`
+	// ScopePresets are named bundles over Scopes, accepted as scope_presets
+	// wherever scopes are requested.
+	ScopePresets    map[string][]string `json:"scope_presets,omitempty"`
+	TokenTTLSeconds int                 `json:"token_ttl_seconds"`
+	SigningAlg      string              `json:"signing_alg"`
 	// PublishResourceMetadata is true when Atlas serves the API's RFC 9728
 	// protected-resource metadata document.
 	PublishResourceMetadata bool `json:"publish_resource_metadata"`
@@ -44,10 +47,13 @@ type ResourceServer struct {
 // scope may be a bare string or a {value, description}; pass the latter as
 // ResourceServerScope. Scopes accepts []interface{} for that flexibility.
 type CreateResourceServerParams struct {
-	Identifier      string        `json:"identifier"`
-	Name            string        `json:"name"`
-	Scopes          []interface{} `json:"scopes,omitempty"`
-	TokenTTLSeconds *int          `json:"token_ttl_seconds,omitempty"`
+	Identifier string        `json:"identifier"`
+	Name       string        `json:"name"`
+	Scopes     []interface{} `json:"scopes,omitempty"`
+	// ScopePresets are named bundles over Scopes. A preset naming a scope the
+	// server does not define is refused.
+	ScopePresets    map[string][]string `json:"scope_presets,omitempty"`
+	TokenTTLSeconds *int                `json:"token_ttl_seconds,omitempty"`
 	// SigningAlg is RS256 or ES256: the algorithm of this API's access tokens.
 	SigningAlg string `json:"signing_alg,omitempty"`
 	// PublishResourceMetadata makes Atlas serve the RFC 9728 metadata document.
@@ -71,11 +77,13 @@ type CreateResourceServerParams struct {
 // UpdateResourceServerParams is the body of PATCH /v1/resource_servers/:id. The
 // identifier is immutable.
 type UpdateResourceServerParams struct {
-	Name            string        `json:"name,omitempty"`
-	Scopes          []interface{} `json:"scopes,omitempty"`
-	TokenTTLSeconds *int          `json:"token_ttl_seconds,omitempty"`
-	SigningAlg      string        `json:"signing_alg,omitempty"`
-	Identifier      string        `json:"identifier,omitempty"`
+	Name   string        `json:"name,omitempty"`
+	Scopes []interface{} `json:"scopes,omitempty"`
+	// ScopePresets replaces all the presets. A non-nil empty map removes them.
+	ScopePresets    map[string][]string `json:"scope_presets,omitempty"`
+	TokenTTLSeconds *int                `json:"token_ttl_seconds,omitempty"`
+	SigningAlg      string              `json:"signing_alg,omitempty"`
+	Identifier      string              `json:"identifier,omitempty"`
 	// PublishResourceMetadata turns the RFC 9728 metadata document on or off.
 	PublishResourceMetadata *bool `json:"publish_resource_metadata,omitempty"`
 	// AccessTokenFormat is "jwt" or "opaque"; ClearAccessTokenFormat sends
@@ -147,5 +155,10 @@ func (p CreateResourceServerParams) MarshalJSON() ([]byte, error) {
 // MarshalJSON sends null for the Clear* flags.
 func (p UpdateResourceServerParams) MarshalJSON() ([]byte, error) {
 	type plain UpdateResourceServerParams
-	return marshalWithExtra(plain(p), resourceServerTokenNulls(p.ClearAccessTokenFormat, p.ClearRefreshTokenAbsoluteTTLSeconds, p.ClearRefreshTokenIdleTTLSeconds))
+	extra := resourceServerTokenNulls(p.ClearAccessTokenFormat, p.ClearRefreshTokenAbsoluteTTLSeconds, p.ClearRefreshTokenIdleTTLSeconds)
+	// omitempty would drop the empty map that removes every preset.
+	if p.ScopePresets != nil && len(p.ScopePresets) == 0 {
+		extra["scope_presets"] = p.ScopePresets
+	}
+	return marshalWithExtra(plain(p), extra)
 }

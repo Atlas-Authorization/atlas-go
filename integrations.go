@@ -26,6 +26,13 @@ type IntegrationReceiverHealth struct {
 	ConsecutiveFailures int                 `json:"consecutive_failures"`
 	SuccessRate24h      *float64            `json:"success_rate_24h"`
 	Events              []string            `json:"events,omitempty"`
+	// SecretMissing: the default receiver cannot verify deliveries, as its signing
+	// secret was never stored or revealed and no delivery there succeeded.
+	SecretMissing bool `json:"secret_missing,omitempty"`
+	// UndeliveredEvents are events among the recent attempts that failed with no
+	// retry left; OldestUndeliveredAt is a good Since for RedeliverEvents.
+	UndeliveredEvents   int    `json:"undelivered_events,omitempty"`
+	OldestUndeliveredAt *int64 `json:"oldest_undelivered_at,omitempty"`
 }
 
 // IntegrationCMP is the consent-manager block of an integration.

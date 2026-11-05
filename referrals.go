@@ -736,6 +736,30 @@ func (s *ReferralsService) GetBackfill(ctx context.Context, id string) (*Referra
 	return out, s.client.get(ctx, "/v1/instance/referrals/backfill/"+url.PathEscape(id), nil, out)
 }
 
+// ReferralAccountsResyncParams is the body of POST /v1/instance/referrals/accounts/resync.
+type ReferralAccountsResyncParams struct {
+	StartingAfter string `json:"starting_after,omitempty"`
+}
+
+// ReferralAccountsResync is the answer. When Truncated, continue with
+// StartingAfter set to NextStartingAfter. GetBackfill(BackfillID) shows progress.
+type ReferralAccountsResync struct {
+	Object                    string  `json:"object"`
+	BackfillID                string  `json:"backfill_id"`
+	OrganizationsScanned      int     `json:"organizations_scanned"`
+	CallsQueued               int     `json:"calls_queued"`
+	OrganizationsWithoutOwner int     `json:"organizations_without_owner"`
+	Truncated                 bool    `json:"truncated"`
+	NextStartingAfter         *string `json:"next_starting_after"`
+}
+
+// ResyncAccounts sends every organization's owner to the referral platform
+// once, up to 10,000 per call. POST /v1/instance/referrals/accounts/resync.
+func (s *ReferralsService) ResyncAccounts(ctx context.Context, params ReferralAccountsResyncParams, opts ...RequestOption) (*ReferralAccountsResync, error) {
+	out := &ReferralAccountsResync{}
+	return out, s.client.post(ctx, "/v1/instance/referrals/accounts/resync", params, out, opts...)
+}
+
 // GetForUser returns the stored referral result for one user (who referred
 // them, how, their own code), with no call to the platform. 404 when the user
 // was never reported. GET /v1/users/:id/referral.

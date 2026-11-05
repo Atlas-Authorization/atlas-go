@@ -113,3 +113,11 @@ func (s *UserHooksService) TestBeforeUserCreate(ctx context.Context) (*BeforeUse
 	out := &BeforeUserCreateHookTest{}
 	return out, s.client.post(ctx, "/v1/instance/hooks/before_user_create/test", nil, out)
 }
+
+// ClearBeforeUserCreate turns the hook off and clears its url and signing
+// secret. Idempotent; timeout_ms and fail_closed are kept.
+// DELETE /v1/instance/hooks/before_user_create.
+func (s *UserHooksService) ClearBeforeUserCreate(ctx context.Context, opts ...RequestOption) (*BeforeUserCreateHook, error) {
+	out := &BeforeUserCreateHook{}
+	return out, s.client.del(ctx, "/v1/instance/hooks/before_user_create", out, opts...)
+}

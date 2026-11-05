@@ -3,6 +3,7 @@ package atlas
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 )
@@ -208,4 +209,33 @@ func (s *PartnerPlatformsService) Deliveries(ctx context.Context, partner string
 	}
 	out := &ListPage[PartnerDelivery]{}
 	return out, s.client.get(ctx, partnerPlatformPath(partner, "/deliveries"), q, out)
+}
+
+// PartnerExecutorKey is a new narrow secret key (privacy:data_rights), shown once.
+type PartnerExecutorKey struct {
+	Secret      string `json:"secret"`
+	ExecutorURL string `json:"executorUrl"`
+}
+
+// PartnerExecutorKeyRevocation counts the keys revoked for the site.
+type PartnerExecutorKeyRevocation struct {
+	Revoked int `json:"revoked"`
+}
+
+// MintExecutorKey is for the partner: mint its data-rights key for one
+// instance. rawBody is sent byte for byte because signature (in
+// signatureHeader) signs those bytes. A second mint for the same site rotates.
+// POST /v1/partner_executor_keys/:partner/:instanceId.
+func (s *PartnerPlatformsService) MintExecutorKey(ctx context.Context, partner, instanceID string, rawBody []byte, signatureHeader, signature string, opts ...RequestOption) (*PartnerExecutorKey, error) {
+	out := &PartnerExecutorKey{}
+	path := "/v1/partner_executor_keys/" + url.PathEscape(partner) + "/" + url.PathEscape(instanceID)
+	return out, s.client.doRaw(ctx, authSecret, http.MethodPost, path, nil, "application/json", rawBody, out, append(opts, WithHeader(signatureHeader, signature))...)
+}
+
+// RevokeExecutorKey is for the partner: the link is gone, revoke the keys
+// minted for that site. DELETE /v1/partner_executor_keys/:partner/:instanceId.
+func (s *PartnerPlatformsService) RevokeExecutorKey(ctx context.Context, partner, instanceID string, rawBody []byte, signatureHeader, signature string, opts ...RequestOption) (*PartnerExecutorKeyRevocation, error) {
+	out := &PartnerExecutorKeyRevocation{}
+	path := "/v1/partner_executor_keys/" + url.PathEscape(partner) + "/" + url.PathEscape(instanceID)
+	return out, s.client.doRaw(ctx, authSecret, http.MethodDelete, path, nil, "application/json", rawBody, out, append(opts, WithHeader(signatureHeader, signature))...)
 }

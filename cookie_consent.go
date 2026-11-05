@@ -1,6 +1,10 @@
 package atlas
 
-import "context"
+import (
+	"context"
+	"net/http"
+	"net/url"
+)
 
 // CookieConsent is the cookie-consent banner (CMP) injected into the hosted
 // sign-in, sign-up and account pages. Enabled is false when none is set.
@@ -166,4 +170,49 @@ func (s *InstanceService) SetCookieConsentHostAliases(ctx context.Context, hosts
 	}
 	out := &CookieConsent{}
 	return out, s.client.put(ctx, "/v1/instance/cookie_consent", map[string][]string{"host_aliases": hosts}, out, opts...)
+}
+
+// StorageDeclarationEntry is one cookie or browser-storage key. DurationSeconds
+// is nil until the browser session ends, or until cleared for storage.
+type StorageDeclarationEntry struct {
+	Name            string `json:"name"`
+	Provider        string `json:"provider"`
+	Domain          string `json:"domain"`
+	Category        string `json:"category"`
+	Type            string `json:"type"`
+	DurationSeconds *int64 `json:"duration_seconds"`
+	Duration        string `json:"duration"`
+	Description     string `json:"description"`
+}
+
+// StorageDeclaration lists the hosted pages' cookies and browser storage for a
+// consent manager to import.
+type StorageDeclaration struct {
+	Object          string                    `json:"object"`
+	Vendor          string                    `json:"vendor"`
+	FrontendAPIHost string                    `json:"frontend_api_host"`
+	Declarations    []StorageDeclarationEntry `json:"declarations"`
+}
+
+// StorageDeclaration reads the declaration. GET /v1/instance/storage_declaration.
+func (s *InstanceService) StorageDeclaration(ctx context.Context) (*StorageDeclaration, error) {
+	out := &StorageDeclaration{}
+	return out, s.client.get(ctx, "/v1/instance/storage_declaration", nil, out)
+}
+
+// StorageDeclarationCSV is StorageDeclaration as CSV, for a generic importer.
+func (s *InstanceService) StorageDeclarationCSV(ctx context.Context) ([]byte, error) {
+	return s.client.doBytes(ctx, http.MethodGet, "/v1/instance/storage_declaration", url.Values{"format": {"csv"}})
+}
+
+// PublicStorageDeclaration reads the same declaration by publishable key.
+// Nothing in it is secret. GET /v1/storage_declaration.
+func (s *InstanceService) PublicStorageDeclaration(ctx context.Context, publishableKey string) (*StorageDeclaration, error) {
+	out := &StorageDeclaration{}
+	return out, s.client.get(ctx, "/v1/storage_declaration", url.Values{"publishable_key": {publishableKey}}, out)
+}
+
+// PublicStorageDeclarationCSV is PublicStorageDeclaration as CSV.
+func (s *InstanceService) PublicStorageDeclarationCSV(ctx context.Context, publishableKey string) ([]byte, error) {
+	return s.client.doBytes(ctx, http.MethodGet, "/v1/storage_declaration", url.Values{"publishable_key": {publishableKey}, "format": {"csv"}})
 }

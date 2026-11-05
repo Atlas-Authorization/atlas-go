@@ -74,3 +74,19 @@ func (s *JWTConnectionsService) Delete(ctx context.Context, id string, opts ...R
 	out := &DeletedObject{}
 	return out, s.client.del(ctx, "/v1/jwt_connections/"+url.PathEscape(id), out, opts...)
 }
+
+// JWTSignInURL is where to send the person's browser to sign in with a trusted
+// JWT (GET /v1/sso/jwt/:connectionId). loginURL is the connection's LoginURL. A
+// URL, not an API call: the token works once, and the 302 carries a one-time
+// ticket that has to reach the browser.
+func JWTSignInURL(loginURL, token, redirectURL string) (string, error) {
+	u, err := url.Parse(loginURL)
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	q.Set("token", token)
+	q.Set("redirect_url", redirectURL)
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}

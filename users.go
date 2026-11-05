@@ -481,6 +481,23 @@ func (s *UsersService) Lock(ctx context.Context, id string, durationInSeconds in
 	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/lock", body, out, opts...)
 }
 
+// AccountClaimProtection is what ProtectAccountClaim applied: password_hold or claim_marker.
+type AccountClaimProtection struct {
+	Object     string `json:"object"`
+	UserID     string `json:"user_id"`
+	Protection string `json:"protection"`
+}
+
+// ProtectAccountClaim protects one existing unverified user, so a proof of its
+// address reaches it instead of making a second account. A 409
+// ACCOUNT_NOT_CLAIMABLE names what else on the user signs in. Safe to repeat.
+// POST /v1/users/:id/account_claim.
+func (s *UsersService) ProtectAccountClaim(ctx context.Context, id string, opts ...RequestOption) (*AccountClaimProtection, error) {
+	out := &AccountClaimProtection{}
+	body := map[string]string{"password_policy": "until_email_verified"}
+	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/account_claim", body, out, opts...)
+}
+
 // Unlock unlocks a user. POST /v1/users/:id/unlock.
 func (s *UsersService) Unlock(ctx context.Context, id string, opts ...RequestOption) (*User, error) {
 	out := &User{}

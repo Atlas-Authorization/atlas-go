@@ -10,6 +10,36 @@ type InstanceIntegrationsService struct {
 	client *Client
 }
 
+// InstanceIntegrationsRedeliverEventsParams is the body of POST
+// /v1/instance/integrations/{product}/deliveries/redeliver. Since is an ISO 8601
+// time, epoch milliseconds or "failing_since".
+type InstanceIntegrationsRedeliverEventsParams struct {
+	Since string `json:"since"`
+}
+
+// InstanceIntegrationsRedelivery is what RedeliverEvents queued. While HasMore is
+// true, call again with Since set to NextSince.
+type InstanceIntegrationsRedelivery struct {
+	Object           string `json:"object"`
+	Integration      string `json:"integration"`
+	EndpointID       string `json:"endpoint_id"`
+	URL              string `json:"url"`
+	Since            int64  `json:"since"`
+	EventsConsidered int    `json:"events_considered"`
+	Queued           int    `json:"queued"`
+	HasMore          bool   `json:"has_more"`
+	NextSince        *int64 `json:"next_since"`
+}
+
+// RedeliverEvents re-sends the events the integration's receiver never got, signed
+// and addressed as of now, and switches a disabled receiver back on. Delivered
+// events are not sent again, so repeating the call queues nothing new.
+// POST /v1/instance/integrations/{product}/deliveries/redeliver.
+func (s *InstanceIntegrationsService) RedeliverEvents(ctx context.Context, product string, params InstanceIntegrationsRedeliverEventsParams, opts ...RequestOption) (*InstanceIntegrationsRedelivery, error) {
+	out := &InstanceIntegrationsRedelivery{}
+	return out, s.client.do(ctx, "POST", "/v1/instance/integrations/"+url.PathEscape(product)+"/deliveries/redeliver", nil, params, out, opts...)
+}
+
 // RotateEventsSecret: Rotate the signing secret of the integration's event receiver. The new
 // secret is revealed exactly once. By default (`overlap_seconds` 0) the old secret stops signing
 // at once. With `overlap_seconds` (at most 604800 = 7 days) every delivery carries two signatures

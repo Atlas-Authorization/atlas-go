@@ -181,15 +181,122 @@ func (s *MachinesService) ListOrganizationMemberships(ctx context.Context, id st
 	return out, s.client.get(ctx, "/v1/machines/"+url.PathEscape(id)+"/organization_memberships", params.values(), out)
 }
 
-// M2MTokenVerification is the verdict of VerifyToken.
-type M2MTokenVerification struct {
-	Object    string `json:"object"`
-	Valid     bool   `json:"valid"`
-	MachineID string `json:"machine_id,omitempty"`
-	Name      string `json:"name,omitempty"`
+// MachineGrant lets a machine obtain tokens for one resource server, up to its scopes.
+type MachineGrant struct {
+	Object           string   `json:"object"`
+	ID               string   `json:"id"`
+	MachineID        string   `json:"machine_id"`
+	ResourceServerID string   `json:"resource_server_id"`
+	Scopes           []string `json:"scopes"`
+	CreatedAt        int64    `json:"created_at"`
+	UpdatedAt        int64    `json:"updated_at"`
 }
 
-// VerifyToken verifies a presented machine secret. POST /v1/m2m_tokens/verify.
+// CreateMachineGrantParams is the body of POST /v1/machines/:id/grants. Scopes
+// must be defined on the resource server; ScopePresets names its scope_presets,
+// unioned with Scopes. The expanded list is what is stored.
+type CreateMachineGrantParams struct {
+	ResourceServerID string   `json:"resource_server_id"`
+	Scopes           []string `json:"scopes,omitempty"`
+	ScopePresets     []string `json:"scope_presets,omitempty"`
+}
+
+// ListGrants lists the resource servers a machine may obtain tokens for.
+// GET /v1/machines/:id/grants.
+func (s *MachinesService) ListGrants(ctx context.Context, id string) (*ListPage[MachineGrant], error) {
+	out := &ListPage[MachineGrant]{}
+	return out, s.client.get(ctx, "/v1/machines/"+url.PathEscape(id)+"/grants", nil, out)
+}
+
+// CreateGrant authorizes a machine for a resource server; a second grant on the
+// same server is a 409. POST /v1/machines/:id/grants.
+func (s *MachinesService) CreateGrant(ctx context.Context, id string, params CreateMachineGrantParams, opts ...RequestOption) (*MachineGrant, error) {
+	out := &MachineGrant{}
+	return out, s.client.post(ctx, "/v1/machines/"+url.PathEscape(id)+"/grants", params, out, opts...)
+}
+
+// DeleteGrant revokes a grant; a token already issued lasts until it expires.
+// DELETE /v1/machines/:id/grants/:grantId.
+func (s *MachinesService) DeleteGrant(ctx context.Context, id, grantID string, opts ...RequestOption) (*DeletedObject, error) {
+	out := &DeletedObject{}
+	return out, s.client.del(ctx, "/v1/machines/"+url.PathEscape(id)+"/grants/"+url.PathEscape(grantID), out, opts...)
+}
+
+// MachineMembership is a machine as an organization member with a role.
+type MachineMembership struct {
+	Object         string `json:"object"`
+	ID             string `json:"id"`
+	OrganizationID string `json:"organization_id"`
+	MachineID      string `json:"machine_id"`
+	// Role is the organization role key.
+	Role      string `json:"role"`
+	RoleID    string `json:"role_id"`
+	CreatedAt int64  `json:"created_at"`
+	UpdatedAt int64  `json:"updated_at"`
+}
+
+// AddMachineToOrganizationParams is the body of POST
+// /v1/organizations/:id/machine_memberships. Role defaults to org:member.
+type AddMachineToOrganizationParams struct {
+	MachineID string `json:"machine_id"`
+	Role      string `json:"role,omitempty"`
+}
+
+// ListOrganizationMembers lists the machines that are members of an organization.
+// GET /v1/organizations/:id/machine_memberships.
+func (s *MachinesService) ListOrganizationMembers(ctx context.Context, organizationID string, params ListParams) (*CursorPage[MachineMembership], error) {
+	out := &CursorPage[MachineMembership]{}
+	return out, s.client.get(ctx, "/v1/organizations/"+url.PathEscape(organizationID)+"/machine_memberships", params.values(), out)
+}
+
+// AddToOrganization makes a machine a member of an organization.
+// POST /v1/organizations/:id/machine_memberships.
+func (s *MachinesService) AddToOrganization(ctx context.Context, organizationID string, params AddMachineToOrganizationParams, opts ...RequestOption) (*MachineMembership, error) {
+	out := &MachineMembership{}
+	return out, s.client.post(ctx, "/v1/organizations/"+url.PathEscape(organizationID)+"/machine_memberships", params, out, opts...)
+}
+
+// UpdateOrganizationRole changes a machine's role; new tokens carry the new role.
+// PATCH /v1/organizations/:id/machine_memberships/:machineId.
+func (s *MachinesService) UpdateOrganizationRole(ctx context.Context, organizationID, machineID, role string, opts ...RequestOption) (*MachineMembership, error) {
+	out := &MachineMembership{}
+	body := map[string]string{"role": role}
+	return out, s.client.patch(ctx, "/v1/organizations/"+url.PathEscape(organizationID)+"/machine_memberships/"+url.PathEscape(machineID), body, out, opts...)
+}
+
+// RemoveFromOrganization removes a machine from an organization.
+// DELETE /v1/organizations/:id/machine_memberships/:machineId.
+func (s *MachinesService) RemoveFromOrganization(ctx context.Context, organizationID, machineID string, opts ...RequestOption) (*DeletedObject, error) {
+	out := &DeletedObject{}
+	return out, s.client.del(ctx, "/v1/organizations/"+url.PathEscape(organizationID)+"/machine_memberships/"+url.PathEscape(machineID), out, opts...)
+}
+
+// M2MTokenVerification is the verdict of VerifyToken. Audience, Scopes,
+// OrganizationID, OrgRole, OrgPermissions and ExpiresAt are set for a machine JWT.
+type M2MTokenVerification struct {
+	Object         string   `json:"object"`
+	Valid          bool     `json:"valid"`
+	MachineID      string   `json:"machine_id,omitempty"`
+	Name           string   `json:"name,omitempty"`
+	Audience       *string  `json:"audience,omitempty"`
+	Scopes         []string `json:"scopes,omitempty"`
+	OrganizationID *string  `json:"organization_id,omitempty"`
+	OrgRole        *string  `json:"org_role,omitempty"`
+	OrgPermissions []string `json:"org_permissions,omitempty"`
+	ExpiresAt      *int64   `json:"expires_at,omitempty"`
+	// Grants and OrganizationMemberships are what the machine holds now.
+	Grants []struct {
+		ResourceServerID string   `json:"resource_server_id"`
+		Audience         string   `json:"audience"`
+		Scopes           []string `json:"scopes"`
+	} `json:"grants,omitempty"`
+	OrganizationMemberships []struct {
+		OrganizationID string `json:"organization_id"`
+		Role           string `json:"role"`
+	} `json:"organization_memberships,omitempty"`
+}
+
+// VerifyToken verifies a presented machine secret or machine JWT. POST /v1/m2m_tokens/verify.
 func (s *MachinesService) VerifyToken(ctx context.Context, token string, opts ...RequestOption) (*M2MTokenVerification, error) {
 	out := &M2MTokenVerification{}
 	body := map[string]string{"token": token}

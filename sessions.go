@@ -151,6 +151,23 @@ func (s *SessionsService) Get(ctx context.Context, id string) (*Session, error) 
 	return out, s.client.get(ctx, "/v1/sessions/"+url.PathEscape(id), nil, out)
 }
 
+// SessionFreshness is GET /v1/sessions/:id/status. ExpiresAt and LastActiveAt
+// are epoch ms; LastActiveAt is absent for a device or CIBA sign-in.
+type SessionFreshness struct {
+	ID           string `json:"id"`
+	Status       string `json:"status"`
+	UserID       string `json:"user_id"`
+	ExpiresAt    *int64 `json:"expires_at"`
+	LastActiveAt *int64 `json:"last_active_at,omitempty"`
+}
+
+// Status is a cheap freshness check: Status is active, expired, revoked or
+// ended. id is a session id or an ID token sid. GET /v1/sessions/:id/status.
+func (s *SessionsService) Status(ctx context.Context, id string) (*SessionFreshness, error) {
+	out := &SessionFreshness{}
+	return out, s.client.get(ctx, "/v1/sessions/"+url.PathEscape(id)+"/status", nil, out)
+}
+
 // Revoke revokes a session. POST /v1/sessions/:id/revoke.
 func (s *SessionsService) Revoke(ctx context.Context, id string, opts ...RequestOption) (*RevokeSessionResult, error) {
 	out := &RevokeSessionResult{}

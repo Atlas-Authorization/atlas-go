@@ -1273,9 +1273,105 @@ func TestBackendAPIOperations(t *testing.T) {
 			_, err := c.Integrations.RunCardAction(ctx, "p 1", "v2", IntegrationsRunCardActionParams{Sub: "x"}, WithIdempotencyKey("idem-1"))
 			return err
 		}},
+		{"GET /v1/machines/{}/grants", "GET", "/v1/machines/p%201/grants", "", "{}", false, nil, func() error {
+			_, err := c.Machines.ListGrants(ctx, "p 1")
+			return err
+		}},
+		{"POST /v1/machines/{}/grants", "POST", "/v1/machines/p%201/grants", "", "{}", true, map[string]interface{}{"resource_server_id": "x", "scope_presets": []interface{}{"readonly"}}, func() error {
+			_, err := c.Machines.CreateGrant(ctx, "p 1", CreateMachineGrantParams{ResourceServerID: "x", ScopePresets: []string{"readonly"}}, WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"DELETE /v1/machines/{}/grants/{}", "DELETE", "/v1/machines/p%201/grants/v2", "", "{}", true, nil, func() error {
+			_, err := c.Machines.DeleteGrant(ctx, "p 1", "v2", WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"GET /v1/organizations/{}/machine_memberships", "GET", "/v1/organizations/p%201/machine_memberships", "limit=5", "{}", false, nil, func() error {
+			_, err := c.Machines.ListOrganizationMembers(ctx, "p 1", ListParams{Limit: 5})
+			return err
+		}},
+		{"POST /v1/organizations/{}/machine_memberships", "POST", "/v1/organizations/p%201/machine_memberships", "", "{}", true, map[string]interface{}{"machine_id": "x", "role": "org:admin"}, func() error {
+			_, err := c.Machines.AddToOrganization(ctx, "p 1", AddMachineToOrganizationParams{MachineID: "x", Role: "org:admin"}, WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"PATCH /v1/organizations/{}/machine_memberships/{}", "PATCH", "/v1/organizations/p%201/machine_memberships/v2", "", "{}", true, map[string]interface{}{"role": "org:admin"}, func() error {
+			_, err := c.Machines.UpdateOrganizationRole(ctx, "p 1", "v2", "org:admin", WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"DELETE /v1/organizations/{}/machine_memberships/{}", "DELETE", "/v1/organizations/p%201/machine_memberships/v2", "", "{}", true, nil, func() error {
+			_, err := c.Machines.RemoveFromOrganization(ctx, "p 1", "v2", WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"POST /v1/instance/integrations/{}/deliveries/redeliver", "POST", "/v1/instance/integrations/p%201/deliveries/redeliver", "", "{}", true, map[string]interface{}{"since": "failing_since"}, func() error {
+			_, err := c.Instance.Integrations.RedeliverEvents(ctx, "p 1", InstanceIntegrationsRedeliverEventsParams{Since: "failing_since"}, WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"POST /v1/users/{}/account_claim", "POST", "/v1/users/p%201/account_claim", "", "{}", true, map[string]interface{}{"password_policy": "until_email_verified"}, func() error {
+			_, err := c.Users.ProtectAccountClaim(ctx, "p 1", WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"DELETE /v1/instance/hooks/before_user_create", "DELETE", "/v1/instance/hooks/before_user_create", "", "{}", true, nil, func() error {
+			_, err := c.UserHooks.ClearBeforeUserCreate(ctx, WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"POST /v1/partner_executor_keys/{}/{}", "POST", "/v1/partner_executor_keys/p%201/v2", "", "{}", true, map[string]interface{}{"x": "s"}, func() error {
+			_, err := c.PartnerPlatforms.MintExecutorKey(ctx, "p 1", "v2", []byte(`{"x":"s"}`), "x-signature", "t=1", WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"DELETE /v1/partner_executor_keys/{}/{}", "DELETE", "/v1/partner_executor_keys/p%201/v2", "", "{}", true, map[string]interface{}{"x": "s"}, func() error {
+			_, err := c.PartnerPlatforms.RevokeExecutorKey(ctx, "p 1", "v2", []byte(`{"x":"s"}`), "x-signature", "t=1", WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"DELETE /v1/users/{}/password", "DELETE", "/v1/users/p%201/password", "sign_out_of_other_sessions=false", "{}", true, nil, func() error {
+			off := false
+			_, err := c.Users.RemovePassword(ctx, "p 1", RemoveUserPasswordParams{SignOutOfOtherSessions: &off}, WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"GET /v1/instance/storage_declaration", "GET", "/v1/instance/storage_declaration", "", "{}", false, nil, func() error {
+			_, err := c.Instance.StorageDeclaration(ctx)
+			return err
+		}},
+		{"GET /v1/storage_declaration", "GET", "/v1/storage_declaration", "publishable_key=pk_1", "{}", false, nil, func() error {
+			_, err := c.Instance.PublicStorageDeclaration(ctx, "pk_1")
+			return err
+		}},
+		{"GET /v1/sessions/{}/status", "GET", "/v1/sessions/p%201/status", "", "{}", false, nil, func() error {
+			_, err := c.Sessions.Status(ctx, "p 1")
+			return err
+		}},
+		{"POST /v1/instance/referrals/accounts/resync", "POST", "/v1/instance/referrals/accounts/resync", "", "{}", true, map[string]interface{}{"starting_after": "org_1"}, func() error {
+			_, err := c.Referrals.ResyncAccounts(ctx, ReferralAccountsResyncParams{StartingAfter: "org_1"}, WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"DELETE /v1/instance/signing_keys/next", "DELETE", "/v1/instance/signing_keys/next", "", "{}", true, nil, func() error {
+			_, err := c.InstanceSecurity.CancelStagedSigningKey(ctx, WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"GET /v1/instance/signing_key_policy", "GET", "/v1/instance/signing_key_policy", "", "{}", false, nil, func() error {
+			_, err := c.InstanceSecurity.GetSigningKeyPolicy(ctx)
+			return err
+		}},
+		{"PATCH /v1/instance/signing_key_policy", "PATCH", "/v1/instance/signing_key_policy", "", "{}", true, map[string]interface{}{"prepublish_days": float64(7)}, func() error {
+			days := 7
+			_, err := c.InstanceSecurity.SetSigningKeyPolicy(ctx, &days, WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"PATCH /v1/sso_onboarding_profiles/{}", "PATCH", "/v1/sso_onboarding_profiles/p%201", "", "{}", true, map[string]interface{}{"company_name": "x"}, func() error {
+			name := "x"
+			_, err := c.SSOOnboarding.Update(ctx, "p 1", UpdateSSOOnboardingProfileParams{CompanyName: &name}, WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"PUT /v1/organizations/by_external_id/{}", "PUT", "/v1/organizations/by_external_id/p%201", "", "{}", true, map[string]interface{}{"name": "x"}, func() error {
+			_, err := c.Organizations.UpsertByExternalID(ctx, "p 1", UpsertOrganizationParams{Name: "x"}, WithIdempotencyKey("idem-1"))
+			return err
+		}},
+		{"PUT /v1/sso_onboarding_profiles/by_name/{}", "PUT", "/v1/sso_onboarding_profiles/by_name/p%201", "", "{}", true, map[string]interface{}{"company_name": "x"}, func() error {
+			name := "x"
+			_, err := c.SSOOnboarding.UpsertByName(ctx, "p 1", UpsertSSOOnboardingProfileParams{CompanyName: &name}, WithIdempotencyKey("idem-1"))
+			return err
+		}},
 	}
-	if len(rows) != 452 {
-		t.Fatalf("operation table has %d rows, want 452", len(rows))
+	if len(rows) != 475 {
+		t.Fatalf("operation table has %d rows, want 475", len(rows))
 	}
 	seen := map[string]bool{}
 	for _, r := range rows {

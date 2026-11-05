@@ -3,6 +3,7 @@ package atlas
 import (
 	"context"
 	"net/url"
+	"strconv"
 )
 
 // --- Passwords, phone numbers, profile image, passkeys --------------------
@@ -22,6 +23,23 @@ type SetUserPasswordParams struct {
 func (s *UsersService) SetPassword(ctx context.Context, id string, params SetUserPasswordParams, opts ...RequestOption) (*User, error) {
 	out := &User{}
 	return out, s.client.post(ctx, "/v1/users/"+url.PathEscape(id)+"/password", params, out, opts...)
+}
+
+// RemoveUserPasswordParams are the options of DELETE /v1/users/:id/password.
+type RemoveUserPasswordParams struct {
+	// SignOutOfOtherSessions false keeps the user's sessions; nil leaves the default (sign out).
+	SignOutOfOtherSessions *bool
+}
+
+// RemovePassword removes the password, even when it is the only sign-in
+// method. Idempotent. DELETE /v1/users/:id/password.
+func (s *UsersService) RemovePassword(ctx context.Context, id string, params RemoveUserPasswordParams, opts ...RequestOption) (*User, error) {
+	var q url.Values
+	if params.SignOutOfOtherSessions != nil {
+		q = url.Values{"sign_out_of_other_sessions": {strconv.FormatBool(*params.SignOutOfOtherSessions)}}
+	}
+	out := &User{}
+	return out, s.client.delQ(ctx, "/v1/users/"+url.PathEscape(id)+"/password", q, out, opts...)
 }
 
 // UserPhoneNumber is a phone number on a user.
