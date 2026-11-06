@@ -4,6 +4,15 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.26.0 — 2026-11-06
+
+### Added
+
+- Machines: `ListGrants`, `CreateGrant`, `DeleteGrant`, `ListOrganizationMembers`, `AddToOrganization`, `UpdateOrganizationRole`, `RemoveFromOrganization`.
+- Instance: `StorageDeclaration`, `StorageDeclarationCSV`, `PublicStorageDeclaration`, `PublicStorageDeclarationCSV`.
+- Integrations: `RedeliverEvents`. `JWTSignInURL` builds a sign-in URL for a JWT connection.
+- Additions to cookie consent, OAuth clients, partner platforms, referrals, resource servers, sessions, user hooks and the user lifecycle, to match the live API.
+
 ## 0.25.0 — 2026-11-03
 
 ### Added
