@@ -46,6 +46,8 @@ const (
 	// Atlas app webhooks).
 	WebhookEventUserDeletionScheduled = "user.deletion_scheduled"
 	WebhookEventUserDeletionCanceled  = "user.deletion_canceled"
+	// WebhookEventUserDeletionPaused: a pre_user_deletion Action put the scheduled deletion on hold until the person re-confirms.
+	WebhookEventUserDeletionPaused = "user.deletion_paused"
 
 	// ScopePrivacyExecute lets a key call /v1/privacy/*.
 	ScopePrivacyExecute = "privacy:execute"

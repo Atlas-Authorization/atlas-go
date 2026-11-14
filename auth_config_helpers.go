@@ -90,4 +90,6 @@ type ComplianceRetentionConfig struct {
 	DeletedUserGraceDays   *float64 `json:"deletedUserGraceDays,omitempty"`
 	ErasureGraceDays       *float64 `json:"erasureGraceDays,omitempty"`
 	CancelDeletionOnSignIn *bool    `json:"cancelDeletionOnSignIn,omitempty"`
+	DeletionReminders      []string `json:"deletionReminders,omitempty"`
+	RequireFinalNotice     *bool    `json:"requireFinalNotice,omitempty"`
 }
