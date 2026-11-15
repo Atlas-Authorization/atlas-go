@@ -3,7 +3,7 @@ module github.com/Atlas-Authorization/atlas-go/echo
 go 1.26.0
 
 require (
-	github.com/Atlas-Authorization/atlas-go v0.0.0
+	github.com/Atlas-Authorization/atlas-go v0.27.0
 	github.com/labstack/echo/v4 v4.16.4
 )
 

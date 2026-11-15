@@ -3,7 +3,7 @@ module github.com/Atlas-Authorization/atlas-go/chi
 go 1.26.0
 
 require (
-	github.com/Atlas-Authorization/atlas-go v0.0.0
+	github.com/Atlas-Authorization/atlas-go v0.27.0
 	github.com/go-chi/chi/v5 v5.5.0
 )
 

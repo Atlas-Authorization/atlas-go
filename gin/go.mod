@@ -3,7 +3,7 @@ module github.com/Atlas-Authorization/atlas-go/gin
 go 1.26.0
 
 require (
-	github.com/Atlas-Authorization/atlas-go v0.0.0
+	github.com/Atlas-Authorization/atlas-go v0.27.0
 	github.com/gin-gonic/gin v1.10.0
 )
 

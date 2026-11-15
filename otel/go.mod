@@ -3,7 +3,7 @@ module github.com/Atlas-Authorization/atlas-go/otel
 go 1.26.0
 
 require (
-	github.com/Atlas-Authorization/atlas-go v0.0.0
+	github.com/Atlas-Authorization/atlas-go v0.27.0
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/metric v1.24.0
 	go.opentelemetry.io/otel/sdk v1.24.0
