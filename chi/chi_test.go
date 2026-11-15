@@ -19,7 +19,6 @@ import (
 
 const testIssuer = "https://issuer.atlas.dev"
 
-
 // newBackend stubs a single-key JWKS, mints a real RS256 token, and returns a
 // genuine *atlas.AtlasBackend so the adapter exercises the real verify path.
 func newBackend(t *testing.T) (*atlas.AtlasBackend, string) {
@@ -74,7 +73,6 @@ func signToken(t *testing.T, key *rsa.PrivateKey, kid string, claims map[string]
 	}
 	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
 }
-
 
 func serve(t *testing.T, b *atlas.AtlasBackend, token string, path string) *httptest.ResponseRecorder {
 	t.Helper()

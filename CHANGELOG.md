@@ -4,6 +4,28 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.27.0 — 2026-11-14
+
+### Changed
+
+- Requires Go 1.26 or later (Go 1.21 to 1.25 are past end of support). Dependencies are updated to patched releases, including golang.org/x/crypto, golang.org/x/net, echo and chi.
+
+### Added
+
+- Every Backend and Platform API operation now has a typed method (about 650 more), generated from the OpenAPI description: `context.Context` first, `...Query` and `...Params` structs, typed results, `RequestOption`s on every call, and `...Iter` iterators for cursor lists. Where an older method returns a narrower shape, a `...Full` variant returns the complete model.
+- Hosted-redirect relying party: `NewRelyingParty` with `Start`, `Callback`, `TouchIfDue`, `SignOut`, `RequireRecentAuth`, a signed session cookie, `Handler`, `Middleware` and back-channel logout over `net/http`.
+- Offline relying-party test issuer (`NewRPTestIssuer`: discovery, JWKS, authorize, token with PKCE, signed ID and back-channel logout tokens), and organization and SSO claim readers (`RPOrganizationOf`, `RPOrganizationsOf`, `RPSsoOf`).
+- Signed status-list source for the session revocation list (`Source: "status_list"`, `VerifyStatusListToken`, `NewEdgeRevocationChecker`) and `KeyMirror.Rotate`.
+- Typed methods for every verb of every API path, including verbs that share a path with an older method; PATCH and PUT bodies take `ClearFields` to send an explicit null.
+- Verification primitives: webhook dedupe, transaction tokens, session revocation list, API key mirror, resource-role mirror, machine client with DPoP, Web Bot Auth verifier.
+- `AuthenticatedWithin`, `UsedMultiFactor`, `SessionClaims.AuthTime`; JWT template settings (`CreateWithSettings`, `UpdateWithSettings`, `GetWithSettings`, `ListWithSettings`).
+- Retries: `WithRetries`, `WithRetryPolicy`, `WithMaxRetries`. Honours `Retry-After`, backs off on 429 and 5xx for safe requests, and can read the status endpoint (`StatusAware`). `APIError.RetryAfter`.
+- `WithObserver` and the optional `otel` module (OpenTelemetry spans, metrics, trace context). `Client.Doctor` checks key, instance, clock, signing keys, status and origins.
+
+### Changed
+
+- Retries are off by default; nothing changes until you opt in.
+
 ## 0.26.0 — 2026-11-06
 
 ### Added

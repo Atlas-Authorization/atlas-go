@@ -34,6 +34,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // DefaultBaseURL is the Atlas Backend API origin (BAPI_ORIGIN), overridable per
@@ -54,6 +55,8 @@ type Client struct {
 	strict          *bool
 	onUnknownFields UnknownFieldsHandler
 	secretRecipient string
+	retry           RetryPolicy
+	observer        Observer
 
 	// Namespaces — one per BAPI area, mirroring the TypeScript SDK.
 	Users           *UsersService
@@ -229,6 +232,9 @@ type Client struct {
 	PolicyBundles           *PolicyBundlesService
 	ProxyApps               *ProxyAppsService
 	MCPGateways             *MCPGatewaysService
+
+	// catalogServices are the resource groups generated from the API description.
+	catalogServices
 }
 
 // Option configures a Client at construction time.
@@ -422,6 +428,7 @@ func New(secretKey string, opts ...Option) *Client {
 	c.Status = &StatusService{client: c}
 	c.Delivery = &DeliveryService{client: c}
 	c.wireGenerated()
+	c.wireCatalog()
 	return c
 }
 
@@ -432,6 +439,7 @@ type requestConfig struct {
 	headers        map[string]string
 	dryRun         bool
 	traceparent    string
+	retries        *int
 }
 
 // RequestOption tunes a single request: WithIdempotencyKey on creates, and
@@ -517,7 +525,85 @@ func (c *Client) send(ctx context.Context, auth authKind, method, path string, q
 	for _, opt := range opts {
 		opt(&cfg)
 	}
+	res := &RequestResult{}
+	finish := func(RequestResult) {}
+	if c.observer != nil {
+		ctx, finish = c.observer.StartRequest(ctx, RequestInfo{Method: method, Path: path})
+	}
+	raw, err := c.sendWithRetry(ctx, res, &cfg, auth, method, path, query, contentType, payload, hasBody, out)
+	res.Err = err
+	finish(*res)
+	return raw, err
+}
 
+// sendWithRetry runs one logical request: the attempt loop of the retry policy,
+// then error mapping and response decoding.
+func (c *Client) sendWithRetry(ctx context.Context, res *RequestResult, cfg *requestConfig, auth authKind, method, path string, query url.Values, contentType string, payload []byte, hasBody bool, out interface{}) ([]byte, error) {
+	policy := c.retry
+	if cfg.retries != nil {
+		policy.MaxRetries = *cfg.retries
+	}
+	policy = policy.withDefaults()
+
+	var (
+		status int
+		header http.Header
+		raw    []byte
+		err    error
+	)
+	for attempt := 1; ; attempt++ {
+		res.Attempts = attempt
+		status, header, raw, err = c.attempt(ctx, cfg, auth, method, path, query, contentType, payload, hasBody)
+		res.Status = status
+		wait, again := policy.next(attempt, method, cfg.idempotencyKey != "", status, header, err)
+		if !again || ctx.Err() != nil {
+			break
+		}
+		if policy.StatusAware && status == http.StatusServiceUnavailable && header.Get("Retry-After") == "" {
+			wait = policy.stretch(wait, c.probeStatus(ctx))
+		}
+		if policy.OnRetry != nil {
+			policy.OnRetry(RetryEvent{Method: method, Path: path, Attempt: attempt, Status: status, Delay: wait, Err: err})
+		}
+		if sleepErr := policy.pause(ctx, wait); sleepErr != nil {
+			return nil, fmt.Errorf("atlas: waiting to retry: %w", sleepErr)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if c.onUnknownFields != nil {
+		if fields := parseUnknownFields(header.Get("Atlas-Unknown-Fields")); len(fields) > 0 {
+			c.onUnknownFields(method, path, fields)
+		}
+	}
+
+	if status < 200 || status >= 300 {
+		apiErr := parseError(status, raw)
+		if ae, ok := apiErr.(*APIError); ok {
+			ae.RetryAfter = parseRetryAfter(header, time.Now())
+		}
+		return nil, apiErr
+	}
+
+	if out == nil || len(raw) == 0 {
+		return raw, nil
+	}
+	if sp, ok := out.(*string); ok && raw[0] != '"' {
+		// text endpoints (NDJSON, CSV, SSE, Rego bundles) answer with the raw body
+		*sp = string(raw)
+		return raw, nil
+	}
+	if err := json.Unmarshal(raw, out); err != nil {
+		return raw, fmt.Errorf("atlas: decoding response body: %w", err)
+	}
+	return raw, nil
+}
+
+// attempt performs one HTTP round trip and reads the whole body. A transport
+// failure is returned as err with status 0.
+func (c *Client) attempt(ctx context.Context, cfg *requestConfig, auth authKind, method, path string, query url.Values, contentType string, payload []byte, hasBody bool) (int, http.Header, []byte, error) {
 	var reader io.Reader
 	if hasBody {
 		reader = bytes.NewReader(payload)
@@ -539,7 +625,7 @@ func (c *Client) send(ctx context.Context, auth authKind, method, path string, q
 
 	req, err := http.NewRequestWithContext(ctx, method, fullURL, reader)
 	if err != nil {
-		return nil, fmt.Errorf("atlas: building request: %w", err)
+		return 0, nil, nil, fmt.Errorf("atlas: building request: %w", err)
 	}
 	key := c.secretKey
 	if auth == authPlatform && c.platformKey != "" {
@@ -548,6 +634,11 @@ func (c *Client) send(ctx context.Context, auth authKind, method, path string, q
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", userAgent)
+	if c.observer != nil {
+		if inj, ok := c.observer.(HeaderInjector); ok {
+			inj.InjectHeaders(ctx, req.Header)
+		}
+	}
 	if hasBody && contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
@@ -583,32 +674,15 @@ func (c *Client) send(ctx context.Context, auth authKind, method, path string, q
 	}
 	resp, err := hc.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("atlas: performing request: %w", err)
+		return 0, nil, nil, fmt.Errorf("atlas: performing request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("atlas: reading response body: %w", err)
+		return 0, nil, nil, fmt.Errorf("atlas: reading response body: %w", err)
 	}
-
-	if c.onUnknownFields != nil {
-		if fields := parseUnknownFields(resp.Header.Get("Atlas-Unknown-Fields")); len(fields) > 0 {
-			c.onUnknownFields(method, path, fields)
-		}
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseError(resp.StatusCode, raw)
-	}
-
-	if out == nil || len(raw) == 0 {
-		return raw, nil
-	}
-	if err := json.Unmarshal(raw, out); err != nil {
-		return raw, fmt.Errorf("atlas: decoding response body: %w", err)
-	}
-	return raw, nil
+	return resp.StatusCode, resp.Header, raw, nil
 }
 
 func isWrite(method string) bool {
