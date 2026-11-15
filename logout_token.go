@@ -129,12 +129,7 @@ func (v *LogoutTokenVerifier) Verify(ctx context.Context, token string) (*Logout
 	if set == nil || len(set.Keys) == 0 {
 		return nil, ErrNoKeys
 	}
-	var keyFound bool
-	if header.Alg == "ES256" {
-		keyFound = selectECKey(set, header.Kid) != nil
-	} else {
-		keyFound = selectRSAKey(set, header.Kid) != nil
-	}
+	keyFound := hasJWSKey(set, header.Alg, header.Kid)
 	if !keyFound {
 		// A key Atlas just rotated to, whose refetch failed: temporary.
 		v.jwks.mu.Lock()

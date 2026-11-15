@@ -15,7 +15,7 @@ import (
 //
 // Atlas, acting as your authorization server, issues access tokens for the APIs
 // you register as resource servers. AccessTokenVerifier checks one locally
-// against the instance JWKS (RS256 or ES256, nothing else): the issuer, expiry,
+// against the instance JWKS (SigningAlgs, nothing else): the issuer, expiry,
 // that it IS an access token, that its aud names your API (RFC 8707), and the
 // scopes the route needs. A failure comes back with the RFC 6750 / RFC 9728
 // WWW-Authenticate challenge to answer with, so an OAuth or MCP client can

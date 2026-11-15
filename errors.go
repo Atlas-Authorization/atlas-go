@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // ErrorItem is one entry in the Atlas §9.1 error envelope. Code is the stable,
@@ -139,6 +140,9 @@ type APIError struct {
 	Status int
 	// Errors is the full envelope, in the order the server returned it.
 	Errors []ErrorItem
+	// RetryAfter is the server's Retry-After hint on a 429 or 503 (zero when
+	// absent), so callers that handle their own retries can honour it.
+	RetryAfter time.Duration
 }
 
 // Error implements the error interface.

@@ -849,6 +849,118 @@ cookie consent (`c.Instance.CookieConsent`). OAuth providers can be filtered and
 re-branded (display name, icon, mode, wallet settings); webhook endpoints can be
 updated in place, tested, redelivered and have their secret revealed or rotated.
 
+## Retries and rate limits
+
+Retries are off until you opt in. `WithRetries(n)` retries transient failures
+with exponential backoff and jitter and honours `Retry-After` (seconds or an
+HTTP date); `WithRetryPolicy` sets every knob.
+
+```go
+c := atlas.New("sk_live_...", atlas.WithRetryPolicy(atlas.RetryPolicy{
+	MaxRetries:  4,
+	StatusAware: true, // after a 503, read /v1/status and wait longer during an outage
+	OnRetry:     func(e atlas.RetryEvent) { log.Printf("retry %s %s in %s", e.Method, e.Path, e.Delay) },
+}))
+```
+
+A 429 is retried for every method (it was not processed). 502, 503, 504 and
+transport errors are retried for GET, PUT and DELETE, and for writes that carry
+`WithIdempotencyKey`, so a retry can never apply a write twice. A `Retry-After`
+longer than `MaxRetryAfter` (60 s) returns the error at once. Override one
+call with `atlas.WithMaxRetries(0)`. An `*APIError` carries `RetryAfter` for
+callers that retry on their own.
+
+## Generated API surface and cursor iterators
+
+Every operation of the Backend and Platform API has a typed method: a
+`context.Context` first, path parameters as strings, a `...Query` struct for
+query parameters (pointers for optional numbers and booleans), a `...Params`
+struct for the body, and a typed result. Writes take `RequestOption`s
+(`WithIdempotencyKey`, `StrictBody`, `WithDryRun`, `WithHeader`).
+
+Cursor lists return a `*CursorPage[T]` and come with a `...Iter` helper that
+fetches the next page on demand:
+
+```go
+it := c.AbuseSignals.ListIter(ctx, atlas.AbuseSignalsListQuery{})
+for it.Next() {
+	fmt.Println(it.Item().ID)
+}
+if err := it.Err(); err != nil {
+	log.Fatal(err)
+}
+```
+
+Where a long-standing method returns a narrower or untyped shape, a `...Full`
+variant returns the complete typed model; the original method is unchanged.
+
+## Observability and the doctor
+
+`WithObserver` takes an `Observer` called once per API call. The
+`github.com/Atlas-Authorization/atlas-go/otel` module implements it with
+OpenTelemetry (one client span per call, a request counter, a duration
+histogram, and W3C `traceparent` on every attempt); the base module has no
+OpenTelemetry dependency.
+
+```go
+obs := atlasotel.New() // global tracer and meter providers
+c := atlas.New("sk_live_...", atlas.WithObserver(obs))
+```
+
+`c.Doctor(ctx)` checks the setup without changing anything: the key form, that
+the API accepts it, the local clock against the API, that the signing keys can
+be fetched, the service status and the allowed origins.
+
+```go
+rep, _ := c.Doctor(ctx)
+fmt.Print(rep) // [pass] key: secret key present ...
+if !rep.OK {
+	os.Exit(1)
+}
+```
+
+## Recent authentication and JWT template settings
+
+```go
+claims, _ := backend.Verify(ctx, token)
+if !atlas.AuthenticatedWithin(claims, 5*time.Minute) { /* ask the user to step up */ }
+if !atlas.UsedMultiFactor(claims) { /* the session never proved a second factor */ }
+```
+
+`c.JWTTemplates.CreateWithSettings` and `UpdateWithSettings` set a template's
+lifetime, audience, algorithm and HS256 secret (`ClearLifetime` and
+`ClearAudience` go back to the instance default); `GetWithSettings` and
+`ListWithSettings` read them back.
+
+## Hosted-redirect relying party
+
+`atlas.NewRelyingParty(atlas.RPConfig{...})` runs the hosted redirect for a Go
+web app: PKCE, state and nonce, ID token verification against the issuer's
+keys, a signed session cookie, session keep-alive, sign-out and back-channel
+logout. It speaks plain `net/http`, so it works with chi, gin and echo.
+
+```go
+rp, err := atlas.NewRelyingParty(atlas.RPConfig{
+	Issuer: "https://auth.example.com", ClientID: "...", ClientSecret: "...",
+	RedirectURI: "https://app.example.com/auth/callback", Secret: os.Getenv("SESSION_SECRET"),
+})
+mux.Handle("/auth/", rp.Handler())          // sign-in, callback, sign-out, back-channel logout
+mux.Handle("/app/", rp.Middleware(appMux))  // requires a session; atlas.RPSessionFromContext(r.Context())
+```
+
+`Start`, `Callback`, `TouchIfDue`, `SignOut` and `RequireRecentAuth` are also
+available as plain methods. Failures are `*RPError` values. The in-memory
+back-channel store is per process; give several servers a shared `RPSidStore`.
+
+## Verification primitives
+
+- `VerifyAndDedupe` and `WebhookDedupeHandler`: verify a webhook and drop redeliveries (memory or `database/sql` store).
+- `VerifyTransactionToken`: verify a transaction token against the issuer's keys.
+- `NewSidRevocationList`: a polled list of revoked sessions with stale-feed policy (`StaleReject`, `StaleAfter`, `ServeStaleFor`).
+- `NewKeyMirror` and `NewResourceRoleMirror`: local mirrors of API keys and resource roles that verify without a network call, kept fresh by `Sync` and `ApplyWebhook`.
+- `NewMachineClient`: enrol a machine identity, cache and share tokens, DPoP proofs.
+- `VerifyWebBotAuth` and `NewWebBotAuthVerifier`: verify signed bot requests (RFC 9421) with an SSRF-safe directory fetch and an `http.Handler` middleware.
+
 ## Development
 
 ```sh

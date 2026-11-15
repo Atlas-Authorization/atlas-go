@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -57,6 +59,9 @@ type SessionClaims struct {
 	// challenge, a step-up, or a trusted enterprise SSO sign-in); nil on tokens
 	// minted before the claim existed. Read it through MFASatisfied(claims).
 	MFASatisfied *bool `json:"mfa_satisfied,omitempty"`
+	// AuthTime is when the user last signed in with a first factor or stepped
+	// up, epoch seconds (0 when absent). Read it through AuthenticatedWithin.
+	AuthTime int64 `json:"auth_time,omitempty"`
 	// LastActiveAt is the session's last activity when the token was minted,
 	// epoch seconds (0 when absent), for idle checks.
 	LastActiveAt int64 `json:"last_active_at,omitempty"`
@@ -563,70 +568,127 @@ func (b *AtlasBackend) now() time.Time {
 }
 
 // SigningAlgs are the JWS algorithms Atlas signs tokens with: an instance key
-// is RS256 (the default) or ES256, and an API may use either. Every verifier
-// in this package is pinned to exactly this list — "none" and HMAC never
-// verify — and the token's kid selects one published key whose type fixes
-// which of the two applies.
-var SigningAlgs = []string{"RS256", "ES256"}
+// signs with RS256 (the default), ES256, ES384, PS256 or EdDSA. Every verifier
+// in this package is pinned to exactly this list ("none" and HMAC never
+// verify), and the key's type must match the token's alg.
+var SigningAlgs = []string{"RS256", "ES256", "ES384", "PS256", "EdDSA"}
 
-// verifyJWSSignature checks sig over signingInput with the key kid selects,
-// for alg RS256 (an RSA key) or ES256 (a P-256 EC key, raw r||s signature).
-// A key whose own alg names the other algorithm never verifies.
+// verifyJWSSignature checks sig over signingInput with the key kid selects, for
+// the five algorithms instances sign with: RS256 and PS256 (RSA keys), ES256
+// (P-256), ES384 (P-384) and EdDSA (Ed25519), ECDSA signatures in raw r||s form.
+// The key type (kty, crv) must match alg, and a key whose own alg names another
+// algorithm never verifies, so a key cannot be replayed under a different alg.
 func verifyJWSSignature(set *jwks, alg, kid, signingInput string, sig []byte) bool {
-	digest := sha256.Sum256([]byte(signingInput))
 	switch alg {
 	case "RS256":
-		pub := selectRSAKey(set, kid)
-		return pub != nil && rsa.VerifyPKCS1v15(pub, crypto.SHA256, digest[:], sig) == nil
-	case "ES256":
-		pub := selectECKey(set, kid)
-		if pub == nil || len(sig) != 64 {
+		pub := selectJWSKey(set, alg, kid)
+		rpub, ok := pub.(*rsa.PublicKey)
+		if !ok {
 			return false
 		}
-		r := new(big.Int).SetBytes(sig[:32])
-		sv := new(big.Int).SetBytes(sig[32:])
-		return ecdsa.Verify(pub, digest[:], r, sv)
+		digest := sha256.Sum256([]byte(signingInput))
+		return rsa.VerifyPKCS1v15(rpub, crypto.SHA256, digest[:], sig) == nil
+	case "PS256":
+		rpub, ok := selectJWSKey(set, alg, kid).(*rsa.PublicKey)
+		if !ok {
+			return false
+		}
+		digest := sha256.Sum256([]byte(signingInput))
+		return rsa.VerifyPSS(rpub, crypto.SHA256, digest[:], sig, &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash}) == nil
+	case "ES256", "ES384":
+		epub, ok := selectJWSKey(set, alg, kid).(*ecdsa.PublicKey)
+		if !ok {
+			return false
+		}
+		size := 32
+		var digest []byte
+		if alg == "ES384" {
+			size = 48
+			d := sha512.Sum384([]byte(signingInput))
+			digest = d[:]
+		} else {
+			d := sha256.Sum256([]byte(signingInput))
+			digest = d[:]
+		}
+		if len(sig) != 2*size {
+			return false
+		}
+		return ecdsa.Verify(epub, digest, new(big.Int).SetBytes(sig[:size]), new(big.Int).SetBytes(sig[size:]))
+	case "EdDSA":
+		epub, ok := selectJWSKey(set, alg, kid).(ed25519.PublicKey)
+		return ok && len(sig) == ed25519.SignatureSize && ed25519.Verify(epub, []byte(signingInput), sig)
 	}
 	return false
 }
 
-// selectECKey picks the P-256 key matching kid (any when kid is empty).
-func selectECKey(set *jwks, kid string) *ecdsa.PublicKey {
+// hasJWSKey reports whether the set publishes a usable key for alg and kid.
+func hasJWSKey(set *jwks, alg, kid string) bool { return selectJWSKey(set, alg, kid) != nil }
+
+// selectJWSKey picks the first key that suits alg (kty and curve checked
+// against it; its own alg, when set, must equal alg) and matches kid (any when
+// kid is empty). The result is *rsa.PublicKey, *ecdsa.PublicKey or
+// ed25519.PublicKey, or nil.
+func selectJWSKey(set *jwks, alg, kid string) interface{} {
+	if set == nil {
+		return nil
+	}
 	for _, k := range set.Keys {
-		if k.Kty != "EC" || k.Crv != "P-256" || (k.Alg != "" && k.Alg != "ES256") {
+		if k.Alg != "" && k.Alg != alg {
 			continue
 		}
 		if kid != "" && k.Kid != kid {
 			continue
 		}
-		xb, err1 := base64urlDecode(k.X)
-		yb, err2 := base64urlDecode(k.Y)
-		if err1 != nil || err2 != nil {
-			continue
+		switch alg {
+		case "RS256", "PS256":
+			if k.Kty != "RSA" {
+				continue
+			}
+			if pub, err := jwkToPublicKey(k); err == nil {
+				return pub
+			}
+		case "ES256", "ES384":
+			curve, crv := elliptic.P256(), "P-256"
+			if alg == "ES384" {
+				curve, crv = elliptic.P384(), "P-384"
+			}
+			if k.Kty != "EC" || k.Crv != crv {
+				continue
+			}
+			xb, err1 := base64urlDecode(k.X)
+			yb, err2 := base64urlDecode(k.Y)
+			if err1 != nil || err2 != nil {
+				continue
+			}
+			x, y := new(big.Int).SetBytes(xb), new(big.Int).SetBytes(yb)
+			if !curve.IsOnCurve(x, y) {
+				continue
+			}
+			return &ecdsa.PublicKey{Curve: curve, X: x, Y: y}
+		case "EdDSA":
+			if k.Kty != "OKP" || k.Crv != "Ed25519" {
+				continue
+			}
+			xb, err := base64urlDecode(k.X)
+			if err != nil || len(xb) != ed25519.PublicKeySize {
+				continue
+			}
+			return ed25519.PublicKey(xb)
 		}
-		x, y := new(big.Int).SetBytes(xb), new(big.Int).SetBytes(yb)
-		if !elliptic.P256().IsOnCurve(x, y) {
-			continue
-		}
-		return &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
 	}
 	return nil
 }
 
+// selectECKey picks the P-256 key matching kid (any when kid is empty).
+func selectECKey(set *jwks, kid string) *ecdsa.PublicKey {
+	pub, _ := selectJWSKey(set, "ES256", kid).(*ecdsa.PublicKey)
+	return pub
+}
+
 // selectRSAKey picks the RSA key matching kid (any RSA key when kid is empty).
 func selectRSAKey(set *jwks, kid string) *rsa.PublicKey {
-	for _, k := range set.Keys {
-		if k.Kty != "RSA" || (k.Alg != "" && k.Alg != "RS256") {
-			continue
-		}
-		if kid != "" && k.Kid != kid {
-			continue
-		}
-		if pub, err := jwkToPublicKey(k); err == nil {
-			return pub
-		}
-	}
-	return nil
+	pub, _ := selectJWSKey(set, "RS256", kid).(*rsa.PublicKey)
+	return pub
 }
 
 func jwkToPublicKey(k jwk) (*rsa.PublicKey, error) {
