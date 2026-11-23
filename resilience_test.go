@@ -243,3 +243,44 @@ func TestStatusAwareTreatsBackendComponentOutageAsOutage(t *testing.T) {
 		t.Fatalf("got %v", slept)
 	}
 }
+
+type resetOnce struct {
+	calls int32
+	next  http.RoundTripper
+	err   error
+}
+
+func (r *resetOnce) RoundTrip(req *http.Request) (*http.Response, error) {
+	if atomic.AddInt32(&r.calls, 1) == 1 {
+		return nil, r.err
+	}
+	return r.next.RoundTrip(req)
+}
+
+func TestConnectionResetRetriedOnceForSafeRequests(t *testing.T) {
+	var calls int32
+	srv := retryServer(0, 0, nil, &calls)
+	defer srv.Close()
+	rt := &resetOnce{next: http.DefaultTransport, err: errors.New("read tcp: connection reset by peer")}
+	c := New("sk_test", WithBaseURL(srv.URL), WithHTTPClient(&http.Client{Transport: rt}))
+	if _, err := c.Instance.Get(context.Background()); err != nil {
+		t.Fatalf("GET should survive one reset: %v", err)
+	}
+	if rt.calls != 2 || calls != 1 {
+		t.Fatalf("transport calls=%d server calls=%d", rt.calls, calls)
+	}
+}
+
+func TestConnectionResetNotRetriedForPlainWriteOrTimeout(t *testing.T) {
+	req, _ := http.NewRequest(http.MethodPost, "http://x", nil)
+	if resetRetryable(errors.New("connection reset by peer"), req) {
+		t.Fatal("unkeyed POST must not be replayed")
+	}
+	req.Header.Set("Idempotency-Key", "k")
+	if !resetRetryable(errors.New("connection reset by peer"), req) {
+		t.Fatal("keyed POST may be replayed")
+	}
+	if resetRetryable(context.DeadlineExceeded, req) {
+		t.Fatal("a timeout must not be replayed")
+	}
+}

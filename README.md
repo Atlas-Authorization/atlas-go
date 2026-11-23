@@ -291,6 +291,8 @@ all, err := atlas.Paginate(func(cursor string) (*atlas.CursorPage[atlas.User], e
 
 ## Idempotency
 
+Every client retries once, after a short jittered delay, when a request fails with a connection reset before any response (an idle pooled connection the server closed). That covers GET, HEAD, OPTIONS, PUT, DELETE and any call with an `Idempotency-Key`; timeouts and other writes are never replayed. Keep your own `http.Transport.IdleConnTimeout` below 60 s.
+
 Pass `WithIdempotencyKey` to any create/mutation to de-duplicate retries
 server-side (§9.1); it sets the `Idempotency-Key` header:
 

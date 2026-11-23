@@ -4,6 +4,12 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.28.1 — 2026-11-23
+
+### Fixed
+
+- A request that fails with a connection reset, broken pipe, refused connect or closed idle socket before any response is retried once, after a short jittered delay, when it is a GET, HEAD, OPTIONS, PUT or DELETE or carries an Idempotency-Key. Timeouts, cancellations and other writes are never retried.
+
 ## 0.28.0 — 2026-11-22
 
 ### Added
