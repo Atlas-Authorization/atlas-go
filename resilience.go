@@ -3,11 +3,14 @@ package atlas
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -273,4 +276,61 @@ type HeaderInjector interface {
 // WithObserver registers an Observer for tracing and metrics.
 func WithObserver(o Observer) Option {
 	return func(c *Client) { c.observer = o }
+}
+
+// resetRetryable reports a connection-level failure before any response (a reset,
+// a broken pipe, a refused connect, the server closing a reused idle socket) on a
+// request that is safe to replay: GET, HEAD, OPTIONS, PUT, DELETE or any request
+// carrying an Idempotency-Key. Timeouts and cancellations never qualify.
+func resetRetryable(err error, req *http.Request) bool {
+	switch req.Method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodPut, http.MethodDelete:
+	default:
+		if req.Header.Get("Idempotency-Key") == "" {
+			return false
+		}
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return false
+	}
+	if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNREFUSED) ||
+		errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "connection reset") || strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "server closed idle connection")
+}
+
+// cloneForRetry returns a fresh copy of req with a re-readable body.
+func cloneForRetry(ctx context.Context, req *http.Request) (*http.Request, error) {
+	c := req.Clone(ctx)
+	if req.GetBody != nil {
+		body, err := req.GetBody()
+		if err != nil {
+			return nil, err
+		}
+		c.Body = body
+	}
+	return c, nil
+}
+
+// resetDelay is the short jittered wait (25-125ms) before the single reset retry.
+func resetDelay() time.Duration {
+	return 25*time.Millisecond + time.Duration(rand.Float64()*float64(100*time.Millisecond))
+}
+
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }

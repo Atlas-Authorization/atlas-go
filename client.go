@@ -673,6 +673,12 @@ func (c *Client) attempt(ctx context.Context, cfg *requestConfig, auth authKind,
 		hc = http.DefaultClient
 	}
 	resp, err := hc.Do(req)
+	if err != nil && resetRetryable(err, req) {
+		// An idle pooled connection the server closed fails before any response: retry once.
+		if retry, rerr := cloneForRetry(ctx, req); rerr == nil && sleepCtx(ctx, resetDelay()) == nil {
+			resp, err = hc.Do(retry)
+		}
+	}
 	if err != nil {
 		return 0, nil, nil, fmt.Errorf("atlas: performing request: %w", err)
 	}
