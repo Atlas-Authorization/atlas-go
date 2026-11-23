@@ -421,7 +421,7 @@ def default_method_name(m, rel, op):
 
 TAKEN_METHODS = {}  # service -> set
 services = {}       # service go name -> dict(field, existing, ops=[])
-CLIENT_USED = set(CLIENT_FIELDS)
+CLIENT_USED = set(CLIENT_FIELDS) | set(METHODS.get('Client', ()))  # a Client method name is taken too
 
 _SVC_MEMO = {}  # one name resolution per segment: wire + tests must agree on the field
 
@@ -469,6 +469,11 @@ def query_params(op):
         if isinstance(x, dict) and x.get('in') == 'query':
             out.append(x)
     return out
+
+# reserve every pinned name first, so a new op visited earlier cannot take a published method name
+for _pv in PINS['ops'].values():
+    _sn, _mn = _pv.split('.')
+    TAKEN_METHODS.setdefault(_sn, set(METHODS.get(_sn, set()))).add(_mn)
 
 specs = []  # emitted per-op records
 for m, p, op in ops:
@@ -539,6 +544,9 @@ def emit(s, method_blocks, tests):
     test_args = ['ctx'] + ['"p%d"' % (k + 1) for k in range(len(pparams))]
     # query
     qps = query_params(op)
+    # a query the spec added after release: the shipped method keeps its signature, `<Name>WithQuery` takes the query
+    legacy_name = name if qps and f'{m} {p}' in PINS.get('no_query', []) else None
+    if legacy_name: name = name + 'WithQuery'
     qtype = None
     qblock = ''
     if qps:
@@ -636,6 +644,12 @@ def emit(s, method_blocks, tests):
               f'\tif err := {callexpr % "&out"}; err != nil {{\n\t\treturn {zero}, err\n\t}}\n\treturn out, nil\n}}\n')
         test_call = f'_, err := c.{s["field"]}.{name}({", ".join(test_args)}, opts...)\n\t\treturn err'
     blk = qblock + doc + fn
+    if legacy_name:
+        wsig = [x for x in sig if not x.startswith('query ')]
+        wcall = [f'{qtype}{{}}' if x == 'query' else x for x in call_args]
+        blk += (f'\n// {legacy_name} calls {name} without the query (the signature it shipped with).\n'
+                f'func (s *{svc}) {legacy_name}({", ".join(wsig)}) {"error" if ret is None else "(" + ret + ", error)"} {{\n'
+                f'\treturn s.{name}({", ".join(wcall)}, opts...)\n}}\n')
     # cursor iterator helper
     if cursor and any(q['name'] == 'starting_after' for q in qps):
         iname = name + 'Iter'
@@ -702,7 +716,11 @@ def hand_text():
 _pass1 = ''.join(b for _, b in T.out) + ''.join(''.join(v) for v in method_blocks.values())
 _have = idents_of(hand_text() + _pass1)
 _missing = {n: v for n, v in spec_fields().items() if n.lower().replace('_', '') not in _have}
-_full_keys = sorted({v[0] for v in _missing.values()})
+# a pinned `...Full` operation stays generated even once pass 1 models its fields (published names never vanish)
+_pinned_full = {k for k, v in PINS['ops'].items() if v.endswith('Full') and ' ' in k and k.split(' ', 1)[1] in d['paths']
+                and k.split(' ', 1)[0].lower() in d['paths'][k.split(' ', 1)[1]]}
+_pass1_keys = {f"{x['m'].upper()} {x['p']}" for x in specs}
+_full_keys = sorted({v[0] for v in _missing.values()} | (_pinned_full - _pass1_keys))
 full_blocks, full_tests = {}, {}
 full_specs = []
 for key in _full_keys:

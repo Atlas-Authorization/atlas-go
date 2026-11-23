@@ -1,4 +1,7 @@
 {
+ "no_query": [
+  "PUT /v1/instance/scopes"
+ ],
  "ops": {
   "DELETE /v1/action_templates/{id}": "ActionTemplatesService.DeleteByID",
   "DELETE /v1/action_templates/{id}/versions/{version}": "ActionTemplatesService.DeleteVersionByID",

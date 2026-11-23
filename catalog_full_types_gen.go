@@ -52,6 +52,13 @@ type APIKey2RateLimit struct {
 	WindowSeconds *int64 `json:"window_seconds,omitempty"`
 }
 
+// APIKey2RevokedBy is a typed object of the Backend API.
+type APIKey2RevokedBy struct {
+	// api_key, user, system, scim or sso.
+	Type string  `json:"type"`
+	ID   *string `json:"id,omitempty"`
+}
+
 // APIKey2: The `ApiKey` object.
 type APIKey2 struct {
 	Object string `json:"object"`
@@ -72,8 +79,18 @@ type APIKey2 struct {
 	MaxTokenLifetimeSeconds *int64 `json:"max_token_lifetime_seconds,omitempty"`
 	// Registered SPKI PEM public key for proof-of-possession, or null for a bearer key.
 	PublicKey *string `json:"public_key,omitempty"`
-	// RFC 7638 JWK thumbprint of public_key — the cnf.jkt minted tokens carry.
+	// RFC 7638 JWK thumbprint of public_key — the cnf.jkt minted tokens carry (a key_pair key's tokens
+	// carry none).
 	PublicKeyJkt *string `json:"public_key_jkt,omitempty"`
+	// `secret`: a shared `ak_` secret. `key_pair`: no secret exists; the holder signs short-lived JWT
+	// assertions with a private key Atlas never holds, and `public_key` verifies them. One of: secret,
+	// key_pair.
+	Credential *string `json:"credential,omitempty"`
+	// key_pair only: the `aud` an assertion must carry (default: the instance id). Null for a secret
+	// key.
+	Audience *string `json:"audience,omitempty"`
+	// The key id (the same as `id`): the `kid` header and `iss` claim of an assertion.
+	KeyID *string `json:"key_id,omitempty"`
 	// Per-key spend caps, metered with POST /v1/api_keys/{id}/usage. null when the key has none.
 	Limits []APIKeyLimit2 `json:"limits,omitempty"`
 	// Each cap with its current-window usage (empty when the key has no caps).
@@ -99,6 +116,20 @@ type APIKey2 struct {
 	OrganizationID *string `json:"organization_id,omitempty"`
 	// The member who created an ORGANIZATION key, when recorded.
 	CreatedByUserID *string `json:"created_by_user_id,omitempty"`
+	// Why the key ended, always answered once it has: the stored `revoked_reason`, else
+	// `revoked_by_api` (a secret key or person revoked it) or `revoked_by_admin` (a dashboard user
+	// did); `signed_out_everywhere` for a key that died with the sign-out. Null while live.
+	EndReason *string `json:"end_reason,omitempty"`
+	// Epoch ms the key ended (the same value as `revoked_at`).
+	EndedAt *int64 `json:"ended_at,omitempty"`
+	// Who revoked the key. Null while live and for keys revoked before this was recorded.
+	RevokedBy *APIKey2RevokedBy `json:"revoked_by,omitempty"`
+	// `sign_out_everywhere`: the key is revoked when its user subject signs out everywhere. Null =
+	// independent of sessions. One of: sign_out_everywhere, None.
+	DiesWith *string `json:"dies_with,omitempty"`
+	// The same object as `claims`, under the name most integrators use: your own vocabulary (scopes,
+	// team, label), echoed back on verify.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	// Created (epoch ms).
 	CreatedAt int64 `json:"created_at"`
 }
@@ -644,6 +675,222 @@ type Branding2 struct {
 	Resolved Branding2Resolved `json:"resolved"`
 }
 
+// CustomOAuthProvidersListFullItemHostParamsSchemaItem is a typed object of the Backend API.
+type CustomOAuthProvidersListFullItemHostParamsSchemaItem struct {
+	// The template name: lowercase first letter, at most 32 letters, digits or _.
+	Name string `json:"name"`
+	// A regular expression of at most 128 characters; lookaround, backreferences and nested repeats
+	// are refused.
+	Pattern string `json:"pattern"`
+}
+
+// CustomOAuthProvidersListFullItemProfileMappingFields: Target user fields: id (the upstream account id), email, email_verified, first_name, last_name,
+// full_name, username, image_url, phone_number (E.164), external_id.
+type CustomOAuthProvidersListFullItemProfileMappingFields struct {
+	// A claim path (`email`, `profile.emails[0].value`, `["https://acme.example/claims"].roles`,
+	// `$id_token.acr`, `$userinfo.sub`), a template (`"{{given_name}} {{family_name}}"`), or a rule `{
+	// from: path | path[] (fallbacks), template, value (constant), transforms: [...] }`. Transforms:
+	// lowercase, uppercase, trim, first, last, compact, unique, to_string, to_number, to_boolean,
+	// {split}, {join}, {index}, {replace: {find, with}}, {prefix}, {suffix}, {default}.
+	ID interface{} `json:"id,omitempty"`
+	// A claim path (`email`, `profile.emails[0].value`, `["https://acme.example/claims"].roles`,
+	// `$id_token.acr`, `$userinfo.sub`), a template (`"{{given_name}} {{family_name}}"`), or a rule `{
+	// from: path | path[] (fallbacks), template, value (constant), transforms: [...] }`. Transforms:
+	// lowercase, uppercase, trim, first, last, compact, unique, to_string, to_number, to_boolean,
+	// {split}, {join}, {index}, {replace: {find, with}}, {prefix}, {suffix}, {default}.
+	Email interface{} `json:"email,omitempty"`
+	// A claim path (`email`, `profile.emails[0].value`, `["https://acme.example/claims"].roles`,
+	// `$id_token.acr`, `$userinfo.sub`), a template (`"{{given_name}} {{family_name}}"`), or a rule `{
+	// from: path | path[] (fallbacks), template, value (constant), transforms: [...] }`. Transforms:
+	// lowercase, uppercase, trim, first, last, compact, unique, to_string, to_number, to_boolean,
+	// {split}, {join}, {index}, {replace: {find, with}}, {prefix}, {suffix}, {default}.
+	EmailVerified interface{} `json:"email_verified,omitempty"`
+	// A claim path (`email`, `profile.emails[0].value`, `["https://acme.example/claims"].roles`,
+	// `$id_token.acr`, `$userinfo.sub`), a template (`"{{given_name}} {{family_name}}"`), or a rule `{
+	// from: path | path[] (fallbacks), template, value (constant), transforms: [...] }`. Transforms:
+	// lowercase, uppercase, trim, first, last, compact, unique, to_string, to_number, to_boolean,
+	// {split}, {join}, {index}, {replace: {find, with}}, {prefix}, {suffix}, {default}.
+	FirstName interface{} `json:"first_name,omitempty"`
+	// A claim path (`email`, `profile.emails[0].value`, `["https://acme.example/claims"].roles`,
+	// `$id_token.acr`, `$userinfo.sub`), a template (`"{{given_name}} {{family_name}}"`), or a rule `{
+	// from: path | path[] (fallbacks), template, value (constant), transforms: [...] }`. Transforms:
+	// lowercase, uppercase, trim, first, last, compact, unique, to_string, to_number, to_boolean,
+	// {split}, {join}, {index}, {replace: {find, with}}, {prefix}, {suffix}, {default}.
+	LastName interface{} `json:"last_name,omitempty"`
+	// A claim path (`email`, `profile.emails[0].value`, `["https://acme.example/claims"].roles`,
+	// `$id_token.acr`, `$userinfo.sub`), a template (`"{{given_name}} {{family_name}}"`), or a rule `{
+	// from: path | path[] (fallbacks), template, value (constant), transforms: [...] }`. Transforms:
+	// lowercase, uppercase, trim, first, last, compact, unique, to_string, to_number, to_boolean,
+	// {split}, {join}, {index}, {replace: {find, with}}, {prefix}, {suffix}, {default}.
+	FullName interface{} `json:"full_name,omitempty"`
+	// A claim path (`email`, `profile.emails[0].value`, `["https://acme.example/claims"].roles`,
+	// `$id_token.acr`, `$userinfo.sub`), a template (`"{{given_name}} {{family_name}}"`), or a rule `{
+	// from: path | path[] (fallbacks), template, value (constant), transforms: [...] }`. Transforms:
+	// lowercase, uppercase, trim, first, last, compact, unique, to_string, to_number, to_boolean,
+	// {split}, {join}, {index}, {replace: {find, with}}, {prefix}, {suffix}, {default}.
+	Username interface{} `json:"username,omitempty"`
+	// A claim path (`email`, `profile.emails[0].value`, `["https://acme.example/claims"].roles`,
+	// `$id_token.acr`, `$userinfo.sub`), a template (`"{{given_name}} {{family_name}}"`), or a rule `{
+	// from: path | path[] (fallbacks), template, value (constant), transforms: [...] }`. Transforms:
+	// lowercase, uppercase, trim, first, last, compact, unique, to_string, to_number, to_boolean,
+	// {split}, {join}, {index}, {replace: {find, with}}, {prefix}, {suffix}, {default}.
+	ImageURL interface{} `json:"image_url,omitempty"`
+	// A claim path (`email`, `profile.emails[0].value`, `["https://acme.example/claims"].roles`,
+	// `$id_token.acr`, `$userinfo.sub`), a template (`"{{given_name}} {{family_name}}"`), or a rule `{
+	// from: path | path[] (fallbacks), template, value (constant), transforms: [...] }`. Transforms:
+	// lowercase, uppercase, trim, first, last, compact, unique, to_string, to_number, to_boolean,
+	// {split}, {join}, {index}, {replace: {find, with}}, {prefix}, {suffix}, {default}.
+	PhoneNumber interface{} `json:"phone_number,omitempty"`
+	// A claim path (`email`, `profile.emails[0].value`, `["https://acme.example/claims"].roles`,
+	// `$id_token.acr`, `$userinfo.sub`), a template (`"{{given_name}} {{family_name}}"`), or a rule `{
+	// from: path | path[] (fallbacks), template, value (constant), transforms: [...] }`. Transforms:
+	// lowercase, uppercase, trim, first, last, compact, unique, to_string, to_number, to_boolean,
+	// {split}, {join}, {index}, {replace: {find, with}}, {prefix}, {suffix}, {default}.
+	ExternalID interface{} `json:"external_id,omitempty"`
+}
+
+// CustomOAuthProvidersListFullItemProfileMapping: Declarative profile mapping from the upstream userinfo / id_token claims to Atlas user fields
+// and metadata. Unmapped fields keep the provider defaults. A remapped `email` is unverified
+// unless `email_verified` is mapped too. null clears it.
+type CustomOAuthProvidersListFullItemProfileMapping struct {
+	// Target user fields: id (the upstream account id), email, email_verified, first_name, last_name,
+	// full_name, username, image_url, phone_number (E.164), external_id.
+	Fields *CustomOAuthProvidersListFullItemProfileMappingFields `json:"fields,omitempty"`
+	// Key → expression, shallow-merged into the user's public metadata.
+	PublicMetadata map[string]interface{} `json:"public_metadata,omitempty"`
+	// Key → expression, shallow-merged into the user's private metadata.
+	PrivateMetadata map[string]interface{} `json:"private_metadata,omitempty"`
+	// false (default): mapped values are applied when the account is created (and fill empty fields
+	// later). true: names, image and metadata are re-applied on every sign-in.
+	UpdateOnSignIn *bool `json:"update_on_sign_in,omitempty"`
+}
+
+// CustomOAuthProvidersListFullItemLogout: Upstream logout. OpenID Connect providers only.
+type CustomOAuthProvidersListFullItemLogout struct {
+	// On Atlas sign-out, hand back the upstream end-session URL (id_token_hint,
+	// post_logout_redirect_uri, state) to send the browser to.
+	RPInitiated *bool `json:"rp_initiated,omitempty"`
+	// Where the user lands after the upstream logout when the app names no return URL.
+	PostLogoutRedirectURL *string `json:"post_logout_redirect_url,omitempty"`
+	// Accept OIDC Back-Channel Logout tokens at backchannel_logout_uri and end the matching Atlas
+	// sessions.
+	Backchannel *bool `json:"backchannel,omitempty"`
+	// Accept OIDC Front-Channel Logout: the provider loads frontchannel_logout_uri in an iframe and
+	// the matching Atlas sessions end.
+	Frontchannel *bool `json:"frontchannel,omitempty"`
+	// Front-channel: require iss + sid (default true). false also ends the framing browser's own
+	// session from this provider when they are absent.
+	FrontchannelSessionRequired *bool `json:"frontchannel_session_required,omitempty"`
+	// An explicit end-session endpoint; default: the discovery document's.
+	EndSessionEndpoint *string `json:"end_session_endpoint,omitempty"`
+}
+
+// CustomOAuthProvidersListFullItemIDPInitiatedLogin: OIDC third-party initiated login at initiate_login_uri. OpenID Connect providers only.
+type CustomOAuthProvidersListFullItemIDPInitiatedLogin struct {
+	Enabled *bool `json:"enabled,omitempty"`
+	// Where a login may land: exact URLs, or bare origins (any path). Required when enabled.
+	AllowedTargets []string `json:"allowed_targets,omitempty"`
+	// The landing page when the request names no target_link_uri; must be an allowed target.
+	DefaultTarget *string `json:"default_target,omitempty"`
+}
+
+// CustomOAuthProvidersListFullItemSigningKeysItem is a typed object of the Backend API.
+type CustomOAuthProvidersListFullItemSigningKeysItem struct {
+	Object string `json:"object"`
+	Kid    string `json:"kid"`
+	// One of: RS256, PS256, ES256.
+	Alg string `json:"alg"`
+	// active signs assertions; retiring is still published; retired is gone. One of: active, retiring,
+	// retired.
+	Status string `json:"status"`
+	// The public JWK (never the private key).
+	PublicJWK map[string]interface{} `json:"public_jwk"`
+	// Created (epoch ms).
+	CreatedAt int64  `json:"created_at"`
+	RetiredAt *int64 `json:"retired_at,omitempty"`
+}
+
+// CustomOAuthProvidersListFullItem is a typed object of the Backend API.
+type CustomOAuthProvidersListFullItem struct {
+	Object      string  `json:"object"`
+	ID          string  `json:"id"`
+	ProviderKey string  `json:"provider_key"`
+	DisplayName string  `json:"display_name"`
+	IconURL     *string `json:"icon_url,omitempty"`
+	// oidc (default): id_token verified, discovery available. oauth2: hand-entered endpoints, profile
+	// from userinfo. One of: oidc, oauth2.
+	Protocol string `json:"protocol"`
+	// OIDC: the issuer (the id_token `iss`); endpoints are discovered from it.
+	Issuer *string `json:"issuer,omitempty"`
+	// A non-standard discovery document URL.
+	DiscoveryURL          *string `json:"discovery_url,omitempty"`
+	AuthorizationEndpoint *string `json:"authorization_endpoint,omitempty"`
+	TokenEndpoint         *string `json:"token_endpoint,omitempty"`
+	UserinfoEndpoint      *string `json:"userinfo_endpoint,omitempty"`
+	JWKSURI               *string `json:"jwks_uri,omitempty"`
+	EndSessionEndpoint    *string `json:"end_session_endpoint,omitempty"`
+	// RFC 7009 revoke endpoint, used when a connection on this provider is disconnected. May carry
+	// {name} host templates.
+	RevocationEndpoint *string `json:"revocation_endpoint,omitempty"`
+	// For a data-only provider: the connect-time host_params the {name} templates in the endpoints
+	// take. Each value must match its pattern as a whole and use only letters, digits, dot, dash and
+	// underscore; the resulting endpoints must be https URLs on public hostnames.
+	HostParamsSchema []CustomOAuthProvidersListFullItemHostParamsSchemaItem `json:"host_params_schema,omitempty"`
+	// Only data connections may use this provider: it is never a sign-in method, a sign-in button or a
+	// login strategy. Required for endpoints with {name} templates. Default false.
+	DataOnly *bool    `json:"data_only,omitempty"`
+	Scopes   []string `json:"scopes,omitempty"`
+	// One of: , ,, +.
+	ScopeSeparator *string `json:"scope_separator,omitempty"`
+	// Send PKCE (S256). Default true.
+	PKCE *bool `json:"pkce,omitempty"`
+	// Extra authorize parameters (protocol parameters are reserved).
+	AuthorizationParams map[string]string `json:"authorization_params,omitempty"`
+	// Extra token-request parameters.
+	TokenParams map[string]string `json:"token_params,omitempty"`
+	// One of: header, query.
+	UserinfoAuth *string `json:"userinfo_auth,omitempty"`
+	// How Atlas authenticates to the upstream token endpoint. private_key_jwt signs a client assertion
+	// with an Atlas-held key published at client_jwks_uri. One of: client_secret_basic,
+	// client_secret_post, client_secret_jwt, private_key_jwt, none.
+	TokenEndpointAuthMethod *string `json:"token_endpoint_auth_method,omitempty"`
+	// The `aud` of a client assertion; default: the token endpoint.
+	ClientAssertionAudience *string `json:"client_assertion_audience,omitempty"`
+	// Where the profile comes from. merged (default): userinfo over id_token claims. One of: merged,
+	// userinfo, id_token.
+	ProfileSource *string `json:"profile_source,omitempty"`
+	// Declarative profile mapping from the upstream userinfo / id_token claims to Atlas user fields
+	// and metadata. Unmapped fields keep the provider defaults. A remapped `email` is unverified
+	// unless `email_verified` is mapped too. null clears it.
+	ProfileMapping *CustomOAuthProvidersListFullItemProfileMapping `json:"profile_mapping,omitempty"`
+	// Upstream logout. OpenID Connect providers only.
+	Logout *CustomOAuthProvidersListFullItemLogout `json:"logout,omitempty"`
+	// OIDC third-party initiated login at initiate_login_uri. OpenID Connect providers only.
+	IDPInitiatedLogin *CustomOAuthProvidersListFullItemIDPInitiatedLogin `json:"idp_initiated_login,omitempty"`
+	ClientID          *string                                            `json:"client_id,omitempty"`
+	HasSecret         *bool                                              `json:"has_secret,omitempty"`
+	Enabled           bool                                               `json:"enabled"`
+	AllowSignIn       *bool                                              `json:"allow_sign_in,omitempty"`
+	AllowSignUp       *bool                                              `json:"allow_sign_up,omitempty"`
+	// Register at the provider as the redirect / callback URI.
+	RedirectURI string `json:"redirect_uri"`
+	// Register as the client JWKS URL (private_key_jwt).
+	ClientJWKSURI *string `json:"client_jwks_uri,omitempty"`
+	// Register as the back-channel logout URI.
+	BackchannelLogoutURI *string `json:"backchannel_logout_uri,omitempty"`
+	// Register as the front-channel logout URI.
+	FrontchannelLogoutURI *string `json:"frontchannel_logout_uri,omitempty"`
+	// Register as a post-logout redirect URI.
+	PostLogoutRedirectURI *string `json:"post_logout_redirect_uri,omitempty"`
+	// Register as the initiate-login URI (third-party initiated login).
+	InitiateLoginURI *string                                           `json:"initiate_login_uri,omitempty"`
+	SigningKeys      []CustomOAuthProvidersListFullItemSigningKeysItem `json:"signing_keys,omitempty"`
+	// Created (epoch ms).
+	CreatedAt *int64 `json:"created_at,omitempty"`
+	// Updated (epoch ms).
+	UpdatedAt *int64 `json:"updated_at,omitempty"`
+}
+
 // DesktopMFAGetPolicyFullResult is a typed object of the Backend API.
 type DesktopMFAGetPolicyFullResult struct {
 	Object string `json:"object"`
@@ -946,6 +1193,11 @@ type AuthConfigAccountUXLastSignInMethod struct {
 	Enabled bool `json:"enabled"`
 }
 
+// AuthConfigAccountUXLinking is a typed object of the Backend API.
+type AuthConfigAccountUXLinking struct {
+	RequireExternalID bool `json:"requireExternalId"`
+}
+
 // AuthConfigAccountUXPasskeyAdoptionEndpoints is a typed object of the Backend API.
 type AuthConfigAccountUXPasskeyAdoptionEndpoints struct {
 	Enroll *string `json:"enroll,omitempty"`
@@ -1003,6 +1255,12 @@ type AuthConfigAccountUXPasskeySignUp struct {
 	Preferred bool   `json:"preferred"`
 }
 
+// AuthConfigAccountUXPasswordImport is a typed object of the Backend API.
+type AuthConfigAccountUXPasswordImport struct {
+	// One of: active, until_email_verified.
+	ImportedPasswordPolicy string `json:"importedPasswordPolicy"`
+}
+
 // AuthConfigAccountUXSecurityNotifications is a typed object of the Backend API.
 type AuthConfigAccountUXSecurityNotifications struct {
 	AccountChanges  bool `json:"accountChanges"`
@@ -1026,8 +1284,10 @@ type AuthConfigAccountUX struct {
 	EmailVerification string                              `json:"emailVerification"`
 	Impersonation     AuthConfigAccountUXImpersonation    `json:"impersonation"`
 	LastSignInMethod  AuthConfigAccountUXLastSignInMethod `json:"lastSignInMethod"`
+	Linking           AuthConfigAccountUXLinking          `json:"linking"`
 	PasskeyAdoption   AuthConfigAccountUXPasskeyAdoption  `json:"passkeyAdoption"`
 	PasskeySignUp     AuthConfigAccountUXPasskeySignUp    `json:"passkeySignUp"`
+	PasswordImport    AuthConfigAccountUXPasswordImport   `json:"passwordImport"`
 	// One of: both, code, link.
 	PasswordReset         string                                   `json:"passwordReset"`
 	SecurityNotifications AuthConfigAccountUXSecurityNotifications `json:"securityNotifications"`
@@ -1050,9 +1310,10 @@ type AuthConfigAgentFabric struct {
 
 // AuthConfigAppApproval is a typed object of the Backend API.
 type AuthConfigAppApproval struct {
-	FirstFactor bool    `json:"firstFactor"`
-	StepUp      bool    `json:"stepUp"`
-	TTLSeconds  float64 `json:"ttlSeconds"`
+	FirstFactor     bool    `json:"firstFactor"`
+	RevealNoAccount bool    `json:"revealNoAccount"`
+	StepUp          bool    `json:"stepUp"`
+	TTLSeconds      float64 `json:"ttlSeconds"`
 }
 
 // AuthConfigAppCatalogOIDCAppsItemAssignment is a typed object of the Backend API.
@@ -1326,6 +1587,7 @@ type AuthConfigComplianceRetention struct {
 	DeletionReminders      []string `json:"deletionReminders"`
 	DSRDueDays             float64  `json:"dsrDueDays"`
 	ErasureGraceDays       float64  `json:"erasureGraceDays"`
+	MaxPauses              float64  `json:"maxPauses"`
 	// One of: block, off, require_action.
 	OwnershipTransfer  string `json:"ownershipTransfer"`
 	RequireFinalNotice bool   `json:"requireFinalNotice"`
@@ -1340,6 +1602,28 @@ type AuthConfigCompliance struct {
 	InactiveUsers AuthConfigComplianceInactiveUsers  `json:"inactiveUsers"`
 	Minors        AuthConfigComplianceMinors         `json:"minors"`
 	Retention     AuthConfigComplianceRetention      `json:"retention"`
+}
+
+// AuthConfigDelegationTokensAudiencesItem is a typed object of the Backend API.
+type AuthConfigDelegationTokensAudiencesItem struct {
+	Audience string   `json:"audience"`
+	Scopes   []string `json:"scopes"`
+}
+
+// AuthConfigDelegationTokens: Server-minted delegation tokens (POST /v1/users/{id}/delegation_tokens and the token-exchange
+// grant). Off by default.
+type AuthConfigDelegationTokens struct {
+	// The audiences a token may be minted for, and the scopes allowed for each. Anything else is
+	// refused.
+	Audiences []AuthConfigDelegationTokensAudiencesItem `json:"audiences"`
+	// 30 to maxTtlSeconds, default 120.
+	DefaultTTLSeconds float64 `json:"defaultTtlSeconds"`
+	Enabled           bool    `json:"enabled"`
+	// OAuth client ids of confidential clients that may use the token-exchange grant for delegation
+	// tokens. Empty means none.
+	ExchangeClientIDs []string `json:"exchangeClientIds"`
+	// 30 to 300, default 300.
+	MaxTTLSeconds float64 `json:"maxTtlSeconds"`
 }
 
 // AuthConfigEndUserAPIKeys is a typed object of the Backend API.
@@ -1447,6 +1731,12 @@ type AuthConfigIdentityTraits struct {
 	AudienceKey *string                              `json:"audienceKey,omitempty"`
 	Groups      []AuthConfigIdentityTraitsGroupsItem `json:"groups,omitempty"`
 	Traits      []AuthConfigIdentityTraitsTraitsItem `json:"traits"`
+}
+
+// AuthConfigIssuerAliasesItem is a typed object of the Backend API.
+type AuthConfigIssuerAliasesItem struct {
+	AcceptedUntil *string `json:"acceptedUntil,omitempty"`
+	Issuer        string  `json:"issuer"`
 }
 
 // AuthConfigJWTTemplateSettingsValue is a typed object of the Backend API.
@@ -1639,10 +1929,36 @@ type AuthConfigNativeAppsAndroidAppsItem struct {
 	Sha256CertFingerprints []string `json:"sha256CertFingerprints"`
 }
 
+// AuthConfigNativeAppsAppsItem is a typed object of the Backend API.
+type AuthConfigNativeAppsAppsItem struct {
+	AllowedUsers []string `json:"allowed_users,omitempty"`
+	BundleID     *string  `json:"bundle_id,omitempty"`
+	CallbackURLs []string `json:"callback_urls"`
+	CreatedAt    float64  `json:"created_at"`
+	ExpiresAt    *float64 `json:"expires_at,omitempty"`
+	ID           string   `json:"id"`
+	PackageName  *string  `json:"package_name,omitempty"`
+	// One of: android, development, ios.
+	Platform               string   `json:"platform"`
+	Sha256CertFingerprints []string `json:"sha256_cert_fingerprints,omitempty"`
+	TeamID                 *string  `json:"team_id,omitempty"`
+}
+
+// AuthConfigNativeAppsUnregisteredSession is a typed object of the Backend API.
+type AuthConfigNativeAppsUnregisteredSession struct {
+	AbsoluteMs *float64 `json:"absoluteMs,omitempty"`
+	RequireMFA *bool    `json:"requireMfa,omitempty"`
+}
+
 // AuthConfigNativeApps is a typed object of the Backend API.
 type AuthConfigNativeApps struct {
-	AndroidApps []AuthConfigNativeAppsAndroidAppsItem `json:"androidApps"`
-	AppleAppIDs []string                              `json:"appleAppIds"`
+	AndroidApps          []AuthConfigNativeAppsAndroidAppsItem `json:"androidApps"`
+	AppleAppIDs          []string                              `json:"appleAppIds"`
+	Apps                 []AuthConfigNativeAppsAppsItem        `json:"apps"`
+	PublishableKeyAppIDs []string                              `json:"publishableKeyAppIds"`
+	// One of: allow, device_bound, refuse.
+	Unregistered        *string                                  `json:"unregistered,omitempty"`
+	UnregisteredSession *AuthConfigNativeAppsUnregisteredSession `json:"unregisteredSession,omitempty"`
 }
 
 // AuthConfigOAuthProviderAdvancedClientAttestationIssuersItemJWKS is a typed object of the Backend API.
@@ -1761,14 +2077,17 @@ type AuthConfigOAuthProviderClientIDMetadataDocuments struct {
 
 // AuthConfigOAuthProviderCustomScopesItem is a typed object of the Backend API.
 type AuthConfigOAuthProviderCustomScopesItem struct {
-	Claims                 []string          `json:"claims"`
-	Description            string            `json:"description"`
-	Descriptions           map[string]string `json:"descriptions,omitempty"`
-	Labels                 map[string]string `json:"labels,omitempty"`
-	Name                   string            `json:"name"`
-	Parameters             []string          `json:"parameters,omitempty"`
-	RequiresVerifiedClient *bool             `json:"requiresVerifiedClient,omitempty"`
-	Sensitive              *bool             `json:"sensitive,omitempty"`
+	Claims       []string          `json:"claims"`
+	Description  string            `json:"description"`
+	Descriptions map[string]string `json:"descriptions,omitempty"`
+	Labels       map[string]string `json:"labels,omitempty"`
+	Name         string            `json:"name"`
+	OwnerExempt  *bool             `json:"ownerExempt,omitempty"`
+	Parameters   []string          `json:"parameters,omitempty"`
+	// One of: any, certified, verified.
+	RequiresClientLevel    *string `json:"requiresClientLevel,omitempty"`
+	RequiresVerifiedClient *bool   `json:"requiresVerifiedClient,omitempty"`
+	Sensitive              *bool   `json:"sensitive,omitempty"`
 }
 
 // AuthConfigOAuthProviderTokenClaimsItem is a typed object of the Backend API.
@@ -1873,11 +2192,83 @@ type AuthConfigPasswordPolicy struct {
 	RequireUppercase          bool `json:"requireUppercase"`
 }
 
+// AuthConfigPCAObjectiveRiskGraphEdgesItem is a typed object of the Backend API.
+type AuthConfigPCAObjectiveRiskGraphEdgesItem struct {
+	From string `json:"from"`
+	Kind string `json:"kind"`
+	To   string `json:"to"`
+}
+
+// AuthConfigPCAObjectiveRiskGraphNodesItem is a typed object of the Backend API.
+type AuthConfigPCAObjectiveRiskGraphNodesItem struct {
+	Harm map[string]float64 `json:"harm,omitempty"`
+	ID   string             `json:"id"`
+}
+
+// AuthConfigPCAObjectiveRiskGraph is a typed object of the Backend API.
+type AuthConfigPCAObjectiveRiskGraph struct {
+	Edges []AuthConfigPCAObjectiveRiskGraphEdgesItem `json:"edges,omitempty"`
+	Nodes []AuthConfigPCAObjectiveRiskGraphNodesItem `json:"nodes,omitempty"`
+}
+
+// AuthConfigPCAObjectiveRiskRegistryEntriesItemVerification is a typed object of the Backend API.
+type AuthConfigPCAObjectiveRiskRegistryEntriesItemVerification struct {
+	EvidenceDigest string `json:"evidence_digest"`
+	VerifierID     string `json:"verifier_id"`
+}
+
+// AuthConfigPCAObjectiveRiskRegistryEntriesItem is a typed object of the Backend API.
+type AuthConfigPCAObjectiveRiskRegistryEntriesItem struct {
+	// One of: exact, partial.
+	Fidelity     string                                                     `json:"fidelity"`
+	InverseKind  string                                                     `json:"inverse_kind"`
+	Verb         string                                                     `json:"verb"`
+	Verification *AuthConfigPCAObjectiveRiskRegistryEntriesItemVerification `json:"verification,omitempty"`
+}
+
+// AuthConfigPCAObjectiveRiskRegistry is a typed object of the Backend API.
+type AuthConfigPCAObjectiveRiskRegistry struct {
+	Entries          []AuthConfigPCAObjectiveRiskRegistryEntriesItem `json:"entries,omitempty"`
+	TrustedVerifiers []string                                        `json:"trusted_verifiers,omitempty"`
+}
+
+// AuthConfigPCAObjectiveRisk is a typed object of the Backend API.
+type AuthConfigPCAObjectiveRisk struct {
+	AllowHeuristicFallback *bool                               `json:"allow_heuristic_fallback,omitempty"`
+	Calibration            []float64                           `json:"calibration,omitempty"`
+	Graph                  *AuthConfigPCAObjectiveRiskGraph    `json:"graph,omitempty"`
+	Registry               *AuthConfigPCAObjectiveRiskRegistry `json:"registry,omitempty"`
+}
+
+// AuthConfigPCAQuotas is a typed object of the Backend API.
+type AuthConfigPCAQuotas struct {
+	GrantActionsPerMin            *float64 `json:"grantActionsPerMin,omitempty"`
+	InstanceActionsPerMin         *float64 `json:"instanceActionsPerMin,omitempty"`
+	MaxActiveGrants               *float64 `json:"maxActiveGrants,omitempty"`
+	MaxActiveGrantsPerPrincipal   *float64 `json:"maxActiveGrantsPerPrincipal,omitempty"`
+	MaxPlansPerGrant              *float64 `json:"maxPlansPerGrant,omitempty"`
+	MaxRevocationsPerGrant        *float64 `json:"maxRevocationsPerGrant,omitempty"`
+	MaxStepupsPerGrant            *float64 `json:"maxStepupsPerGrant,omitempty"`
+	MaxUnverifiedGrants           *float64 `json:"maxUnverifiedGrants,omitempty"`
+	MaxUnverifiedGrantsPerKey     *float64 `json:"maxUnverifiedGrantsPerKey,omitempty"`
+	PqVerifyUnitsPerSourcePerMin  *float64 `json:"pqVerifyUnitsPerSourcePerMin,omitempty"`
+	PublicPerNetworkPerMin        *float64 `json:"publicPerNetworkPerMin,omitempty"`
+	PublicPreAuthGlobalPerMin     *float64 `json:"publicPreAuthGlobalPerMin,omitempty"`
+	UnverifiedRegistrationsPerMin *float64 `json:"unverifiedRegistrationsPerMin,omitempty"`
+}
+
 // AuthConfigPCA is a typed object of the Backend API.
 type AuthConfigPCA struct {
-	Enabled               bool    `json:"enabled"`
-	MaxPlanNodes          float64 `json:"maxPlanNodes"`
-	PublicRateLimitPerMin float64 `json:"publicRateLimitPerMin"`
+	AllowedSuites []string `json:"allowedSuites,omitempty"`
+	// One of: both, operator, principal.
+	Beacons               *string                     `json:"beacons,omitempty"`
+	Enabled               bool                        `json:"enabled"`
+	MaxPlanNodes          float64                     `json:"maxPlanNodes"`
+	ObjectiveRisk         *AuthConfigPCAObjectiveRisk `json:"objectiveRisk,omitempty"`
+	Optimistic            *bool                       `json:"optimistic,omitempty"`
+	PublicRateLimitPerMin float64                     `json:"publicRateLimitPerMin"`
+	Quotas                *AuthConfigPCAQuotas        `json:"quotas,omitempty"`
+	UndoSigner            *string                     `json:"undoSigner,omitempty"`
 }
 
 // AuthConfigPhoneChannels is a typed object of the Backend API.
@@ -2092,9 +2483,18 @@ type AuthConfigSessionCustomData struct {
 // AuthConfigSession: Session lifetime + token behaviour.
 type AuthConfigSession struct {
 	// Absolute session lifetime in ms. At most 90 days; 365 days while longLived is on.
-	AbsoluteMs              float64                     `json:"absoluteMs"`
-	Audience                interface{}                 `json:"audience,omitempty"`
-	CrossSubdomainCookies   bool                        `json:"crossSubdomainCookies"`
+	AbsoluteMs     float64     `json:"absoluteMs"`
+	Audience       interface{} `json:"audience,omitempty"`
+	BrowserHandoff bool        `json:"browserHandoff"`
+	// Explicit Domain for the session cookies, for example ".example.com". Needed by a path-mounted
+	// instance, where cookies are otherwise host-only. It must cover your sign-in host and can never
+	// be a public suffix or Atlas's own domain; an invalid value is refused on write. Default null.
+	CookieDomain          *string `json:"cookieDomain,omitempty"`
+	CrossSubdomainCookies bool    `json:"crossSubdomainCookies"`
+	// Set a readable __atlas_csrf cookie with each session token: a signed token tied to the session,
+	// replaced whenever the session token is. Verify it in your backend with the instance JWKS.
+	// Default false.
+	CsrfCookie              bool                        `json:"csrfCookie"`
 	CustomData              AuthConfigSessionCustomData `json:"customData"`
 	DeviceBoundSessions     bool                        `json:"deviceBoundSessions"`
 	IdleMs                  float64                     `json:"idleMs"`
@@ -2103,19 +2503,31 @@ type AuthConfigSession struct {
 	// Add email/name to the session JWT.
 	IncludeEmailClaim bool `json:"includeEmailClaim"`
 	// Add the eu_orgs reader claim.
-	IncludeEndUserPoolClaim bool    `json:"includeEndUserPoolClaim"`
-	IncludeOrgsClaim        bool    `json:"includeOrgsClaim"`
-	IncludeRiskClaim        bool    `json:"includeRiskClaim"`
-	JWTTTLSeconds           float64 `json:"jwtTtlSeconds"`
+	IncludeEndUserPoolClaim bool `json:"includeEndUserPoolClaim"`
+	IncludeOrgsClaim        bool `json:"includeOrgsClaim"`
+	// Add a res claim with the user direct resource role assignments (capped;
+	// resource_claims_truncated when over the cap).
+	IncludeResourceRoleClaims bool `json:"includeResourceRoleClaims"`
+	IncludeRiskClaim          bool `json:"includeRiskClaim"`
+	// Lifetime of the session token (the __session JWT) in seconds, 30 to 900, default 60. A shorter
+	// lifetime means faster revocation: a signed-out or banned user stops being accepted by your
+	// backend sooner. A longer lifetime means fewer lapses in throttled background tabs, where the
+	// browser delays the timer that renews the token.
+	JWTTTLSeconds float64 `json:"jwtTtlSeconds"`
 	// Long first-party sessions: raises the absoluteMs ceiling from 90 to 365 days. Needs
 	// refreshRotation (refused while it is off). Organization caps still only shorten a session.
-	LongLived                 bool     `json:"longLived"`
-	MaxConcurrentSessions     float64  `json:"maxConcurrentSessions"`
-	MultiSession              bool     `json:"multiSession"`
-	NonPersistentAbsoluteMs   *float64 `json:"nonPersistentAbsoluteMs,omitempty"`
-	NonPersistentIdleMs       *float64 `json:"nonPersistentIdleMs,omitempty"`
-	RefreshRotation           bool     `json:"refreshRotation"`
-	RememberMe                bool     `json:"rememberMe"`
+	LongLived               bool     `json:"longLived"`
+	MaxConcurrentSessions   float64  `json:"maxConcurrentSessions"`
+	MultiSession            bool     `json:"multiSession"`
+	NonPersistentAbsoluteMs *float64 `json:"nonPersistentAbsoluteMs,omitempty"`
+	NonPersistentIdleMs     *float64 `json:"nonPersistentIdleMs,omitempty"`
+	// Seconds after a refresh token rotates during which presenting the previous one returns the same
+	// new token instead of ending the session. 0 to 30, default 30.
+	RefreshGraceSeconds float64 `json:"refreshGraceSeconds"`
+	RefreshRotation     bool    `json:"refreshRotation"`
+	RememberMe          bool    `json:"rememberMe"`
+	// Cap for the res claim (default 25).
+	ResourceRoleClaimsMax     float64  `json:"resourceRoleClaimsMax"`
 	RevokeOnPasswordChange    bool     `json:"revokeOnPasswordChange"`
 	TokenIncludedSettingsKeys []string `json:"tokenIncludedSettingsKeys"`
 	// One of: refresh, sliding.
@@ -2270,14 +2682,22 @@ type AuthConfig struct {
 	// addresses as unproven when linking social sign-ins, auto-joining organizations and accepting
 	// invitations. Preflight reports email_verified_unproven while this is on.
 	DangerouslyReportSkippedEmailsAsVerified bool `json:"dangerouslyReportSkippedEmailsAsVerified"`
+	// Server-minted delegation tokens (POST /v1/users/{id}/delegation_tokens and the token-exchange
+	// grant). Off by default.
+	DelegationTokens AuthConfigDelegationTokens `json:"delegationTokens"`
 	// One of: allow, block.
 	DeletedUserReturn string                    `json:"deletedUserReturn"`
 	EndUserAPIKeys    *AuthConfigEndUserAPIKeys `json:"endUserApiKeys,omitempty"`
 	Entitlements      AuthConfigEntitlements    `json:"entitlements"`
 	// Trust JWTs minted by an EXTERNAL issuer as a sign-in credential (e.g. a legacy IdP or your own
 	// token service). The linked identity is stored under provider ext_jwt:<id>.
-	ExternalJWT         AuthConfigExternalJWT                         `json:"externalJwt"`
-	IdentityTraits      AuthConfigIdentityTraits                      `json:"identityTraits"`
+	ExternalJWT    AuthConfigExternalJWT    `json:"externalJwt"`
+	IdentityTraits AuthConfigIdentityTraits `json:"identityTraits"`
+	// Previous issuers of this instance that verification should still accept, for a host or mount
+	// move made before Atlas recorded it. Listed in discovery as atlas_previous_issuers and accepted
+	// by @atlasauth/backend with previousIssuers "discovery". At most 10; acceptedUntil at most a year
+	// ahead.
+	IssuerAliases       []AuthConfigIssuerAliasesItem                 `json:"issuerAliases"`
 	JWTTemplates        map[string]map[string]string                  `json:"jwtTemplates"`
 	JWTTemplateSettings map[string]AuthConfigJWTTemplateSettingsValue `json:"jwtTemplateSettings"`
 	Kerberos            AuthConfigKerberos                            `json:"kerberos"`
@@ -2286,16 +2706,17 @@ type AuthConfig struct {
 	MCPConnector        *AuthConfigMCPConnector                       `json:"mcpConnector,omitempty"`
 	MFA                 AuthConfigMFA                                 `json:"mfa"`
 	// One of: off, optional, required.
-	MFAPolicy      string                   `json:"mfaPolicy"`
-	NativeApps     AuthConfigNativeApps     `json:"nativeApps"`
-	OAuthProvider  AuthConfigOAuthProvider  `json:"oauthProvider"`
-	Organizations  AuthConfigOrganizations  `json:"organizations"`
-	PasskeyPolicy  AuthConfigPasskeyPolicy  `json:"passkeyPolicy"`
-	PasswordPolicy AuthConfigPasswordPolicy `json:"passwordPolicy"`
-	PCA            *AuthConfigPCA           `json:"pca,omitempty"`
-	PhoneChannels  AuthConfigPhoneChannels  `json:"phoneChannels"`
-	QrSignIn       AuthConfigQrSignIn       `json:"qrSignIn"`
-	RateLimit      AuthConfigRateLimit      `json:"rateLimit"`
+	MFAPolicy                 string                   `json:"mfaPolicy"`
+	NativeApps                AuthConfigNativeApps     `json:"nativeApps"`
+	OAuthProvider             AuthConfigOAuthProvider  `json:"oauthProvider"`
+	Organizations             AuthConfigOrganizations  `json:"organizations"`
+	PasskeyPolicy             AuthConfigPasskeyPolicy  `json:"passkeyPolicy"`
+	PasswordPolicy            AuthConfigPasswordPolicy `json:"passwordPolicy"`
+	PCA                       *AuthConfigPCA           `json:"pca,omitempty"`
+	PhoneChannels             AuthConfigPhoneChannels  `json:"phoneChannels"`
+	PreviousIssuerOverlapDays float64                  `json:"previousIssuerOverlapDays"`
+	QrSignIn                  AuthConfigQrSignIn       `json:"qrSignIn"`
+	RateLimit                 AuthConfigRateLimit      `json:"rateLimit"`
 	// Whether a password sign-up must prove the address with an emailed code before it completes. When
 	// false the sign-up completes at once, but the address stays unverified (verified,
 	// verification.status and email_verified report false) until the user proves it later.
@@ -2411,6 +2832,13 @@ type InstanceGetFullResult struct {
 	// password sign-in for users who already hold a password, without password reset (and without
 	// password sign-up while sign-up must verify the address by email).
 	LimitedMethods []InstanceGetFullResultLimitedMethodsItem `json:"limited_methods,omitempty"`
+	// GET only. Whether a new user can create an account right now. False when no first-factor sign-up
+	// method is active (email methods without an email provider, no social provider, no SSO
+	// connection, no Sign in with Atlas); preflight reports the same as no_usable_signup_method.
+	SignupUsable *bool `json:"signup_usable,omitempty"`
+	// GET only. When signup_usable is false: why, and the fix (turn on Sign in with Atlas first). Null
+	// otherwise.
+	SignupUnusableReason *string `json:"signup_unusable_reason,omitempty"`
 	// Created (epoch ms).
 	CreatedAt *int64 `json:"created_at,omitempty"`
 }
@@ -2843,8 +3271,9 @@ type InstanceListIntegrationsFullItemHealthEvents struct {
 	// `signature_rejected`: the secret was handed off (see secret_handed_off_at) but the receiver
 	// still answers 401/403, so its copy does not match: hand it off again. `backlog_pending`: the
 	// receiver is healthy and events failed with no retry left; Atlas re-sends them on its own
-	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now. null = nothing to
-	// do. One of: secret_missing, signature_rejected, backlog_pending, None.
+	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now with `{ since:
+	// <oldest_undelivered_at> }` (`since` is required). null = nothing to do. One of: secret_missing,
+	// signature_rejected, backlog_pending, None.
 	Reason *string `json:"reason,omitempty"`
 	// Event receiver only: what to do about `reason`, in words, with the exact call.
 	Hint *string `json:"hint,omitempty"`
@@ -2895,8 +3324,9 @@ type InstanceListIntegrationsFullItemHealthBackchannelLogout struct {
 	// `signature_rejected`: the secret was handed off (see secret_handed_off_at) but the receiver
 	// still answers 401/403, so its copy does not match: hand it off again. `backlog_pending`: the
 	// receiver is healthy and events failed with no retry left; Atlas re-sends them on its own
-	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now. null = nothing to
-	// do. One of: secret_missing, signature_rejected, backlog_pending, None.
+	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now with `{ since:
+	// <oldest_undelivered_at> }` (`since` is required). null = nothing to do. One of: secret_missing,
+	// signature_rejected, backlog_pending, None.
 	Reason *string `json:"reason,omitempty"`
 	// Event receiver only: what to do about `reason`, in words, with the exact call.
 	Hint *string `json:"hint,omitempty"`
@@ -3262,8 +3692,9 @@ type InstanceGetIntegrationFullResultHealthEvents struct {
 	// `signature_rejected`: the secret was handed off (see secret_handed_off_at) but the receiver
 	// still answers 401/403, so its copy does not match: hand it off again. `backlog_pending`: the
 	// receiver is healthy and events failed with no retry left; Atlas re-sends them on its own
-	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now. null = nothing to
-	// do. One of: secret_missing, signature_rejected, backlog_pending, None.
+	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now with `{ since:
+	// <oldest_undelivered_at> }` (`since` is required). null = nothing to do. One of: secret_missing,
+	// signature_rejected, backlog_pending, None.
 	Reason *string `json:"reason,omitempty"`
 	// Event receiver only: what to do about `reason`, in words, with the exact call.
 	Hint *string `json:"hint,omitempty"`
@@ -3314,8 +3745,9 @@ type InstanceGetIntegrationFullResultHealthBackchannelLogout struct {
 	// `signature_rejected`: the secret was handed off (see secret_handed_off_at) but the receiver
 	// still answers 401/403, so its copy does not match: hand it off again. `backlog_pending`: the
 	// receiver is healthy and events failed with no retry left; Atlas re-sends them on its own
-	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now. null = nothing to
-	// do. One of: secret_missing, signature_rejected, backlog_pending, None.
+	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now with `{ since:
+	// <oldest_undelivered_at> }` (`since` is required). null = nothing to do. One of: secret_missing,
+	// signature_rejected, backlog_pending, None.
 	Reason *string `json:"reason,omitempty"`
 	// Event receiver only: what to do about `reason`, in words, with the exact call.
 	Hint *string `json:"hint,omitempty"`
@@ -3879,6 +4311,95 @@ type LegacyAuthConnectionGetFullResult struct {
 	Configured *bool `json:"configured,omitempty"`
 }
 
+// MachineGrant2RevokedBy is a typed object of the Backend API.
+type MachineGrant2RevokedBy struct {
+	Type string  `json:"type"`
+	ID   *string `json:"id,omitempty"`
+}
+
+// MachineGrant2: The `MachineGrant` object.
+type MachineGrant2 struct {
+	Object           string `json:"object"`
+	ID               string `json:"id"`
+	MachineID        string `json:"machine_id"`
+	ResourceServerID string `json:"resource_server_id"`
+	// The scopes the machine may request. Always plain scope values: presets are expanded before
+	// storing.
+	Scopes []string `json:"scopes"`
+	// Limits set on the grant, carried in the `constraints` claim of every token the machine mints for
+	// this resource server. Null when none.
+	Constraints map[string]interface{} `json:"constraints,omitempty"`
+	// When the grant stops minting tokens (epoch ms), or null for no expiry.
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// True once `expires_at` has passed. An expired grant mints nothing and is dropped from verify
+	// results.
+	Expired *bool `json:"expired,omitempty"`
+	// Recorded `sign_out_everywhere`. A grant of a machine that has an owner always ends with the
+	// owner signing out everywhere. One of: sign_out_everywhere, None.
+	DiesWith *string `json:"dies_with,omitempty"`
+	// Epoch ms the grant was ended (it is kept as a record for 90 days; `GET
+	// .../grants?include_ended=true` lists it). Null while live.
+	RevokedAt *int64 `json:"revoked_at,omitempty"`
+	// The same value as `revoked_at`.
+	EndedAt *int64 `json:"ended_at,omitempty"`
+	// Why it ended: revoked_by_api or owner_signed_out.
+	RevokedReason *string `json:"revoked_reason,omitempty"`
+	// Who ended it.
+	RevokedBy *MachineGrant2RevokedBy `json:"revoked_by,omitempty"`
+	// Created (epoch ms).
+	CreatedAt int64 `json:"created_at"`
+	// Last updated (epoch ms).
+	UpdatedAt int64 `json:"updated_at"`
+}
+
+// MessagingProvider2: The `MessagingProvider` object.
+type MessagingProvider2 struct {
+	Object string `json:"object"`
+	// Always true on a configured object (the unconfigured reply is { configured: false }).
+	Configured *bool `json:"configured,omitempty"`
+	// The provider id; pass it as provider_id to managed email or the development sender.
+	ID      *string `json:"id,omitempty"`
+	Channel string  `json:"channel"`
+	// How the provider sends. One of: standard, development, managed_domain.
+	Mode        *string           `json:"mode,omitempty"`
+	Transport   string            `json:"transport"`
+	FromAddress *string           `json:"from_address,omitempty"`
+	Status      string            `json:"status"`
+	Config      map[string]string `json:"config"`
+	SecretsSet  map[string]bool   `json:"secrets_set"`
+	// For each write-only secret config field that is set: the first 8 hex characters of sha256 of its
+	// value, to compare with the value you hold. Never the value.
+	SecretFingerprints map[string]string `json:"secret_fingerprints,omitempty"`
+	// Last updated (epoch ms).
+	UpdatedAt int64 `json:"updated_at"`
+}
+
+// MessagingProvidersGetFullResultManagedEmail is a typed object of the Backend API.
+type MessagingProvidersGetFullResultManagedEmail struct {
+	Object      string `json:"object"`
+	FromAddress string `json:"from_address"`
+	Domain      string `json:"domain"`
+	Status      string `json:"status"`
+	Verified    bool   `json:"verified"`
+}
+
+// MessagingProvidersGetFullResultDevelopmentEmail is a typed object of the Backend API.
+type MessagingProvidersGetFullResultDevelopmentEmail struct {
+	Object      string  `json:"object"`
+	Enabled     bool    `json:"enabled"`
+	FromAddress *string `json:"from_address,omitempty"`
+}
+
+// MessagingProvidersGetFullResult is a typed object of the Backend API.
+type MessagingProvidersGetFullResult struct {
+	Object           string                                           `json:"object"`
+	Email            *MessagingProvider2                              `json:"email,omitempty"`
+	SMS              *MessagingProvider2                              `json:"sms,omitempty"`
+	Push             *MessagingProvider2                              `json:"push,omitempty"`
+	ManagedEmail     *MessagingProvidersGetFullResultManagedEmail     `json:"managed_email,omitempty"`
+	DevelopmentEmail *MessagingProvidersGetFullResultDevelopmentEmail `json:"development_email,omitempty"`
+}
+
 // OAuthClientsListFullItemAppSettingsBranding: The heading, sub-heading, logo and primary colour of the hosted sign-in and sign-up pages when
 // the sign-in is for this app.
 type OAuthClientsListFullItemAppSettingsBranding struct {
@@ -4009,6 +4530,10 @@ type OAuthClientsListFullItem struct {
 	LoginURL *string `json:"login_url,omitempty"`
 	// Your own consent page for this client.
 	ConsentURL *string `json:"consent_url,omitempty"`
+	// 'always' when a first-party client's consent is sent to consent_url. One of: always, None.
+	DelegateConsent *string `json:"delegate_consent,omitempty"`
+	// Your own device-approval page for this client.
+	DeviceURL *string `json:"device_url,omitempty"`
 	// `cimd` when the client was created from its Client ID Metadata Document (its client_id is that
 	// document's URL); null for a registered client. One of: cimd, None.
 	DiscoverySource        *string  `json:"discovery_source,omitempty"`
@@ -4036,9 +4561,21 @@ type OAuthClientsListFullItem struct {
 	ApprovedScopes []string `json:"approved_scopes,omitempty"`
 	// Token endpoint requests per minute this client may make; null = no limit.
 	RateLimitPerMinute *int64 `json:"rate_limit_per_minute,omitempty"`
-	// The `sub` this client sees: the user id, or a per-sector pairwise identifier. One of: public,
-	// pairwise.
-	SubjectType         *string `json:"subject_type,omitempty"`
+	// Scopes a request without `scope` gets; null = none.
+	DefaultScopes   []string `json:"default_scopes,omitempty"`
+	DefaultResource *string  `json:"default_resource,omitempty"`
+	// false = a pure-API client: no openid required, no ID token issued.
+	RequireOpenid *bool `json:"require_openid,omitempty"`
+	// The instance certified this client (the level above approved).
+	Certified *bool `json:"certified,omitempty"`
+	// When the client was certified (epoch ms); null = not certified.
+	CertifiedAt *int64 `json:"certified_at,omitempty"`
+	// The `sub` this client sees: the user id, a per-sector pairwise identifier, or the user's
+	// external_id. One of: public, pairwise, external_id.
+	SubjectType *string `json:"subject_type,omitempty"`
+	// With subject_type external_id: what a user without an external_id gets. One of: atlas_user_id,
+	// refuse.
+	SubjectFallback     *string `json:"subject_fallback,omitempty"`
 	SectorIdentifierURI *string `json:"sector_identifier_uri,omitempty"`
 	// When the current client secret stops authenticating (epoch ms). Null = it does not expire.
 	ClientSecretExpiresAt *int64 `json:"client_secret_expires_at,omitempty"`
@@ -4090,18 +4627,66 @@ type OAuthInitialAccessTokensListFullItem struct {
 	Token *string `json:"token,omitempty"`
 }
 
+// OAuthProvider2ModesNative is a typed object of the Backend API.
+type OAuthProvider2ModesNative struct {
+	CredentialFields []map[string]interface{} `json:"credential_fields,omitempty"`
+	Hint             *string                  `json:"hint,omitempty"`
+}
+
+// OAuthProvider2ModesRedirect is a typed object of the Backend API.
+type OAuthProvider2ModesRedirect struct {
+	CredentialFields []map[string]interface{} `json:"credential_fields,omitempty"`
+	Hint             *string                  `json:"hint,omitempty"`
+}
+
+// OAuthProvider2Modes: For a provider with a native (in-page) mode: the credential fields and a hint for each sign-in
+// mode. Native needs no client secret. Null for a redirect-only provider.
+type OAuthProvider2Modes struct {
+	Native   *OAuthProvider2ModesNative   `json:"native,omitempty"`
+	Redirect *OAuthProvider2ModesRedirect `json:"redirect,omitempty"`
+}
+
+// OAuthProvider2ConnectionExtrasItem is a typed object of the Backend API.
+type OAuthProvider2ConnectionExtrasItem struct {
+	// The `host_params` key.
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	// Must be present on a connection OAuth client of this provider.
+	Required bool `json:"required"`
+	// Anchored regular expression the whole value must match.
+	Pattern     *string `json:"pattern,omitempty"`
+	Description string  `json:"description"`
+}
+
+// OAuthProvider2HostedIDToken: For a provider whose authorize page can return an id_token (google, apple, microsoft, twitch):
+// sign-in with only the client_id on every platform (native apps, Expo Go, desktop, web), used
+// automatically while the provider has no client secret. `available` says whether that is the case
+// now; `redirect_uri` is the URL to register with the provider for it. Null for other providers.
+type OAuthProvider2HostedIDToken struct {
+	Available   bool   `json:"available"`
+	RedirectURI string `json:"redirect_uri"`
+}
+
 // OAuthProvider2: A social/OAuth provider config. Secrets never returned (has_secret marks presence).
 type OAuthProvider2 struct {
-	Object           string                   `json:"object"`
-	Provider         string                   `json:"provider"`
-	DisplayName      string                   `json:"display_name"`
-	Category         *string                  `json:"category,omitempty"`
-	Tier             *string                  `json:"tier,omitempty"`
-	SetupDocsURL     *string                  `json:"setup_docs_url,omitempty"`
-	DefaultScopes    []string                 `json:"default_scopes,omitempty"`
-	APIScopes        []string                 `json:"api_scopes,omitempty"`
+	Object        string   `json:"object"`
+	Provider      string   `json:"provider"`
+	DisplayName   string   `json:"display_name"`
+	Category      *string  `json:"category,omitempty"`
+	Tier          *string  `json:"tier,omitempty"`
+	SetupDocsURL  *string  `json:"setup_docs_url,omitempty"`
+	DefaultScopes []string `json:"default_scopes,omitempty"`
+	APIScopes     []string `json:"api_scopes,omitempty"`
+	// The fields the redirect flow needs (client id and secret).
 	CredentialFields []map[string]interface{} `json:"credential_fields,omitempty"`
-	Settings         []map[string]interface{} `json:"settings,omitempty"`
+	// For a provider with a native (in-page) mode: the credential fields and a hint for each sign-in
+	// mode. Native needs no client secret. Null for a redirect-only provider.
+	Modes    *OAuthProvider2Modes     `json:"modes,omitempty"`
+	Settings []map[string]interface{} `json:"settings,omitempty"`
+	// Non-secret settings a connection OAuth client of this provider (`PUT
+	// /v1/connections/oauth_clients`) carries in `host_params`, such as TikTok Shop's `service_id`. A
+	// required one must be sent; an unknown key is refused.
+	ConnectionExtras []OAuthProvider2ConnectionExtrasItem `json:"connection_extras,omitempty"`
 	// Credential-less providers only (siwe, siws, siwb, siwf): the stored verifier settings, e.g. {
 	// domain, chain_ids, rpc_url }. Empty for every other provider.
 	SettingValues map[string]string `json:"setting_values,omitempty"`
@@ -4123,15 +4708,21 @@ type OAuthProvider2 struct {
 	RedirectURI *string `json:"redirect_uri,omitempty"`
 	// Atlas's own callback URL; a custom_redirect_uri forwards ?code&state here.
 	AtlasCallback *string `json:"atlas_callback,omitempty"`
-	// The extra audiences a native app id_token may carry (set with settings.native_client_ids on PUT,
-	// a comma list; an empty string clears it). Empty when none.
+	// The extra audiences a native app id_token may carry (set with `native_client_ids` on PUT, an
+	// array or a comma list, or settings.native_client_ids; an empty array or string clears it). Empty
+	// when none.
 	NativeClientIDs []string `json:"native_client_ids,omitempty"`
 	// A tenant's own already-registered callback (migration): Atlas uses it in the authorize + token
 	// exchange and it forwards to atlas_callback. Null when unset.
 	CustomRedirectURI *string `json:"custom_redirect_uri,omitempty"`
-	Configured        bool    `json:"configured"`
-	ClientID          *string `json:"client_id,omitempty"`
-	HasSecret         *bool   `json:"has_secret,omitempty"`
+	// For a provider whose authorize page can return an id_token (google, apple, microsoft, twitch):
+	// sign-in with only the client_id on every platform (native apps, Expo Go, desktop, web), used
+	// automatically while the provider has no client secret. `available` says whether that is the case
+	// now; `redirect_uri` is the URL to register with the provider for it. Null for other providers.
+	HostedIDToken *OAuthProvider2HostedIDToken `json:"hosted_id_token,omitempty"`
+	Configured    bool                         `json:"configured"`
+	ClientID      *string                      `json:"client_id,omitempty"`
+	HasSecret     *bool                        `json:"has_secret,omitempty"`
 	// Whether the provider is turned on. Saving credentials via PUT does NOT enable it; toggle with
 	// POST /v1/oauth_providers/{provider}/enabled.
 	Enabled     bool     `json:"enabled"`
@@ -4760,57 +5351,6 @@ type PlatformListAtlasIDAppsFullResult struct {
 	Used int64 `json:"used"`
 }
 
-// PreflightFinding2FixCall: Only where one exact Backend API call is the whole remedy: that call, ready to send. It is one
-// of the remedies fix describes, so read fix first.
-type PreflightFinding2FixCall struct {
-	// One of: POST, PUT, PATCH.
-	Method string                 `json:"method"`
-	Path   string                 `json:"path"`
-	Body   map[string]interface{} `json:"body,omitempty"`
-}
-
-// PreflightFinding2Acknowledged: Present when the code is acknowledged (PUT /v1/instance/preflight/acks/{code}): a known,
-// accepted warning or info finding that no longer counts. Never on an error.
-type PreflightFinding2Acknowledged struct {
-	Reason string `json:"reason"`
-	// The API key or dashboard user that acknowledged it.
-	By *string `json:"by,omitempty"`
-	// Epoch ms.
-	At int64 `json:"at"`
-	// Epoch ms; null = until removed.
-	ExpiresAt *int64 `json:"expires_at,omitempty"`
-}
-
-// PreflightFinding2: The `PreflightFinding` object.
-type PreflightFinding2 struct {
-	// One of: error, warning, info.
-	Severity string `json:"severity"`
-	// Stable snake_case identifier. Every code is listed by GET /v1/instance/preflight/codes.
-	Code string `json:"code"`
-	// What is wrong, in a plain sentence.
-	Message string `json:"message"`
-	// What to do about it, in a plain sentence.
-	Fix string `json:"fix"`
-	// Only where one exact Backend API call is the whole remedy: that call, ready to send. It is one
-	// of the remedies fix describes, so read fix first.
-	FixCall *PreflightFinding2FixCall `json:"fix_call,omitempty"`
-	// With fix_call: true only when the call cannot lock anyone out or change sign-in for existing
-	// users.
-	SafeToAutofix *bool `json:"safe_to_autofix,omitempty"`
-	// Ids of what the finding is about (provider, id/client_id, origin, domain_id/host, site_id, …).
-	Subject map[string]string `json:"subject,omitempty"`
-	// Set on the security posture findings (weaker than the defaults new instances get). One of:
-	// security_posture.
-	Group *string `json:"group,omitempty"`
-	// Only with include_suppressed=true: the finding does not apply to how the instance integrates.
-	Suppressed *bool `json:"suppressed,omitempty"`
-	// Only with include_suppressed=true: why it does not apply.
-	SuppressedReason *string `json:"suppressed_reason,omitempty"`
-	// Present when the code is acknowledged (PUT /v1/instance/preflight/acks/{code}): a known,
-	// accepted warning or info finding that no longer counts. Never on an error.
-	Acknowledged *PreflightFinding2Acknowledged `json:"acknowledged,omitempty"`
-}
-
 // AtlasIDButtonOrigin: The `AtlasIdButtonOrigin` object.
 type AtlasIDButtonOrigin struct {
 	// The page origin (scheme, host and port).
@@ -5282,6 +5822,24 @@ type UsersGetMinorStatusFullResult struct {
 	Guardians    []UsersGetMinorStatusFullResultGuardiansItem `json:"guardians,omitempty"`
 }
 
+// UsersListOrganizationMembershipsFullItem is a typed object of the Backend API.
+type UsersListOrganizationMembershipsFullItem struct {
+	Object           *string `json:"object,omitempty"`
+	OrganizationID   *string `json:"organization_id,omitempty"`
+	OrganizationSlug *string `json:"organization_slug,omitempty"`
+	// The member's role key in this org.
+	Role *string `json:"role,omitempty"`
+	// Who manages the role: `scim`, `sso:<connection id>` or `ldap:<connection id>` (the identity
+	// provider's groups or roles keep it in step), `directory_sync`, `manual` (set through the API or
+	// dashboard; no directory changes it), or null (joined by invitation, or before sources were
+	// recorded).
+	RoleSource *string `json:"role_source,omitempty"`
+	// The org's active entitlement plan slug, or null.
+	Plan *string `json:"plan,omitempty"`
+	// When the membership was created (epoch ms).
+	JoinedAt *int64 `json:"joined_at,omitempty"`
+}
+
 // UsersGetReferralFullResult is a typed object of the Backend API.
 type UsersGetReferralFullResult struct {
 	Object string `json:"object"`
@@ -5321,70 +5879,6 @@ type UsersGetReferralFullResult struct {
 	SignedUpAt int64 `json:"signed_up_at"`
 	// Epoch-ms.
 	UpdatedAt int64 `json:"updated_at"`
-}
-
-// Session2Location is a typed object of the Backend API.
-type Session2Location struct {
-	// ISO country code.
-	Country string  `json:"country"`
-	Region  *string `json:"region,omitempty"`
-	City    *string `json:"city,omitempty"`
-}
-
-// Session2Risk is a typed object of the Backend API.
-type Session2Risk struct {
-	Score *int64 `json:"score,omitempty"`
-	// One of: low, medium, high.
-	Level      *string  `json:"level,omitempty"`
-	Reasons    []string `json:"reasons,omitempty"`
-	ComputedAt *int64   `json:"computed_at,omitempty"`
-}
-
-// Session2: The `Session` object.
-type Session2 struct {
-	Object                   string  `json:"object"`
-	ID                       string  `json:"id"`
-	UserID                   string  `json:"user_id"`
-	Status                   string  `json:"status"`
-	LastActiveOrganizationID *string `json:"last_active_organization_id,omitempty"`
-	ImpersonatedBy           *string `json:"impersonated_by,omitempty"`
-	// Last active (epoch ms).
-	LastActiveAt int64 `json:"last_active_at"`
-	// Expires (epoch ms).
-	ExpireAt int64 `json:"expire_at"`
-	// Abandoned (epoch ms).
-	AbandonAt int64 `json:"abandon_at"`
-	// Epoch ms when the session ends from inactivity unless there is activity first (same value as
-	// abandon_at). Slides on activity and on POST /v1/sessions/{id}/touch; never past expire_at.
-	IdleExpiresAt int64 `json:"idle_expires_at"`
-	// Created (epoch ms).
-	CreatedAt int64 `json:"created_at"`
-	// Custom per-session data the app attached (PUT/PATCH /v1/sessions/{id}/custom_data, or a
-	// post_login Action). Null when none.
-	CustomData map[string]interface{} `json:"custom_data,omitempty"`
-	// How the session was signed in: the first-factor strategy (password, email_code, email_link,
-	// phone_code, passkey, oauth, sso, saml, ticket, ...). Null for a session created before this was
-	// recorded.
-	SignInMethod *string `json:"sign_in_method,omitempty"`
-	// The social provider id when sign_in_method is oauth; otherwise null.
-	Provider *string `json:"provider,omitempty"`
-	// The authentication methods proven at sign-in (RFC 8176, e.g. pwd, otp, webauthn, ext, mfa);
-	// updated by a step-up. Null for a session created before this was recorded.
-	Amr []string `json:"amr,omitempty"`
-	// The user agent of the device that signed in. Null when none was sent.
-	UserAgent *string `json:"user_agent,omitempty"`
-	// The client IP at sign-in (through a path mount: the browser IP your proxy asserted with its
-	// proxy secret). Dropped 30 days after the session ends.
-	IPAddress *string `json:"ip_address,omitempty"`
-	// Coarse location of the sign-in, when a geo source resolved one.
-	Location *Session2Location `json:"location,omitempty"`
-	// Advisory risk assessment. Null = not assessed (never "safe"). Atlas decides nothing from it.
-	Risk *Session2Risk `json:"risk,omitempty"`
-	// Epoch ms when the session was ended (null while active, or when it simply ran out).
-	RevokedAt *int64 `json:"revoked_at,omitempty"`
-	// Why the session was ended, e.g. signed_out, revoked_by_api, token_reuse (a refresh token was
-	// presented after it had been replaced and its grace window had passed). Null while active.
-	RevokedReason *string `json:"revoked_reason,omitempty"`
 }
 
 // VCListCredentialTypesFullItemClaimsItem is a typed object of the Backend API.
@@ -5427,6 +5921,67 @@ type VCListCredentialTypesFullItem struct {
 	RequireWalletAttestation *bool                                     `json:"require_wallet_attestation,omitempty"`
 	// Created (epoch ms).
 	CreatedAt *int64 `json:"created_at,omitempty"`
+}
+
+// WhoamiGetFullResultKeyCanMint: What this key may hand out through POST /v1/secret_keys: nothing without secret_keys:write;
+// otherwise only scopes it holds itself.
+type WhoamiGetFullResultKeyCanMint struct {
+	SecretKeys *bool    `json:"secret_keys,omitempty"`
+	Scopes     []string `json:"scopes,omitempty"`
+	Presets    []string `json:"presets,omitempty"`
+}
+
+// WhoamiGetFullResultKey is a typed object of the Backend API.
+type WhoamiGetFullResultKey struct {
+	ID *string `json:"id,omitempty"`
+	// One of: secret, publishable, platform, partner_link, access_token.
+	Type        *string  `json:"type,omitempty"`
+	Prefix      *string  `json:"prefix,omitempty"`
+	Environment *string  `json:"environment,omitempty"`
+	Scopes      []string `json:"scopes,omitempty"`
+	// Presets (read_only, privacy:execute, …) expanded.
+	EffectiveScopes []string `json:"effective_scopes,omitempty"`
+	// The named key preset (app-runtime, provisioning, integrations) whose scopes are exactly this
+	// key's; null otherwise.
+	Preset *string `json:"preset,omitempty"`
+	// What this key may hand out through POST /v1/secret_keys: nothing without secret_keys:write;
+	// otherwise only scopes it holds itself.
+	CanMint *WhoamiGetFullResultKeyCanMint `json:"can_mint,omitempty"`
+	// What the key is scoped to: { type: "instance", id } (or the platform/account for a platform
+	// key).
+	Resource map[string]interface{} `json:"resource,omitempty"`
+	// Backend API route prefixes (for example /v1/domains) with at least one route this key's scopes
+	// allow, sorted.
+	RoutePrefixes []string `json:"route_prefixes,omitempty"`
+	Owner         *string  `json:"owner,omitempty"`
+	CreatedAt     *int64   `json:"created_at,omitempty"`
+	ExpiresAt     *int64   `json:"expires_at,omitempty"`
+	LastUsedAt    *int64   `json:"last_used_at,omitempty"`
+	LastUsedIP    *string  `json:"last_used_ip,omitempty"`
+}
+
+// WhoamiGetFullResultInstance is a typed object of the Backend API.
+type WhoamiGetFullResultInstance struct {
+	ID          *string `json:"id,omitempty"`
+	Environment *string `json:"environment,omitempty"`
+	Issuer      *string `json:"issuer,omitempty"`
+}
+
+// WhoamiGetFullResultAccount is a typed object of the Backend API.
+type WhoamiGetFullResultAccount struct {
+	ID *string `json:"id,omitempty"`
+}
+
+// WhoamiGetFullResult is a typed object of the Backend API.
+type WhoamiGetFullResult struct {
+	Object   string                       `json:"object"`
+	Key      WhoamiGetFullResultKey       `json:"key"`
+	Instance *WhoamiGetFullResultInstance `json:"instance,omitempty"`
+	Account  WhoamiGetFullResultAccount   `json:"account"`
+	// When a partner link (or a token minted from one) is calling.
+	Partner map[string]interface{} `json:"partner,omitempty"`
+	// When an operator token is calling: sub, auth_time, acr, amr.
+	Operator map[string]interface{} `json:"operator,omitempty"`
 }
 
 // ActionsUpdateFullParamsHTTPTarget is a typed object of the Backend API.
@@ -6617,6 +7172,303 @@ type ActionTestResult2 struct {
 	Error        *string                             `json:"error,omitempty"`
 }
 
+// APIKeysTokenFullParams is a typed object of the Backend API.
+type APIKeysTokenFullParams struct {
+	Secret          *string     `json:"secret,omitempty"`
+	Assertion       *string     `json:"assertion,omitempty"`
+	TTLSeconds      *float64    `json:"ttl_seconds,omitempty"`
+	Audience        interface{} `json:"audience,omitempty"`
+	ClientIP        *string     `json:"client_ip,omitempty"`
+	IncludeMetadata *bool       `json:"include_metadata,omitempty"`
+}
+
+// APIKeyToken2Organization: Present for a key bound to an organization: the membership at mint time (`id`, `role`,
+// `permissions`). `scopes` is then the effective scopes and the token carries the same object as
+// its `organization` claim.
+type APIKeyToken2Organization struct {
+	ID          *string  `json:"id,omitempty"`
+	Role        *string  `json:"role,omitempty"`
+	Permissions []string `json:"permissions,omitempty"`
+}
+
+// APIKeyToken2Cnf: Proof-of-possession confirmation — present only for a PoP key.
+type APIKeyToken2Cnf struct {
+	Jkt *string `json:"jkt,omitempty"`
+}
+
+// APIKeyToken2: The `ApiKeyToken` object.
+type APIKeyToken2 struct {
+	Object string `json:"object"`
+	// The short-lived JWKS-signed access JWT (token_use:api_key).
+	Token     string `json:"token"`
+	TokenType string `json:"token_type"`
+	// Unique token id — deny-list this to revoke one token.
+	Jti string `json:"jti"`
+	// The long-lived key this token was minted from (the JWT sub).
+	KeyID string `json:"key_id"`
+	// One of: user, organization, machine.
+	SubjectType *string                `json:"subject_type,omitempty"`
+	SubjectID   *string                `json:"subject_id,omitempty"`
+	Scopes      []string               `json:"scopes"`
+	Constraints map[string]interface{} `json:"constraints"`
+	// Present for a key bound to an organization: the membership at mint time (`id`, `role`,
+	// `permissions`). `scopes` is then the effective scopes and the token carries the same object as
+	// its `organization` claim.
+	Organization *APIKeyToken2Organization `json:"organization,omitempty"`
+	// Proof-of-possession confirmation — present only for a PoP key.
+	Cnf *APIKeyToken2Cnf `json:"cnf,omitempty"`
+	// Lifetime in seconds (clamped to key expiry + org ceiling + global cap).
+	ExpiresIn int64 `json:"expires_in"`
+	// Expiry (epoch ms).
+	ExpiresAt int64 `json:"expires_at"`
+	// The issuer/JWKS a verifier checks this token against.
+	Issuer string `json:"issuer"`
+}
+
+// BetterAuthImportsCreateFullParamsOptions: What the import does. Every field is optional; an unknown field is refused.
+type BetterAuthImportsCreateFullParamsOptions struct {
+	// Only these Better Auth models (e.g. `user`, `account`, `organization`). Default: all.
+	Models []string `json:"models,omitempty"`
+	// A Better Auth user whose verified email belongs to an Atlas user from elsewhere: skip it
+	// (reported as a conflict) or merge into that user. One of: skip, link.
+	OnEmailConflict *string `json:"on_email_conflict,omitempty"`
+	// The admin plugin's default role; it is not carried as an Atlas app role.
+	DefaultRole *string `json:"default_role,omitempty"`
+	// Create an Atlas app role for each admin-plugin role that has none.
+	CreateAppRoles *bool `json:"create_app_roles,omitempty"`
+	// Carry social accounts' access and refresh tokens.
+	ImportOAuthTokens *bool `json:"import_oauth_tokens,omitempty"`
+	// Passkeys registered for another relying-party id than the instance's. One of: skip, import.
+	PasskeysOnRPMismatch *string `json:"passkeys_on_rp_mismatch,omitempty"`
+	// Adopt Stripe subscriptions (needs the instance Stripe key).
+	ImportSubscriptions *bool `json:"import_subscriptions,omitempty"`
+	// Better Auth plan name to Atlas billing plan id.
+	PlanMap map[string]string `json:"plan_map,omitempty"`
+	// Publish the JWT plugin's public keys in the instance JWKS for the cutover.
+	ImportJWKS *bool `json:"import_jwks,omitempty"`
+	// How long imported JWKS keys stay published.
+	JWKSCutoverDays *int64 `json:"jwks_cutover_days,omitempty"`
+	// Import still-valid sessions (as token hashes) for the session bridge.
+	ImportSessions *bool `json:"import_sessions,omitempty"`
+	// Keep the sealed bundle after a successful apply (it is deleted by default).
+	RetainBundle *bool `json:"retain_bundle,omitempty"`
+}
+
+// BetterAuthImportsCreateFullParams is a typed object of the Backend API.
+type BetterAuthImportsCreateFullParams struct {
+	// What the import does. Every field is optional; an unknown field is refused.
+	Options *BetterAuthImportsCreateFullParamsOptions `json:"options,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultOptions: What the import does. Every field is optional; an unknown field is refused.
+type BetterAuthImportsCreateFullResultOptions struct {
+	// Only these Better Auth models (e.g. `user`, `account`, `organization`). Default: all.
+	Models []string `json:"models,omitempty"`
+	// A Better Auth user whose verified email belongs to an Atlas user from elsewhere: skip it
+	// (reported as a conflict) or merge into that user. One of: skip, link.
+	OnEmailConflict *string `json:"on_email_conflict,omitempty"`
+	// The admin plugin's default role; it is not carried as an Atlas app role.
+	DefaultRole *string `json:"default_role,omitempty"`
+	// Create an Atlas app role for each admin-plugin role that has none.
+	CreateAppRoles *bool `json:"create_app_roles,omitempty"`
+	// Carry social accounts' access and refresh tokens.
+	ImportOAuthTokens *bool `json:"import_oauth_tokens,omitempty"`
+	// Passkeys registered for another relying-party id than the instance's. One of: skip, import.
+	PasskeysOnRPMismatch *string `json:"passkeys_on_rp_mismatch,omitempty"`
+	// Adopt Stripe subscriptions (needs the instance Stripe key).
+	ImportSubscriptions *bool `json:"import_subscriptions,omitempty"`
+	// Better Auth plan name to Atlas billing plan id.
+	PlanMap map[string]string `json:"plan_map,omitempty"`
+	// Publish the JWT plugin's public keys in the instance JWKS for the cutover.
+	ImportJWKS *bool `json:"import_jwks,omitempty"`
+	// How long imported JWKS keys stay published.
+	JWKSCutoverDays *int64 `json:"jwks_cutover_days,omitempty"`
+	// Import still-valid sessions (as token hashes) for the session bridge.
+	ImportSessions *bool `json:"import_sessions,omitempty"`
+	// Keep the sealed bundle after a successful apply (it is deleted by default).
+	RetainBundle *bool `json:"retain_bundle,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultSourceExporter is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultSourceExporter struct {
+	Name    *string `json:"name,omitempty"`
+	Version *string `json:"version,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultSource: What the exporter reported about the Better Auth app.
+type BetterAuthImportsCreateFullResultSource struct {
+	ExportedAt        *string                                          `json:"exported_at,omitempty"`
+	Exporter          *BetterAuthImportsCreateFullResultSourceExporter `json:"exporter,omitempty"`
+	BetterAuthVersion *string                                          `json:"better_auth_version,omitempty"`
+	BaseURL           *string                                          `json:"base_url,omitempty"`
+	Plugins           []string                                         `json:"plugins,omitempty"`
+	Models            []string                                         `json:"models,omitempty"`
+	RPID              *string                                          `json:"rp_id,omitempty"`
+	SocialProviders   []string                                         `json:"social_providers,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultProgress is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultProgress struct {
+	Total     *int64 `json:"total,omitempty"`
+	Processed *int64 `json:"processed,omitempty"`
+	Succeeded *int64 `json:"succeeded,omitempty"`
+	Failed    *int64 `json:"failed,omitempty"`
+	Percent   *int64 `json:"percent,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultReportModelsItem is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultReportModelsItem struct {
+	Model      *string `json:"model,omitempty"`
+	Label      *string `json:"label,omitempty"`
+	Found      *int64  `json:"found,omitempty"`
+	WillCreate *int64  `json:"will_create,omitempty"`
+	WillUpdate *int64  `json:"will_update,omitempty"`
+	WillSkip   *int64  `json:"will_skip,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultReportSkippedItem is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultReportSkippedItem struct {
+	Model      *string `json:"model,omitempty"`
+	RowID      *string `json:"row_id,omitempty"`
+	ReasonCode *string `json:"reason_code,omitempty"`
+	Reason     *string `json:"reason,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultReportConflictsItem is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultReportConflictsItem struct {
+	Model   *string `json:"model,omitempty"`
+	RowID   *string `json:"row_id,omitempty"`
+	Code    *string `json:"code,omitempty"`
+	Message *string `json:"message,omitempty"`
+	// One of: merge, skip.
+	Resolution *string `json:"resolution,omitempty"`
+	ExistingID *string `json:"existing_id,omitempty"`
+	Value      *string `json:"value,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultReportActionItemsItem is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultReportActionItemsItem struct {
+	Code *string `json:"code,omitempty"`
+	// required: fix it and re-run, or the rows it names stay out. recommended: imported, but something
+	// outside the import needs doing. The API never blocks an apply on an action item. One of:
+	// required, recommended, info.
+	Severity *string  `json:"severity,omitempty"`
+	Message  *string  `json:"message,omitempty"`
+	Count    *int64   `json:"count,omitempty"`
+	Items    []string `json:"items,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultReport: The dry run: what an apply would do.
+type BetterAuthImportsCreateFullResultReport struct {
+	Models []BetterAuthImportsCreateFullResultReportModelsItem `json:"models,omitempty"`
+	// The first 500 skipped rows.
+	Skipped        []BetterAuthImportsCreateFullResultReportSkippedItem     `json:"skipped,omitempty"`
+	SkippedTotal   *int64                                                   `json:"skipped_total,omitempty"`
+	SkippedByCode  map[string]int64                                         `json:"skipped_by_code,omitempty"`
+	Conflicts      []BetterAuthImportsCreateFullResultReportConflictsItem   `json:"conflicts,omitempty"`
+	ConflictsTotal *int64                                                   `json:"conflicts_total,omitempty"`
+	ActionItems    []BetterAuthImportsCreateFullResultReportActionItemsItem `json:"action_items,omitempty"`
+	Warnings       []string                                                 `json:"warnings,omitempty"`
+	Notes          map[string]interface{}                                   `json:"notes,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultResultModelsItem is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultResultModelsItem struct {
+	Model     *string `json:"model,omitempty"`
+	Label     *string `json:"label,omitempty"`
+	Found     *int64  `json:"found,omitempty"`
+	Created   *int64  `json:"created,omitempty"`
+	Updated   *int64  `json:"updated,omitempty"`
+	Unchanged *int64  `json:"unchanged,omitempty"`
+	Skipped   *int64  `json:"skipped,omitempty"`
+	Failed    *int64  `json:"failed,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultResultSkippedItem is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultResultSkippedItem struct {
+	Model      *string `json:"model,omitempty"`
+	RowID      *string `json:"row_id,omitempty"`
+	ReasonCode *string `json:"reason_code,omitempty"`
+	Reason     *string `json:"reason,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultResultConflictsItem is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultResultConflictsItem struct {
+	Model   *string `json:"model,omitempty"`
+	RowID   *string `json:"row_id,omitempty"`
+	Code    *string `json:"code,omitempty"`
+	Message *string `json:"message,omitempty"`
+	// One of: merge, skip.
+	Resolution *string `json:"resolution,omitempty"`
+	ExistingID *string `json:"existing_id,omitempty"`
+	Value      *string `json:"value,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultResultActionItemsItem is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultResultActionItemsItem struct {
+	Code *string `json:"code,omitempty"`
+	// required: fix it and re-run, or the rows it names stay out. recommended: imported, but something
+	// outside the import needs doing. The API never blocks an apply on an action item. One of:
+	// required, recommended, info.
+	Severity *string  `json:"severity,omitempty"`
+	Message  *string  `json:"message,omitempty"`
+	Count    *int64   `json:"count,omitempty"`
+	Items    []string `json:"items,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultResult: What the apply wrote (so far, while it runs).
+type BetterAuthImportsCreateFullResultResult struct {
+	Models      []BetterAuthImportsCreateFullResultResultModelsItem `json:"models,omitempty"`
+	CompletedAt *int64                                              `json:"completed_at,omitempty"`
+	// The first 500 skipped rows.
+	Skipped        []BetterAuthImportsCreateFullResultResultSkippedItem     `json:"skipped,omitempty"`
+	SkippedTotal   *int64                                                   `json:"skipped_total,omitempty"`
+	SkippedByCode  map[string]int64                                         `json:"skipped_by_code,omitempty"`
+	Conflicts      []BetterAuthImportsCreateFullResultResultConflictsItem   `json:"conflicts,omitempty"`
+	ConflictsTotal *int64                                                   `json:"conflicts_total,omitempty"`
+	ActionItems    []BetterAuthImportsCreateFullResultResultActionItemsItem `json:"action_items,omitempty"`
+	Warnings       []string                                                 `json:"warnings,omitempty"`
+	Notes          map[string]interface{}                                   `json:"notes,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResultError is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResultError struct {
+	Code    *string `json:"code,omitempty"`
+	Message *string `json:"message,omitempty"`
+}
+
+// BetterAuthImportsCreateFullResult is a typed object of the Backend API.
+type BetterAuthImportsCreateFullResult struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// One of: uploading, analyzing, ready, invalid, queued, applying, completed, failed.
+	Status string `json:"status"`
+	// The import key the bundle is sealed to.
+	KeyID        *string `json:"key_id,omitempty"`
+	Parts        *int64  `json:"parts,omitempty"`
+	Bytes        *int64  `json:"bytes,omitempty"`
+	BundleSha256 *string `json:"bundle_sha256,omitempty"`
+	// The sealed bundle was deleted (after a completed apply).
+	BundlePurged *bool `json:"bundle_purged,omitempty"`
+	// What the import does. Every field is optional; an unknown field is refused.
+	Options *BetterAuthImportsCreateFullResultOptions `json:"options,omitempty"`
+	// What the exporter reported about the Better Auth app.
+	Source *BetterAuthImportsCreateFullResultSource `json:"source,omitempty"`
+	// Records in the bundle.
+	Total    *int64                                     `json:"total,omitempty"`
+	Progress *BetterAuthImportsCreateFullResultProgress `json:"progress,omitempty"`
+	// The dry run: what an apply would do.
+	Report *BetterAuthImportsCreateFullResultReport `json:"report,omitempty"`
+	// What the apply wrote (so far, while it runs).
+	Result         *BetterAuthImportsCreateFullResultResult `json:"result,omitempty"`
+	Error          *BetterAuthImportsCreateFullResultError  `json:"error,omitempty"`
+	CreatedAt      int64                                    `json:"created_at"`
+	UpdatedAt      int64                                    `json:"updated_at"`
+	AnalyzedAt     *int64                                   `json:"analyzed_at,omitempty"`
+	ApplyStartedAt *int64                                   `json:"apply_started_at,omitempty"`
+	CompletedAt    *int64                                   `json:"completed_at,omitempty"`
+}
+
 // ConnectionsImportFullParamsConnectionsItemOwner is a typed object of the Backend API.
 type ConnectionsImportFullParamsConnectionsItemOwner struct {
 	// external: an opaque id from your own account system (up to 128 characters), for a SaaS that does
@@ -6681,6 +7533,12 @@ type ConnectionsImportFullParams struct {
 	Verify *bool `json:"verify,omitempty"`
 }
 
+// ConnectionsImportFullResultErrorsItem is a typed object of the Backend API.
+type ConnectionsImportFullResultErrorsItem struct {
+	Index   *int64  `json:"index,omitempty"`
+	Message *string `json:"message,omitempty"`
+}
+
 // ConnectionsImportFullResultDataItemErrorProviderError is a typed object of the Backend API.
 type ConnectionsImportFullResultDataItemErrorProviderError struct {
 	Code        *string `json:"code,omitempty"`
@@ -6728,12 +7586,16 @@ type ConnectionsImportFullResult struct {
 	Total  int64  `json:"total"`
 	DryRun bool   `json:"dry_run"`
 	// Whether refresh tokens were checked against the provider.
-	Validated   bool                                  `json:"validated"`
-	Created     int64                                 `json:"created"`
-	Updated     int64                                 `json:"updated"`
-	WouldCreate int64                                 `json:"would_create"`
-	WouldUpdate int64                                 `json:"would_update"`
-	Failed      int64                                 `json:"failed"`
+	Validated   bool  `json:"validated"`
+	Created     int64 `json:"created"`
+	Updated     int64 `json:"updated"`
+	WouldCreate int64 `json:"would_create"`
+	WouldUpdate int64 `json:"would_update"`
+	Failed      int64 `json:"failed"`
+	// One entry per failed row.
+	Errors []ConnectionsImportFullResultErrorsItem `json:"errors"`
+	// Dry run only: this same report, kept for older callers.
+	WouldReturn map[string]interface{}                `json:"would_return,omitempty"`
 	Data        []ConnectionsImportFullResultDataItem `json:"data"`
 }
 
@@ -6910,7 +7772,7 @@ type ConnectionsRevokeFullResult struct {
 	// browser step; client_credentials and jwt_bearer mint tokens from a credential Atlas holds;
 	// api_key, bearer, basic, custom_header and hmac_secret are typed secrets the owner enters. One
 	// of: oauth, api_key, client_credentials, bearer, basic, custom_header, hmac_secret, jwt_bearer,
-	// oauth1, github_app_installation, admin_consent.
+	// oauth1, github_app_installation, admin_consent, cookie_jar.
 	Kind     string `json:"kind"`
 	Provider string `json:"provider"`
 	// Your label for this account, for example "Support inbox".
@@ -7015,6 +7877,33 @@ type DomainsCreateFullParams struct {
 	DNS      map[string]interface{} `json:"dns,omitempty"`
 }
 
+// DomainsCreateFullResultVerificationLastObservation is a typed object of the Backend API.
+type DomainsCreateFullResultVerificationLastObservation struct {
+	// The HTTP status.
+	Status      int64   `json:"status"`
+	ContentType *string `json:"content_type,omitempty"`
+	// Body bytes seen; headers are not counted.
+	Bytes int64 `json:"bytes"`
+	// True when reading stopped at the 64 KiB read limit, so bytes is a lower bound.
+	BytesCapped bool `json:"bytes_capped"`
+	// The first 200 bytes of the body (printable characters only).
+	BodyPrefix string `json:"body_prefix"`
+	// The URL that answered, including the per-check atlas_nonce query parameter. Redirects are not
+	// followed.
+	FinalURL string `json:"final_url"`
+	// The Location of a 3xx answer.
+	RedirectTo *string `json:"redirect_to,omitempty"`
+	// The Age response header, when present.
+	Age *int64 `json:"age,omitempty"`
+	// The cf-cache-status or x-cache response header, when present.
+	CacheStatus *string `json:"cache_status,omitempty"`
+	IsHTML      *bool   `json:"is_html,omitempty"`
+	// True when age is above 0 or a cache header says HIT: a cache answered, not your origin.
+	ServedFromCache *bool `json:"served_from_cache,omitempty"`
+	// When the fetch ran (ms since epoch).
+	CheckedAt int64 `json:"checked_at"`
+}
+
 // DomainsCreateFullResultVerification: method path: the https file that proves the host. Its whole body is the token; the token is
 // bound to this instance, host and base path.
 type DomainsCreateFullResultVerification struct {
@@ -7023,6 +7912,13 @@ type DomainsCreateFullResultVerification struct {
 	Token        string `json:"token"`
 	Content      string `json:"content"`
 	Instructions string `json:"instructions"`
+	// After a rotation: the replaced token's URL, which still verifies until previous_valid_until.
+	PreviousURL *string `json:"previous_url,omitempty"`
+	// After a rotation: when the replaced token stops working (ms since epoch).
+	PreviousValidUntil *int64 `json:"previous_valid_until,omitempty"`
+	// What the most recent failed verification fetch got back, so you can see what answered (a cache,
+	// a catch-all page) without guessing. Null until a check fails, and again after one passes.
+	LastObservation *DomainsCreateFullResultVerificationLastObservation `json:"last_observation,omitempty"`
 }
 
 // DomainsCreateFullResultDNS is a typed object of the Backend API.
@@ -7072,6 +7968,33 @@ type DomainsCreateFullResult struct {
 	DNSResult map[string]interface{} `json:"dns_result,omitempty"`
 }
 
+// DomainsVerifyFullResultVerificationLastObservation is a typed object of the Backend API.
+type DomainsVerifyFullResultVerificationLastObservation struct {
+	// The HTTP status.
+	Status      int64   `json:"status"`
+	ContentType *string `json:"content_type,omitempty"`
+	// Body bytes seen; headers are not counted.
+	Bytes int64 `json:"bytes"`
+	// True when reading stopped at the 64 KiB read limit, so bytes is a lower bound.
+	BytesCapped bool `json:"bytes_capped"`
+	// The first 200 bytes of the body (printable characters only).
+	BodyPrefix string `json:"body_prefix"`
+	// The URL that answered, including the per-check atlas_nonce query parameter. Redirects are not
+	// followed.
+	FinalURL string `json:"final_url"`
+	// The Location of a 3xx answer.
+	RedirectTo *string `json:"redirect_to,omitempty"`
+	// The Age response header, when present.
+	Age *int64 `json:"age,omitempty"`
+	// The cf-cache-status or x-cache response header, when present.
+	CacheStatus *string `json:"cache_status,omitempty"`
+	IsHTML      *bool   `json:"is_html,omitempty"`
+	// True when age is above 0 or a cache header says HIT: a cache answered, not your origin.
+	ServedFromCache *bool `json:"served_from_cache,omitempty"`
+	// When the fetch ran (ms since epoch).
+	CheckedAt int64 `json:"checked_at"`
+}
+
 // DomainsVerifyFullResultVerification: method path: the https file that proves the host. Its whole body is the token; the token is
 // bound to this instance, host and base path.
 type DomainsVerifyFullResultVerification struct {
@@ -7080,6 +8003,13 @@ type DomainsVerifyFullResultVerification struct {
 	Token        string `json:"token"`
 	Content      string `json:"content"`
 	Instructions string `json:"instructions"`
+	// After a rotation: the replaced token's URL, which still verifies until previous_valid_until.
+	PreviousURL *string `json:"previous_url,omitempty"`
+	// After a rotation: when the replaced token stops working (ms since epoch).
+	PreviousValidUntil *int64 `json:"previous_valid_until,omitempty"`
+	// What the most recent failed verification fetch got back, so you can see what answered (a cache,
+	// a catch-all page) without guessing. Null until a check fails, and again after one passes.
+	LastObservation *DomainsVerifyFullResultVerificationLastObservation `json:"last_observation,omitempty"`
 }
 
 // DomainsVerifyFullResultDNS is a typed object of the Backend API.
@@ -7979,6 +8909,14 @@ type MachinesCreateFullParams struct {
 	Name        *string                `json:"name,omitempty"`
 	OwnerUserID *string                `json:"owner_user_id,omitempty"`
 	Data        map[string]interface{} `json:"data,omitempty"`
+	DiesWith    *string                `json:"dies_with,omitempty"`
+}
+
+// MachineWithSecret2RevokedBy is a typed object of the Backend API.
+type MachineWithSecret2RevokedBy struct {
+	// api_key, user or system.
+	Type string  `json:"type"`
+	ID   *string `json:"id,omitempty"`
 }
 
 // MachineWithSecret2: The `MachineWithSecret` object.
@@ -8017,6 +8955,16 @@ type MachineWithSecret2 struct {
 	EnrolledAt *int64 `json:"enrolled_at,omitempty"`
 	// When the machine last minted a token (epoch ms; null = never).
 	LastTokenAt *int64 `json:"last_token_at,omitempty"`
+	// Why a revoked machine ended: revoked_by_api, revoked_by_user, owner_signed_out, superseded,
+	// delegation_ended. Null while not revoked.
+	RevokedReason *string `json:"revoked_reason,omitempty"`
+	// Who revoked the machine. Null while not revoked.
+	RevokedBy *MachineWithSecret2RevokedBy `json:"revoked_by,omitempty"`
+	// Epoch ms the machine was revoked. Null while not revoked.
+	EndedAt *int64 `json:"ended_at,omitempty"`
+	// `sign_out_everywhere`: the machine is revoked when its owner signs out everywhere. Needs an
+	// owner. One of: sign_out_everywhere, None.
+	DiesWith *string `json:"dies_with,omitempty"`
 	// Created (epoch ms).
 	CreatedAt int64 `json:"created_at"`
 	// Updated (epoch ms).
@@ -8066,6 +9014,50 @@ type MCPGatewaysCreateFullParams struct {
 	// Tool name to { allow?, scopes?, conditions?: [{ arg, op: eq|neq|lte|gte|in|not_in|present, value
 	// }], approval?, mask?: { fields?, presets?: email|card|ssn|phone } }.
 	Tools map[string]interface{} `json:"tools,omitempty"`
+}
+
+// NotificationTemplatesOpsCreateFullParamsLocalesValue is a typed object of the Backend API.
+type NotificationTemplatesOpsCreateFullParamsLocalesValue struct {
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
+}
+
+// NotificationTemplatesOpsCreateFullParams is a typed object of the Backend API.
+type NotificationTemplatesOpsCreateFullParams struct {
+	// The template name a send passes; unique per instance.
+	Name    string `json:"name"`
+	Subject string `json:"subject"`
+	// Email body with `{{variables}}`.
+	Body string `json:"body"`
+	// A built-in or tenant-defined notification category key.
+	Category string `json:"category"`
+	// Language variants, keyed by tag (fr, pt-BR): { subject, body } each. `POST /v1/messages` sends
+	// the one matching its `locale`, else the user's own locale, else the base subject and body.
+	Locales map[string]NotificationTemplatesOpsCreateFullParamsLocalesValue `json:"locales,omitempty"`
+}
+
+// NotificationTemplatesOpsCreateFullResultLocalesValue is a typed object of the Backend API.
+type NotificationTemplatesOpsCreateFullResultLocalesValue struct {
+	Subject *string `json:"subject,omitempty"`
+	Body    *string `json:"body,omitempty"`
+}
+
+// NotificationTemplatesOpsCreateFullResult is a typed object of the Backend API.
+type NotificationTemplatesOpsCreateFullResult struct {
+	// One of: notification_template.
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// The template name — the `template` a send passes.
+	Name    string `json:"name"`
+	Subject string `json:"subject"`
+	// The body with `{{variables}}` interpolated at send.
+	Body string `json:"body"`
+	// The end-user notification category whose preference gates this template.
+	Category string `json:"category"`
+	// Language variants keyed by tag: { subject, body } each.
+	Locales   map[string]NotificationTemplatesOpsCreateFullResultLocalesValue `json:"locales,omitempty"`
+	CreatedAt int64                                                           `json:"created_at"`
+	UpdatedAt int64                                                           `json:"updated_at"`
 }
 
 // OrganizationsCreateInvitationFullParams is a typed object of the Backend API.
@@ -8127,6 +9119,26 @@ type OrganizationInvitation2 struct {
 	CreatedAt int64 `json:"created_at"`
 }
 
+// OrganizationsResendInvitationFullParams is a typed object of the Backend API.
+type OrganizationsResendInvitationFullParams struct {
+	RedirectURL *string `json:"redirect_url,omitempty"`
+	KeepOldLink *bool   `json:"keep_old_link,omitempty"`
+}
+
+// OrganizationsResendInvitationFullResult is a typed object of the Backend API.
+type OrganizationsResendInvitationFullResult struct {
+	Object         *string `json:"object,omitempty"`
+	ID             *string `json:"id,omitempty"`
+	OrganizationID *string `json:"organization_id,omitempty"`
+	Email          *string `json:"email,omitempty"`
+	Status         *string `json:"status,omitempty"`
+	ExpiresAt      *int64  `json:"expires_at,omitempty"`
+	// Only with organizations.invitationEmail "atlas" on an email invitation: whether Atlas mailed it.
+	// false = no email provider could deliver (or it refused); the invitation still exists and a
+	// resend tries again.
+	EmailSent *bool `json:"email_sent,omitempty"`
+}
+
 // PlatformCreateAppFullParams is a typed object of the Backend API.
 type PlatformCreateAppFullParams struct {
 	Name                     *string                `json:"name,omitempty"`
@@ -8135,6 +9147,7 @@ type PlatformCreateAppFullParams struct {
 	CreateDevelopmentSibling *bool                  `json:"create_development_sibling,omitempty"`
 	SecretKeyPreset          *string                `json:"secret_key_preset,omitempty"`
 	ProvisioningKey          *bool                  `json:"provisioning_key,omitempty"`
+	SecretKeyProfile         *string                `json:"secret_key_profile,omitempty"`
 	Tags                     []string               `json:"tags,omitempty"`
 	Metadata                 map[string]interface{} `json:"metadata,omitempty"`
 	ExternalRef              *string                `json:"external_ref,omitempty"`
@@ -8193,6 +9206,14 @@ type PlatformAppWithSecret2 struct {
 	// `onboarding_secret_expires_at`.
 	OnboardingSecret *string `json:"onboarding_secret,omitempty"`
 	OnboardingKeyID  *string `json:"onboarding_key_id,omitempty"`
+	// With `secret_key_profile: "web_app"`: the narrow key for the app's server, shown once.
+	RuntimeSecret       *string  `json:"runtime_secret,omitempty"`
+	RuntimeKeyID        *string  `json:"runtime_key_id,omitempty"`
+	RuntimeSecretScopes []string `json:"runtime_secret_scopes,omitempty"`
+	// With `secret_key_profile`: the name of `secret` (`provisioning`).
+	SecretKeyLabel *string `json:"secret_key_label,omitempty"`
+	// With `secret_key_profile`: when `secret` stops working (epoch ms) unless renewed.
+	SecretExpiresAt *int64 `json:"secret_expires_at,omitempty"`
 	// When the setup key stops working (epoch ms), 24 hours after the create.
 	OnboardingSecretExpiresAt *int64 `json:"onboarding_secret_expires_at,omitempty"`
 	// Present when `secret` holds every scope (`full_scope_secret_key`).
@@ -8249,6 +9270,14 @@ type PlatformAppProvisioned2 struct {
 	// `onboarding_secret_expires_at`.
 	OnboardingSecret *string `json:"onboarding_secret,omitempty"`
 	OnboardingKeyID  *string `json:"onboarding_key_id,omitempty"`
+	// With `secret_key_profile: "web_app"`: the narrow key for the app's server, shown once.
+	RuntimeSecret       *string  `json:"runtime_secret,omitempty"`
+	RuntimeKeyID        *string  `json:"runtime_key_id,omitempty"`
+	RuntimeSecretScopes []string `json:"runtime_secret_scopes,omitempty"`
+	// With `secret_key_profile`: the name of `secret` (`provisioning`).
+	SecretKeyLabel *string `json:"secret_key_label,omitempty"`
+	// With `secret_key_profile`: when `secret` stops working (epoch ms) unless renewed.
+	SecretExpiresAt *int64 `json:"secret_expires_at,omitempty"`
 	// When the setup key stops working (epoch ms), 24 hours after the create.
 	OnboardingSecretExpiresAt *int64 `json:"onboarding_secret_expires_at,omitempty"`
 	// Present when `secret` holds every scope (`full_scope_secret_key`).
@@ -8394,13 +9423,31 @@ type PrivacyLookupFullParamsAtlas struct {
 	Principal *string `json:"principal,omitempty"`
 }
 
-// PrivacyLookupFullParams: Provide `emails` or `atlas.sub` / `atlas.ext`.
+// PrivacyLookupFullParamsIdentity: Alias of `atlas`: same object, same validation and lookup order.
+type PrivacyLookupFullParamsIdentity struct {
+	// The issuer that minted `sub`.
+	Iss *string `json:"iss,omitempty"`
+	// The Atlas user id (or the Sign in with Atlas sub).
+	Sub *string `json:"sub,omitempty"`
+	// Your own account id (the user's `external_id`).
+	Ext *string `json:"ext,omitempty"`
+	// Optional: the kind of account the person signed in as (the principal claim). Narrows an email
+	// lookup to the account that signed in as it; on a sub or ext lookup it is reported as
+	// principalMatched.
+	Principal *string `json:"principal,omitempty"`
+}
+
+// PrivacyLookupFullParams: Provide `emails` or `atlas.sub` / `atlas.ext`. `identity` is an alias of `atlas`; send either,
+// or both with identical values (differing values are a 400 on `identity`). An identity match wins
+// over an email match.
 type PrivacyLookupFullParams struct {
 	Emails []string `json:"emails,omitempty"`
 	// The person as the suite knows them. `sub` (with `iss`) is matched ALONE when present — never an
 	// email fallback. `iss` may be this instance's issuer (current or previous) or, with Sign in with
 	// Atlas on, the Sign in with Atlas issuer.
 	Atlas *PrivacyLookupFullParamsAtlas `json:"atlas,omitempty"`
+	// Alias of `atlas`: same object, same validation and lookup order.
+	Identity *PrivacyLookupFullParamsIdentity `json:"identity,omitempty"`
 }
 
 // PrivacyLookup: The `PrivacyLookup` object.
@@ -8643,6 +9690,7 @@ type UsersCreateFullParams struct {
 	Referral               *UsersCreateFullParamsReferral        `json:"referral,omitempty"`
 	ReferralCode           *string                               `json:"referral_code,omitempty"`
 	Notify                 *bool                                 `json:"notify,omitempty"`
+	Sandbox                *bool                                 `json:"sandbox,omitempty"`
 	MFA                    *UsersCreateFullParamsMFA             `json:"mfa,omitempty"`
 }
 
@@ -8651,6 +9699,7 @@ type UsersCreateIdentityFullParams struct {
 	SecondaryUserID *string `json:"secondary_user_id,omitempty"`
 	UserID          *string `json:"user_id,omitempty"`
 	LinkWith        *string `json:"link_with,omitempty"`
+	ExternalID      *string `json:"external_id,omitempty"`
 }
 
 // Identity2: The `Identity` object.
@@ -8677,6 +9726,143 @@ type UsersCreateIdentityFullResult struct {
 	Object     string                                        `json:"object"`
 	Data       []Identity2                                   `json:"data"`
 	Collisions []UsersCreateIdentityFullResultCollisionsItem `json:"collisions"`
+}
+
+// WebhookEndpointsOpsCreateFullParamsFiltersMetadataItem is a typed object of the Backend API.
+type WebhookEndpointsOpsCreateFullParamsFiltersMetadataItem struct {
+	Path   string        `json:"path"`
+	Equals interface{}   `json:"equals,omitempty"`
+	In     []interface{} `json:"in,omitempty"`
+	Exists *bool         `json:"exists,omitempty"`
+}
+
+// WebhookEndpointsOpsCreateFullParamsFilters: Which events the endpoint receives beyond `enabled_events`. `organization_ids`: only events that
+// belong to one of these organizations (up to 100). `metadata`: up to 10 predicates over the event
+// `data`, all of which must hold; each is `{ path, equals }`, `{ path, in: [...] }` or `{ path,
+// exists }`, with a dot path such as `public_metadata.plan`. A predicate cannot read private
+// metadata. null clears the filter.
+type WebhookEndpointsOpsCreateFullParamsFilters struct {
+	OrganizationIDs []string                                                 `json:"organization_ids,omitempty"`
+	Metadata        []WebhookEndpointsOpsCreateFullParamsFiltersMetadataItem `json:"metadata,omitempty"`
+}
+
+// WebhookEndpointsOpsCreateFullParamsOAuth: Have Atlas get an OAuth bearer token with the client-credentials grant and send it as
+// `Authorization: Bearer` on every delivery. Replaces the whole setting. The client secret is
+// stored encrypted and never returned. null clears it.
+type WebhookEndpointsOpsCreateFullParamsOAuth struct {
+	TokenURL     string  `json:"token_url"`
+	ClientID     string  `json:"client_id"`
+	ClientSecret string  `json:"client_secret"`
+	Scope        *string `json:"scope,omitempty"`
+	Audience     *string `json:"audience,omitempty"`
+}
+
+// WebhookEndpointsOpsCreateFullParamsDestination: Where deliveries go instead of an HTTPS URL: { type: "aws_eventbridge", region, event_bus_name,
+// source? } | { type: "gcp_pubsub", project_id, topic_id } | { type: "cloudflare_queue",
+// account_id, queue_id } | { type: "segment" | "mixpanel" | "posthog" | "amplitude" |
+// "customerio", region? } | { type: "ga4", measurement_id } | { type: "slack" } (analytics and
+// messaging types also take include_pii? and event_map?) | { type: "lucida", host? } | { type:
+// "heap", region? } | { type: "rudderstack", data_plane_url } | { type: "hermetica", host? } | {
+// type: "hubspot", external_id_property? } | { type: "brevo", list_ids? } | { type: "mailchimp",
+// list_id, status_if_new? } | { type: "loops" } | { type: "klaviyo" } | { type: "intercom",
+// region? } | { type: "seolyticize", conversion_event? ("user.created" default, or
+// "user.attributed": the signed_up conversion is then sent on user.attributed with the referrer,
+// landing page and utm params, and the endpoint must subscribe to user.attributed) } (Lucida,
+// Heap, RudderStack and Seolyticize also take include_pii? and event_map?; the contact types -
+// Hermetica, HubSpot, Brevo, Mailchimp, Loops, Klaviyo, Intercom - sync
+// user.created/updated/unbanned as a contact and user.banned/deleted as an unsubscribe or removal)
+// | { type: "https" }.
+type WebhookEndpointsOpsCreateFullParamsDestination struct {
+	// One of: https, aws_eventbridge, gcp_pubsub, cloudflare_queue, segment, ga4, mixpanel, posthog,
+	// amplitude, customerio, slack, lucida, heap, rudderstack, hermetica, hubspot, brevo, mailchimp,
+	// loops, klaviyo, intercom, seolyticize, watchtower.
+	Type string `json:"type"`
+}
+
+// WebhookEndpointsOpsCreateFullParams is a typed object of the Backend API.
+type WebhookEndpointsOpsCreateFullParams struct {
+	// The HTTPS receiver (any URL that answers 2xx). Required unless `destination` is an event
+	// destination.
+	URL *string `json:"url,omitempty"`
+	// Event names (canonical or a deprecated spelling), or ["*"] for every canonical event, or
+	// `preset:user_mirror` (every event that changes a local user table; stored as written, so events
+	// added to the preset later reach the endpoint). Default ["*"]. An empty list is refused.
+	EnabledEvents []string `json:"enabled_events,omitempty"`
+	// On create: false creates it switched off (nothing is delivered until it is enabled); default
+	// true. On update: false switches it off; true re-enables it (clears the failure streak and offers
+	// a replay).
+	Active *bool `json:"active,omitempty"`
+	// Which names `*` delivers under: canonical (default for new endpoints) or the pre-convention
+	// spellings (endpoints created before the canonical catalogue). One of: canonical, legacy.
+	EventNaming *string `json:"event_naming,omitempty"`
+	// A third-party receiver (not on your own origins): preflight does not flag its host.
+	External *bool `json:"external,omitempty"`
+	// Mark an endpoint you created for a connected platform as that platform's, so config export, plan
+	// and preflight treat it like one the platform set up itself. The url must be an https URL on that
+	// platform's API host. null clears it. One of: cookiemunch, chatly, forumulate, referalli, None.
+	ManagedBy *string `json:"managed_by,omitempty"`
+	// Signature entries in atlas-signature: v1 (id.timestamp.body, default) and/or v2
+	// (id.timestamp.url.body).
+	SignatureVersions []string `json:"signature_versions,omitempty"`
+	// Who is emailed when the endpoint fails (up to 20). null = the owners of the account.
+	AlertContacts []string `json:"alert_contacts,omitempty"`
+	Description   *string  `json:"description,omitempty"`
+	// Which events the endpoint receives beyond `enabled_events`. `organization_ids`: only events that
+	// belong to one of these organizations (up to 100). `metadata`: up to 10 predicates over the event
+	// `data`, all of which must hold; each is `{ path, equals }`, `{ path, in: [...] }` or `{ path,
+	// exists }`, with a dot path such as `public_metadata.plan`. A predicate cannot read private
+	// metadata. null clears the filter.
+	Filters *WebhookEndpointsOpsCreateFullParamsFilters `json:"filters,omitempty"`
+	// Static request headers sent on every delivery, for a receiver that wants its own API key (1 to
+	// 10 headers, HTTPS endpoints only). Values are stored encrypted and never returned; reads list
+	// the names in `header_names`. Atlas-owned headers (signature, content-type, traceparent) cannot
+	// be replaced. null clears them.
+	Headers map[string]string `json:"headers,omitempty"`
+	// Have Atlas get an OAuth bearer token with the client-credentials grant and send it as
+	// `Authorization: Bearer` on every delivery. Replaces the whole setting. The client secret is
+	// stored encrypted and never returned. null clears it.
+	OAuth *WebhookEndpointsOpsCreateFullParamsOAuth `json:"oauth,omitempty"`
+	// Opt in to the seat private_metadata on organization_membership events sent to this endpoint.
+	// Only instance-owned endpoints can; org-owned and per-app endpoints never receive it. Default
+	// false.
+	IncludePrivateMembership *bool `json:"include_private_membership,omitempty"`
+	// Most deliveries per second Atlas sends to this endpoint; the rest wait their turn. null =
+	// unlimited.
+	MaxRps *int64 `json:"max_rps,omitempty"`
+	// Where deliveries go instead of an HTTPS URL: { type: "aws_eventbridge", region, event_bus_name,
+	// source? } | { type: "gcp_pubsub", project_id, topic_id } | { type: "cloudflare_queue",
+	// account_id, queue_id } | { type: "segment" | "mixpanel" | "posthog" | "amplitude" |
+	// "customerio", region? } | { type: "ga4", measurement_id } | { type: "slack" } (analytics and
+	// messaging types also take include_pii? and event_map?) | { type: "lucida", host? } | { type:
+	// "heap", region? } | { type: "rudderstack", data_plane_url } | { type: "hermetica", host? } | {
+	// type: "hubspot", external_id_property? } | { type: "brevo", list_ids? } | { type: "mailchimp",
+	// list_id, status_if_new? } | { type: "loops" } | { type: "klaviyo" } | { type: "intercom",
+	// region? } | { type: "seolyticize", conversion_event? ("user.created" default, or
+	// "user.attributed": the signed_up conversion is then sent on user.attributed with the referrer,
+	// landing page and utm params, and the endpoint must subscribe to user.attributed) } (Lucida,
+	// Heap, RudderStack and Seolyticize also take include_pii? and event_map?; the contact types -
+	// Hermetica, HubSpot, Brevo, Mailchimp, Loops, Klaviyo, Intercom - sync
+	// user.created/updated/unbanned as a contact and user.banned/deleted as an unsubscribe or removal)
+	// | { type: "https" }.
+	Destination *WebhookEndpointsOpsCreateFullParamsDestination `json:"destination,omitempty"`
+	// Your own credentials for the destination, stored encrypted and never returned: { access_key_id,
+	// secret_access_key, session_token? } (EventBridge, needs events:PutEvents) | {
+	// service_account_json } (Pub/Sub, needs pubsub.topics.publish) | { api_token } (Cloudflare Queues
+	// write) | the vendor key for the other types, e.g. { api_key } (Lucida lc_pk_, Hermetica hm_sk_,
+	// Brevo, Mailchimp, Loops), { app_id } (Heap), { write_key } (RudderStack), { access_token }
+	// (HubSpot, Intercom), { private_api_key } (Klaviyo), { site_key, server_key } (Seolyticize).
+	DestinationCredentials map[string]interface{} `json:"destination_credentials,omitempty"`
+	// Provisioning tags (up to 20 keys; values are strings up to 200 characters, numbers or booleans),
+	// returned on the object and filterable with ?metadata[key]=value.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	// Your own stable key for this object (e.g. "myapp/prod"). A repeated create with the same ref
+	// returns the existing object (200, idempotent_replay: true) instead of a second one.
+	ExternalRef *string `json:"external_ref,omitempty"`
+	// Optional. Your own signing secret instead of a generated one: "whsec_" followed by at least 32
+	// characters (letters, digits, + / = _ -). Generate it with a CSPRNG. Lets a setup script store
+	// the secret in its config before the endpoint exists. A secret that breaks the rule is 422 (param
+	// secret). HTTPS endpoints only.
+	Secret *string `json:"secret,omitempty"`
 }
 
 // WorkflowsCreateFullParamsTrigger is a typed object of the Backend API.
@@ -8775,14 +9961,16 @@ type ConnectionsSetOAuthClientsFullParams struct {
 	// Write-only. Required when the client is first created; omit it to keep the stored secret.
 	ClientSecret *string  `json:"client_secret,omitempty"`
 	Scopes       []string `json:"scopes,omitempty"`
-	// Values that fill the provider's host templates for this one connection, for example
-	// {"subdomain":"acme"} (Zendesk), {"shop":"acme"} (Shopify), {"domain":"acme.my.salesforce.com"}
-	// (Salesforce My Domain), {"data_center":"eu"} (Zoho), {"tenant":"contoso.onmicrosoft.com"}
-	// (Microsoft), {"host":"git.example.com"} (self-managed GitLab). Each key is checked against that
-	// provider's allowlist pattern; a value that is not a plain label or public hostname is refused
-	// with 400 `host_params.<key>`.
+	// Defaults for connections that use this client: the provider's host values plus its own
+	// non-secret settings, such as {"service_id":"…"} for TikTok Shop (required for it). An unknown
+	// key or a malformed value is refused with 400 `host_params.<key>`.
 	HostParams map[string]string `json:"host_params,omitempty"`
 	Enabled    *bool             `json:"enabled,omitempty"`
+	// eBay only: the RuName registered for your eBay app (letters, digits, hyphen, underscore).
+	// Shorthand for host_params.ru_name. It is sent as redirect_uri on both legs of consent, so the
+	// owner authorizes at Atlas; set the client's callback_url as the RuName's accepted URL in the
+	// eBay developer portal. null clears it.
+	RuName *string `json:"ru_name,omitempty"`
 	// How Atlas authenticates to the provider's token endpoint. client_secret (default) keeps the
 	// provider's own style. private_key_jwt: send `generate_key: true` (Atlas keeps the key and
 	// publishes its public half) or your PKCS#8 private key in `client_secret`; Atlas then signs a
@@ -8847,6 +10035,8 @@ type ConnectionsSetOAuthClientsFullResult struct {
 	// with 400 `host_params.<key>`.
 	HostParams map[string]string `json:"host_params"`
 	Enabled    bool              `json:"enabled"`
+	// eBay: the RuName consent runs with.
+	RuName *string `json:"ru_name,omitempty"`
 	// Your own https redirect URI for this client (set with `redirect_uri` on the backend API); null
 	// when Atlas's callback is used.
 	RedirectURI *string `json:"redirect_uri,omitempty"`
@@ -9328,8 +10518,9 @@ type InstanceSetIntegrationFullResultHealthEvents struct {
 	// `signature_rejected`: the secret was handed off (see secret_handed_off_at) but the receiver
 	// still answers 401/403, so its copy does not match: hand it off again. `backlog_pending`: the
 	// receiver is healthy and events failed with no retry left; Atlas re-sends them on its own
-	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now. null = nothing to
-	// do. One of: secret_missing, signature_rejected, backlog_pending, None.
+	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now with `{ since:
+	// <oldest_undelivered_at> }` (`since` is required). null = nothing to do. One of: secret_missing,
+	// signature_rejected, backlog_pending, None.
 	Reason *string `json:"reason,omitempty"`
 	// Event receiver only: what to do about `reason`, in words, with the exact call.
 	Hint *string `json:"hint,omitempty"`
@@ -9380,8 +10571,9 @@ type InstanceSetIntegrationFullResultHealthBackchannelLogout struct {
 	// `signature_rejected`: the secret was handed off (see secret_handed_off_at) but the receiver
 	// still answers 401/403, so its copy does not match: hand it off again. `backlog_pending`: the
 	// receiver is healthy and events failed with no retry left; Atlas re-sends them on its own
-	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now. null = nothing to
-	// do. One of: secret_missing, signature_rejected, backlog_pending, None.
+	// shortly, or call POST /v1/instance/integrations/{id}/deliveries/redeliver now with `{ since:
+	// <oldest_undelivered_at> }` (`since` is required). null = nothing to do. One of: secret_missing,
+	// signature_rejected, backlog_pending, None.
 	Reason *string `json:"reason,omitempty"`
 	// Event receiver only: what to do about `reason`, in words, with the exact call.
 	Hint *string `json:"hint,omitempty"`
@@ -9657,23 +10849,4 @@ func (p MessagingProvidersSetSMSFullParams) MarshalJSON() ([]byte, error) {
 		extra[f] = nil
 	}
 	return marshalWithExtra(plain(p), extra)
-}
-
-// MessagingProvider2: The `MessagingProvider` object.
-type MessagingProvider2 struct {
-	Object string `json:"object"`
-	// Always true on a configured object (the unconfigured reply is { configured: false }).
-	Configured *bool `json:"configured,omitempty"`
-	// The provider id; pass it as provider_id to managed email or the development sender.
-	ID      *string `json:"id,omitempty"`
-	Channel string  `json:"channel"`
-	// How the provider sends. One of: standard, development, managed_domain.
-	Mode        *string           `json:"mode,omitempty"`
-	Transport   string            `json:"transport"`
-	FromAddress *string           `json:"from_address,omitempty"`
-	Status      string            `json:"status"`
-	Config      map[string]string `json:"config"`
-	SecretsSet  map[string]bool   `json:"secrets_set"`
-	// Last updated (epoch ms).
-	UpdatedAt int64 `json:"updated_at"`
 }

@@ -200,6 +200,14 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.AllowlistIdentifiers.Delete(ctx, "p1", opts...)
 			return err
 		}},
+		{"GET", "/v1/analytics/captcha", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Analytics.ListCaptcha(ctx, AnalyticsListCaptchaQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/analytics/sms", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Analytics.ListSMS(ctx, AnalyticsListSMSQuery{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/api_keys/posture", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.APIKeys.ListPosture(ctx, APIKeysListPostureQuery{}, opts...)
 			return err
@@ -665,6 +673,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.ConnectionProviderTopics.Set(ctx, ConnectionProviderTopicsSetParams{}, opts...)
 			return err
 		}},
+		{"GET", "/v1/connection_providers/policies", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.ConnectionProviders.ListPolicies(ctx, ConnectionProvidersListPoliciesQuery{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/connection_providers/p1/policy", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.ConnectionProviders.GetPolicy(ctx, "p1", opts...)
 			return err
@@ -684,12 +696,20 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.ConnectionReconnectSettings.Set(ctx, ConnectionReconnectSettingsSetParams{}, opts...)
 			return err
 		}},
+		{"GET", "/v1/connection_templates", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.ConnectionTemplates.List(ctx, ConnectionTemplatesListQuery{}, opts...)
+			return err
+		}},
 		{"POST", "/v1/connections/oauth/complete", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Connections.CompleteOAuth(ctx, ConnectionsCompleteOAuthParams{}, opts...)
 			return err
 		}},
 		{"POST", "/v1/connections/oauth_clients/register", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Connections.RegisterOAuthClient(ctx, ConnectionsRegisterOAuthClientParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/connections/rehome", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Connections.Rehome(ctx, ConnectionsRehomeParams{}, opts...)
 			return err
 		}},
 		{"GET", "/v1/connections/relay_limits", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -967,6 +987,14 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Diagnostics.GetTrace(ctx, "p1", opts...)
 			return err
 		}},
+		{"GET", "/v1/domains/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Domains.Get(ctx, "p1", opts...)
+			return err
+		}},
+		{"POST", "/v1/domains/p1/verification/rotate", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Domains.RotateVerification(ctx, "p1", nil, opts...)
+			return err
+		}},
 		{"GET", "/v1/dsr_console/requests", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.DSRConsole.ListRequests(ctx, DSRConsoleListRequestsQuery{}, opts...)
 			return err
@@ -1160,6 +1188,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Fraud.SetEmailRiskSettings(ctx, FraudSetEmailRiskSettingsParams{}, opts...)
 			return err
 		}},
+		{"GET", "/v1/grants", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Grants.List(ctx, GrantsListQuery{}, opts...)
+			return err
+		}},
 		{"POST", "/v1/grants/p1/p2/consume", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Grants.Consume(ctx, "p1", "p2", GrantsConsumeParams{}, opts...)
 			return err
@@ -1174,6 +1206,14 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"GET", "/v1/grants/p1/p2/usage", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Grants.GetUsage(ctx, "p1", "p2", opts...)
+			return err
+		}},
+		{"GET", "/v1/grants/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Grants.Get(ctx, "p1", opts...)
+			return err
+		}},
+		{"PATCH", "/v1/grants/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Grants.Update(ctx, "p1", GrantsUpdateParams{}, opts...)
 			return err
 		}},
 		{"GET", "/v1/iga/activations", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -1301,6 +1341,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Instance.RestoreConfigSnapshot(ctx, "p1", InstanceRestoreConfigSnapshotParams{}, opts...)
 			return err
 		}},
+		{"PATCH", "/v1/instance/cookie_consent", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.UpdateCookieConsent(ctx, InstanceUpdateCookieConsentParams{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/instance/data_key_provider", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Instance.GetDataKeyProvider(ctx, opts...)
 			return err
@@ -1369,6 +1413,22 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Instance.CreateExportsRevokeLink(ctx, "p1", opts...)
 			return err
 		}},
+		{"GET", "/v1/instance/hooks/before_first_session", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.GetHooksBeforeFirstSession(ctx, opts...)
+			return err
+		}},
+		{"PATCH", "/v1/instance/hooks/before_first_session", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.UpdateHooksBeforeFirstSession(ctx, InstanceUpdateHooksBeforeFirstSessionParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/instance/hooks/before_first_session", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.DeleteHooksBeforeFirstSession(ctx, opts...)
+			return err
+		}},
+		{"POST", "/v1/instance/hooks/before_first_session/test", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.TestHookBeforeFirstSession(ctx, opts...)
+			return err
+		}},
 		{"GET", "/v1/instance/impersonation_policy", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Instance.GetImpersonationPolicy(ctx, opts...)
 			return err
@@ -1388,12 +1448,31 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Instance.GetImport(ctx, "p1", opts...)
 			return err
 		}},
+		{"GET", "/v1/instance/integrations/forwarding/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.GetIntegrationsForwarding(ctx, "p1", opts...)
+			return err
+		}},
+		{"PUT", "/v1/instance/integrations/forwarding/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.SetIntegrationsForwarding(ctx, "p1", InstanceSetIntegrationsForwardingParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/instance/integrations/forwarding/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			return c.Instance.DeleteIntegrationsForwarding(ctx, "p1", opts...)
+		}},
+		{"GET", "/v1/instance/integrations/health", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.ListIntegrationsHealth(ctx, InstanceListIntegrationsHealthQuery{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/instance/integrations/p1/mints", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Instance.ListIntegrationsMints(ctx, "p1", InstanceListIntegrationsMintsQuery{}, opts...)
 			return err
 		}},
 		{"POST", "/v1/instance/integrations/p1/test", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Instance.TestIntegration(ctx, "p1", InstanceTestIntegrationQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/instance/issuers", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.GetIssuers(ctx, opts...)
 			return err
 		}},
 		{"GET", "/v1/instance/op_keys", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -1442,7 +1521,7 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			return err
 		}},
 		{"PUT", "/v1/instance/scopes", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
-			return c.Instance.SetScopes(ctx, InstanceSetScopesParams{}, opts...)
+			return c.Instance.SetScopesWithQuery(ctx, InstanceSetScopesQuery{}, InstanceSetScopesParams{}, opts...)
 		}},
 		{"GET", "/v1/instance/secret_keys", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Instance.ListSecretKeys(ctx, InstanceListSecretKeysQuery{}, opts...)
@@ -1462,6 +1541,26 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"DELETE", "/v1/instance/signing_key_schedule", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Instance.DeleteSigningKeySchedule(ctx, opts...)
+			return err
+		}},
+		{"GET", "/v1/instance/staging_copies", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.ListStagingCopies(ctx, InstanceListStagingCopiesQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/instance/staging_copies", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.CreateStagingCopy(ctx, InstanceCreateStagingCopyParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/instance/staging_copies/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.GetStagingCopy(ctx, "p1", opts...)
+			return err
+		}},
+		{"DELETE", "/v1/instance/staging_copies/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.DeleteStagingCopy(ctx, "p1", opts...)
+			return err
+		}},
+		{"POST", "/v1/instance/staging_copies/p1/refresh", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.RefreshStagingCopy(ctx, "p1", InstanceRefreshStagingCopyParams{}, opts...)
 			return err
 		}},
 		{"GET", "/v1/instance/user_traits_schema", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -1526,6 +1625,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"POST", "/v1/machine_trust_policies/p1/test", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.MachineTrustPolicies.Test(ctx, "p1", MachineTrustPoliciesTestParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/machines/revoked", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Machines.ListRevoked(ctx, MachinesListRevokedQuery{}, opts...)
 			return err
 		}},
 		{"PATCH", "/v1/machines/p1/grants/p2", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -1607,6 +1710,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.MCPRegistry.Decide(ctx, "p1", MCPRegistryDecideParams{}, opts...)
 			return err
 		}},
+		{"POST", "/v1/message_links", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.MessageLinks.Create(ctx, MessageLinksCreateParams{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/message_receivers", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.MessageReceivers.List(ctx, MessageReceiversListQuery{}, opts...)
 			return err
@@ -1621,6 +1728,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"GET", "/v1/messages", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Messages.List(ctx, MessagesListQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/messages", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Messages.Create(ctx, MessagesCreateParams{}, opts...)
 			return err
 		}},
 		{"GET", "/v1/messages/summary", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -1738,12 +1849,52 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Migrations.GetStatus(ctx, MigrationsGetStatusQuery{}, opts...)
 			return err
 		}},
+		{"POST", "/v1/migrations/p1/sessions", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Migrations.CreateSession(ctx, "p1", MigrationsCreateSessionParams{}, opts...)
+			return err
+		}},
 		{"POST", "/v1/migrations/p1/verify", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Migrations.Verify(ctx, "p1", MigrationsVerifyParams{}, opts...)
 			return err
 		}},
+		{"GET", "/v1/native_apps", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.NativeApps.List(ctx, NativeAppsListQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/native_apps", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.NativeApps.Create(ctx, NativeAppsCreateParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/native_apps/publishable_key", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.NativeApps.GetPublishableKey(ctx, opts...)
+			return err
+		}},
+		{"PUT", "/v1/native_apps/publishable_key", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.NativeApps.SetPublishableKey(ctx, NativeAppsSetPublishableKeyParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/native_apps/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.NativeApps.Get(ctx, "p1", opts...)
+			return err
+		}},
+		{"PATCH", "/v1/native_apps/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.NativeApps.Update(ctx, "p1", NativeAppsUpdateParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/native_apps/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.NativeApps.Delete(ctx, "p1", opts...)
+			return err
+		}},
 		{"GET", "/v1/oauth_application_types", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.OAuthApplicationTypes.List(ctx, OAuthApplicationTypesListQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/oauth_clients/p1/consents", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthClients.ListConsents(ctx, "p1", OAuthClientsListConsentsQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/oauth_clients/p1/consents/revoke", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthClients.RevokeConsent(ctx, "p1", OAuthClientsRevokeConsentParams{}, opts...)
 			return err
 		}},
 		{"PUT", "/v1/oauth_clients/p1/organization_access", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -1781,6 +1932,22 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"DELETE", "/v1/oauth_clients/p1/webhook", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			return c.OAuthClients.DeleteWebhook(ctx, "p1", opts...)
+		}},
+		{"PUT", "/v1/oauth_consent_requests/switch_account", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthConsentRequests.SetSwitchAccount(ctx, OAuthConsentRequestsSetSwitchAccountQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/oauth_device_requests", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthDeviceRequests.Get(ctx, OAuthDeviceRequestsGetQuery{}, opts...)
+			return err
+		}},
+		{"PUT", "/v1/oauth_device_requests/accept", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthDeviceRequests.SetAccept(ctx, OAuthDeviceRequestsSetAcceptQuery{}, opts...)
+			return err
+		}},
+		{"PUT", "/v1/oauth_device_requests/reject", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthDeviceRequests.SetReject(ctx, OAuthDeviceRequestsSetRejectQuery{}, opts...)
+			return err
 		}},
 		{"POST", "/v1/oauth_grants/import", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.OAuthGrants.Import(ctx, OAuthGrantsImportParams{}, opts...)
@@ -1900,6 +2067,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"POST", "/v1/organization_connections/p1/accept", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.OrganizationConnections.Accept(ctx, "p1", OrganizationConnectionsAcceptParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/organization_invitations", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OrganizationInvitations.List(ctx, OrganizationInvitationsListQuery{}, opts...)
 			return err
 		}},
 		{"POST", "/v1/organizations/p1/app_webhook_endpoints", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -2072,6 +2243,282 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.PasskeyCampaigns.Delete(ctx, "p1", opts...)
 			return err
 		}},
+		{"GET", "/v1/pca/action-registry", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.GetActionRegistry(ctx, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/action-registry/actions", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListActionRegistryActions(ctx, PCAListActionRegistryActionsQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/action-registry/actions/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.GetActionRegistryAction(ctx, "p1", opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/action-registry/actions/p1/review", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ReviewActionRegistryAction(ctx, "p1", nil, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/action-registry/drafts", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListActionRegistryDrafts(ctx, PCAListActionRegistryDraftsQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/action-registry/drafts/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.GetActionRegistryDraft(ctx, "p1", opts...)
+			return err
+		}},
+		{"PATCH", "/v1/pca/action-registry/drafts/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.UpdateActionRegistryDraft(ctx, "p1", PCAUpdateActionRegistryDraftParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/pca/action-registry/drafts/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.DeleteActionRegistryDraft(ctx, "p1", opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/action-registry/drafts/p1/confirm", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ConfirmActionRegistryDraft(ctx, "p1", PCAConfirmActionRegistryDraftParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/action-registry/imports", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateActionRegistryImport(ctx, PCACreateActionRegistryImportParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/action-registry/namespaces/p1/diff", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.GetActionRegistryNamespacesDiff(ctx, "p1", PCAGetActionRegistryNamespacesDiffQuery{}, opts...)
+			return err
+		}},
+		{"PUT", "/v1/pca/action-registry/namespaces/p1/pin", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.SetActionRegistryNamespacesPin(ctx, "p1", PCASetActionRegistryNamespacesPinParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/pca/action-registry/namespaces/p1/pin", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.DeleteActionRegistryNamespacesPin(ctx, "p1", opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/action-registry/namespaces/p1/versions", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListActionRegistryNamespacesVersions(ctx, "p1", PCAListActionRegistryNamespacesVersionsQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/action-registry/namespaces/p1/versions/p2", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.GetActionRegistryNamespacesVersion(ctx, "p1", "p2", opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/action-registry/packs", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateActionRegistryPack(ctx, PCACreateActionRegistryPackParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/action-registry/publish", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.PublishActionRegistry(ctx, PCAPublishActionRegistryParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/action-registry/publisher-keys", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateActionRegistryPublisherKey(ctx, PCACreateActionRegistryPublisherKeyParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/pca/action-registry/publisher-keys/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.DeleteActionRegistryPublisherKey(ctx, "p1", opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/action-registry/reviewers", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListActionRegistryReviewers(ctx, PCAListActionRegistryReviewersQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/action-registry/reviewers/enrolments", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateActionRegistryReviewersEnrolment(ctx, PCACreateActionRegistryReviewersEnrolmentParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/pca/action-registry/reviewers/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.DeleteActionRegistryReviewer(ctx, "p1", opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/action-registry/sources", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListActionRegistrySources(ctx, PCAListActionRegistrySourcesQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/action-registry/sources", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateActionRegistrySource(ctx, PCACreateActionRegistrySourceParams{}, opts...)
+			return err
+		}},
+		{"PATCH", "/v1/pca/action-registry/sources/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.UpdateActionRegistrySource(ctx, "p1", PCAUpdateActionRegistrySourceParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/pca/action-registry/sources/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.DeleteActionRegistrySource(ctx, "p1", opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/action-registry/sources/p1/sync", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.SyncActionRegistrySource(ctx, "p1", nil, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/action-registry/templates", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListActionRegistryTemplates(ctx, PCAListActionRegistryTemplatesQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/action-registry/templates/p1/apply", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ApplyActionRegistryTemplate(ctx, "p1", PCAApplyActionRegistryTemplateParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/approvals/settings", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.GetApprovalsSettings(ctx, opts...)
+			return err
+		}},
+		{"PUT", "/v1/pca/approvals/settings", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.SetApprovalsSettings(ctx, PCASetApprovalsSettingsParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/approvers", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListApprovers(ctx, PCAListApproversQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/approvers/enrolments", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateApproversEnrolment(ctx, PCACreateApproversEnrolmentParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/approvers/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.GetApprover(ctx, "p1", opts...)
+			return err
+		}},
+		{"PATCH", "/v1/pca/approvers/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.UpdateApprover(ctx, "p1", PCAUpdateApproverParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/pca/approvers/p1/credentials/p2", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.DeleteApproversCredential(ctx, "p1", "p2", opts...)
+			return err
+		}},
+		{"PATCH", "/v1/pca/approvers/p1/members/p2", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.UpdateApproversMember(ctx, "p1", "p2", PCAUpdateApproversMemberParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/beacons", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateBeacon(ctx, PCACreateBeaconParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/bond-accounts", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.GetBondAccounts(ctx, PCAGetBondAccountsQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/bond-accounts", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateBondAccount(ctx, PCACreateBondAccountParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/constitutions", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateConstitution(ctx, PCACreateConstitutionParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/grants", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListGrants(ctx, PCAListGrantsQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/grants/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.GetGrant(ctx, "p1", opts...)
+			return err
+		}},
+		{"DELETE", "/v1/pca/grants/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.DeleteGrant(ctx, "p1", PCADeleteGrantQuery{}, PCADeleteGrantParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/grants/p1/amend", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.AmendGrant(ctx, "p1", PCAAmendGrantParams{}, opts...)
+			return err
+		}},
+		{"PUT", "/v1/pca/grants/p1/authority", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.SetGrantsAuthority(ctx, "p1", PCASetGrantsAuthorityParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/grants/p1/needs", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListGrantsNeeds(ctx, "p1", PCAListGrantsNeedsQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/grants/p1/needs", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateGrantsNeed(ctx, "p1", PCACreateGrantsNeedParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/grants/p1/step-up", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.StepUpGrant(ctx, "p1", nil, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/grants/p1/step-up/p2/approve", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ApproveGrantStepUp(ctx, "p1", "p2", PCAApproveGrantStepUpParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/guardian/rotate", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.RotateGuardian(ctx, nil, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/intent/maps/p1/observations", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListIntentMapsObservations(ctx, "p1", PCAListIntentMapsObservationsQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/intent/schemas", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateIntentSchema(ctx, PCACreateIntentSchemaParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/needs/p1/approve", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ApproveNeed(ctx, "p1", PCAApproveNeedParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/needs/p1/deny", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.DenyNeed(ctx, "p1", PCADenyNeedParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/pca/pq-pins/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.DeletePqPin(ctx, "p1", opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/principals", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListPrincipals(ctx, PCAListPrincipalsQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/principals", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreatePrincipal(ctx, PCACreatePrincipalParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/pca/principals/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.DeletePrincipal(ctx, "p1", opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/undo/records", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateUndoRecord(ctx, PCACreateUndoRecordParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/undo/records/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.GetUndoRecord(ctx, "p1", opts...)
+			return err
+		}},
+		{"PUT", "/v1/pca/undo/records/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.SetUndoRecord(ctx, "p1", PCASetUndoRecordParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/pca/undo/vetoes", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.ListUndoVetoes(ctx, PCAListUndoVetoesQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/pca/workflow-receipts", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PCA.CreateWorkflowReceipt(ctx, PCACreateWorkflowReceiptParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/permission_aliases", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PermissionAliases.List(ctx, PermissionAliasesListQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/permission_aliases", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PermissionAliases.Create(ctx, PermissionAliasesCreateParams{}, opts...)
+			return err
+		}},
+		{"PUT", "/v1/permission_aliases/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PermissionAliases.Set(ctx, "p1", PermissionAliasesSetParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/permission_aliases/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.PermissionAliases.Delete(ctx, "p1", opts...)
+			return err
+		}},
+		{"POST", "/v1/permissions/p1/rename", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Permissions.Rename(ctx, "p1", PermissionsRenameParams{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/platform/apps/p1/instances/p2/clones", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Platform.ListAppsInstancesClones(ctx, "p1", "p2", PlatformListAppsInstancesClonesQuery{}, opts...)
 			return err
@@ -2088,8 +2535,16 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Platform.DeleteAppsInstancesClone(ctx, "p1", "p2", "p3", opts...)
 			return err
 		}},
+		{"POST", "/v1/platform/apps/p1/instances/p2/clones/p3/refresh", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Platform.RefreshAppInstanceClone(ctx, "p1", "p2", "p3", PlatformRefreshAppInstanceCloneParams{}, opts...)
+			return err
+		}},
 		{"POST", "/v1/platform/apps/p1/narrow_secret_keys", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Platform.CreateAppsNarrowSecretKey(ctx, "p1", PlatformCreateAppsNarrowSecretKeyParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/platform/apps/p1/provisioning_key/renew", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Platform.RenewAppProvisioningKey(ctx, "p1", PlatformRenewAppProvisioningKeyParams{}, opts...)
 			return err
 		}},
 		{"GET", "/v1/platform/atlas_id_apps/p1/adoption_codes", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -2251,6 +2706,13 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.ResourceServers.ListRevokedTokens(ctx, "p1", ResourceServersListRevokedTokensQuery{}, opts...)
 			return err
 		}},
+		{"GET", "/v1/revocations", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Revocations.List(ctx, RevocationsListQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/revocations/stream", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			return c.Revocations.GetStream(ctx, RevocationsGetStreamQuery{}, opts...)
+		}},
 		{"POST", "/v1/risk_based_mfa/replay", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.RiskBasedMFA.Replay(ctx, RiskBasedMFAReplayParams{}, opts...)
 			return err
@@ -2376,6 +2838,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Sessions.ListRevoked(ctx, SessionsListRevokedQuery{}, opts...)
 			return err
 		}},
+		{"PUT", "/v1/sessions/p1/active_organization", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Sessions.SetActiveOrganization(ctx, "p1", SessionsSetActiveOrganizationParams{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/sessions/p1/binding", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Sessions.GetBinding(ctx, "p1", opts...)
 			return err
@@ -2392,8 +2858,40 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Sessions.GetRisk(ctx, "p1", opts...)
 			return err
 		}},
+		{"POST", "/v1/ssf/add_subject", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.SSF.AddSubjectAlt(ctx, SSFAddSubjectAltParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/ssf/configuration", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.SSF.GetConfiguration(ctx, SSFGetConfigurationQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/ssf/configuration", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.SSF.Configuration(ctx, SSFConfigurationParams{}, opts...)
+			return err
+		}},
+		{"PUT", "/v1/ssf/configuration", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.SSF.SetConfiguration(ctx, SSFSetConfigurationParams{}, opts...)
+			return err
+		}},
+		{"PATCH", "/v1/ssf/configuration", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.SSF.UpdateConfiguration(ctx, SSFUpdateConfigurationParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/ssf/configuration", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.SSF.DeleteConfiguration(ctx, SSFDeleteConfigurationQuery{}, nil, opts...)
+			return err
+		}},
 		{"POST", "/v1/ssf/events", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			return c.SSF.CreateEvent(ctx, SSFCreateEventParams{}, opts...)
+		}},
+		{"GET", "/v1/ssf/metadata", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.SSF.GetMetadata(ctx, opts...)
+			return err
+		}},
+		{"POST", "/v1/ssf/remove_subject", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.SSF.RemoveSubjectAlt(ctx, SSFRemoveSubjectAltParams{}, opts...)
+			return err
 		}},
 		{"GET", "/v1/ssf/status", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.SSF.GetStatus(ctx, SSFGetStatusQuery{}, opts...)
@@ -2406,11 +2904,19 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.SSF.ListStreamsSubjects(ctx, "p1", SSFListStreamsSubjectsQuery{}, opts...)
 			return err
 		}},
+		{"POST", "/v1/ssf/streams/p1/poll", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.SSF.PollStream(ctx, "p1", SSFPollStreamParams{}, opts...)
+			return err
+		}},
 		{"POST", "/v1/ssf/subjects/add", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			return c.SSF.AddSubject(ctx, SSFAddSubjectParams{}, opts...)
 		}},
 		{"POST", "/v1/ssf/subjects/remove", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			return c.SSF.RemoveSubject(ctx, SSFRemoveSubjectParams{}, opts...)
+		}},
+		{"POST", "/v1/ssf/verification", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.SSF.Verification(ctx, SSFVerificationParams{}, opts...)
+			return err
 		}},
 		{"POST", "/v1/ssf/verify", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			return c.SSF.Verify(ctx, SSFVerifyParams{}, opts...)
@@ -2523,6 +3029,14 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Users.CancelBulkAction(ctx, "p1", opts...)
 			return err
 		}},
+		{"PUT", "/v1/users/by_external_id/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Users.SetByExternalID(ctx, "p1", UsersSetByExternalIDParams{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/users/deleted", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Users.ListDeleted(ctx, UsersListDeletedQuery{}, opts...)
+			return err
+		}},
 		{"POST", "/v1/users/deleted_addresses", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Users.CreateDeletedAddress(ctx, UsersCreateDeletedAddressParams{}, opts...)
 			return err
@@ -2562,6 +3076,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Users.DeleteApprovalDevice(ctx, "p1", "p2", opts...)
 			return err
 		}},
+		{"GET", "/v1/users/p1/approval_requests", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Users.ListApprovalRequests(ctx, "p1", UsersListApprovalRequestsQuery{}, opts...)
+			return err
+		}},
 		{"POST", "/v1/users/p1/approval_requests/p2/cancel", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Users.CancelApprovalRequest(ctx, "p1", "p2", opts...)
 			return err
@@ -2572,6 +3090,14 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"DELETE", "/v1/users/p1/cookie_consents", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Users.DeleteCookieConsent(ctx, "p1", opts...)
+			return err
+		}},
+		{"POST", "/v1/users/p1/delegation_tokens", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Users.CreateDelegationToken(ctx, "p1", UsersCreateDelegationTokenParams{}, opts...)
+			return err
+		}},
+		{"PATCH", "/v1/users/p1/deletion", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Users.UpdateDeletion(ctx, "p1", UsersUpdateDeletionParams{}, opts...)
 			return err
 		}},
 		{"POST", "/v1/users/p1/deletion/reconfirm", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -2630,6 +3156,22 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Users.Release(ctx, "p1", opts...)
 			return err
 		}},
+		{"GET", "/v1/users/p1/risk_signals", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Users.ListRiskSignals(ctx, "p1", UsersListRiskSignalsQuery{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/users/p1/risk_signals", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Users.CreateRiskSignal(ctx, "p1", UsersCreateRiskSignalParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/users/p1/risk_signals", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Users.DeleteRiskSignal(ctx, "p1", opts...)
+			return err
+		}},
+		{"GET", "/v1/users/p1/security_summary", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Users.GetSecuritySummary(ctx, "p1", opts...)
+			return err
+		}},
 		{"GET", "/v1/users/p1/temporary_access", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Users.ListTemporaryAccess(ctx, "p1", UsersListTemporaryAccessQuery{}, opts...)
 			return err
@@ -2674,6 +3216,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"DELETE", "/v1/web_bot_auth/directories/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.WebBotAuth.DeleteDirectory(ctx, "p1", opts...)
+			return err
+		}},
+		{"GET", "/v1/webhook_dlq", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.WebhookDlq.List(ctx, WebhookDlqListQuery{}, opts...)
 			return err
 		}},
 		{"GET", "/v1/webhook_endpoints/p1/dlq", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -2759,6 +3305,9 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		{"DELETE", "/v1/wsfed_connections/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			return c.WSFedConnections.Delete(ctx, "p1", opts...)
 		}},
+		{"DELETE", "/v1/connections/oauth_clients/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			return c.Connections.DeleteOAuthClientFull(ctx, "p1", ConnectionsDeleteOAuthClientFullQuery{}, opts...)
+		}},
 		{"DELETE", "/v1/users/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Users.DeleteFull(ctx, "p1", UsersDeleteFullParams{}, opts...)
 			return err
@@ -2781,6 +3330,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"GET", "/v1/branding", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Branding.GetFull(ctx, opts...)
+			return err
+		}},
+		{"GET", "/v1/custom_oauth_providers", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.CustomOAuthProviders.ListFull(ctx, CustomOAuthProvidersListFullQuery{}, opts...)
 			return err
 		}},
 		{"GET", "/v1/desktop_mfa/policy", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -2837,6 +3390,14 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"GET", "/v1/legacy_auth_connection", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.LegacyAuthConnection.GetFull(ctx, opts...)
+			return err
+		}},
+		{"GET", "/v1/machines/p1/grants", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Machines.ListGrantsFull(ctx, "p1", MachinesListGrantsFullQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/messaging_providers", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.MessagingProviders.GetFull(ctx, opts...)
 			return err
 		}},
 		{"GET", "/v1/oauth_clients", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -2903,6 +3464,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Users.GetMinorStatusFull(ctx, "p1", opts...)
 			return err
 		}},
+		{"GET", "/v1/users/p1/organization_memberships", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Users.ListOrganizationMembershipsFull(ctx, "p1", UsersListOrganizationMembershipsFullQuery{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/users/p1/referral", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Users.GetReferralFull(ctx, "p1", opts...)
 			return err
@@ -2913,6 +3478,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"GET", "/v1/vc/credential_types", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.VC.ListCredentialTypesFull(ctx, VCListCredentialTypesFullQuery{}, opts...)
+			return err
+		}},
+		{"GET", "/v1/whoami", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.WhoamiAPI.GetFull(ctx, opts...)
 			return err
 		}},
 		{"PATCH", "/v1/actions/p1", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -2937,6 +3506,14 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"POST", "/v1/actions/p1/test", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Actions.TestFull(ctx, "p1", ActionsTestFullParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/api_keys/token", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.APIKeys.TokenFull(ctx, APIKeysTokenFullParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/better_auth_imports", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.BetterAuthImports.CreateFull(ctx, BetterAuthImportsCreateFullParams{}, opts...)
 			return err
 		}},
 		{"POST", "/v1/connections/import", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -3015,8 +3592,16 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.MCPGateways.CreateFull(ctx, MCPGatewaysCreateFullParams{}, opts...)
 			return err
 		}},
+		{"POST", "/v1/notification_templates", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.NotificationTemplatesOps.CreateFull(ctx, NotificationTemplatesOpsCreateFullParams{}, opts...)
+			return err
+		}},
 		{"POST", "/v1/organizations/p1/invitations", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Organizations.CreateInvitationFull(ctx, "p1", OrganizationsCreateInvitationFullParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/organizations/p1/invitations/p2/resend", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Organizations.ResendInvitationFull(ctx, "p1", "p2", OrganizationsResendInvitationFullParams{}, opts...)
 			return err
 		}},
 		{"POST", "/v1/platform/apps", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -3049,6 +3634,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"POST", "/v1/users/p1/identities", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Users.CreateIdentityFull(ctx, "p1", UsersCreateIdentityFullParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/webhook_endpoints", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.WebhookEndpointsOps.CreateFull(ctx, WebhookEndpointsOpsCreateFullParams{}, opts...)
 			return err
 		}},
 		{"POST", "/v1/workflows", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {

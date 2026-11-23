@@ -29,6 +29,7 @@ type catalogServices struct {
 	ConnectionProviderTopics    *ConnectionProviderTopicsService
 	ConnectionProviders         *ConnectionProvidersService
 	ConnectionReconnectSettings *ConnectionReconnectSettingsService
+	ConnectionTemplates         *ConnectionTemplatesService
 	Containments                *ContainmentsService
 	CookieConsents              *CookieConsentsService
 	DSRConsole                  *DSRConsoleService
@@ -49,10 +50,15 @@ type catalogServices struct {
 	MFACampaigns                *MFACampaignsService
 	MFAFactorQuarantines        *MFAFactorQuarantinesService
 	MachineTrustPolicies        *MachineTrustPoliciesService
+	MessageLinks                *MessageLinksService
 	MessageReceivers            *MessageReceiversService
 	Messages                    *MessagesService
 	MessagingProviders          *MessagingProvidersService
+	NativeApps                  *NativeAppsService
+	NotificationTemplatesOps    *NotificationTemplatesOpsService
 	OAuthApplicationTypes       *OAuthApplicationTypesService
+	OAuthConsentRequests        *OAuthConsentRequestsService
+	OAuthDeviceRequests         *OAuthDeviceRequestsService
 	OAuthGrants                 *OAuthGrantsService
 	OAuthPublishers             *OAuthPublishersService
 	OPA                         *OPAService
@@ -60,7 +66,9 @@ type catalogServices struct {
 	OrgRoleSets                 *OrgRoleSetsService
 	OrgTemplates                *OrgTemplatesService
 	OrganizationConnections     *OrganizationConnectionsService
+	OrganizationInvitations     *OrganizationInvitationsService
 	PasskeyCampaigns            *PasskeyCampaignsService
+	PermissionAliases           *PermissionAliasesService
 	ProvisioningConnectors      *ProvisioningConnectorsService
 	Provisioning                *ProvisioningService
 	RateLimitOverrides          *RateLimitOverridesService
@@ -70,6 +78,7 @@ type catalogServices struct {
 	RefreshTokens               *RefreshTokensService
 	Region                      *RegionService
 	ResourceRoleAssignments     *ResourceRoleAssignmentsService
+	Revocations                 *RevocationsService
 	RiskSignals                 *RiskSignalsService
 	RiskyUsers                  *RiskyUsersService
 	SAMLIDP                     *SAMLIDPService
@@ -82,7 +91,9 @@ type catalogServices struct {
 	UserImports                 *UserImportsService
 	WSFedConnections            *WSFedConnectionsService
 	WebBotAuth                  *WebBotAuthService
+	WebhookDlq                  *WebhookDlqService
 	WebhookEndpointsOps         *WebhookEndpointsOpsService
+	WhoamiAPI                   *WhoamiService
 	WorkflowApprovals           *WorkflowApprovalsService
 	WorkflowTemplates           *WorkflowTemplatesService
 	WorkflowTriggers            *WorkflowTriggersService
@@ -114,6 +125,7 @@ func (c *Client) wireCatalog() {
 	c.ConnectionProviderTopics = &ConnectionProviderTopicsService{client: c}
 	c.ConnectionProviders = &ConnectionProvidersService{client: c}
 	c.ConnectionReconnectSettings = &ConnectionReconnectSettingsService{client: c}
+	c.ConnectionTemplates = &ConnectionTemplatesService{client: c}
 	c.Containments = &ContainmentsService{client: c}
 	c.CookieConsents = &CookieConsentsService{client: c}
 	c.DSRConsole = &DSRConsoleService{client: c}
@@ -134,10 +146,15 @@ func (c *Client) wireCatalog() {
 	c.MFACampaigns = &MFACampaignsService{client: c}
 	c.MFAFactorQuarantines = &MFAFactorQuarantinesService{client: c}
 	c.MachineTrustPolicies = &MachineTrustPoliciesService{client: c}
+	c.MessageLinks = &MessageLinksService{client: c}
 	c.MessageReceivers = &MessageReceiversService{client: c}
 	c.Messages = &MessagesService{client: c}
 	c.MessagingProviders = &MessagingProvidersService{client: c}
+	c.NativeApps = &NativeAppsService{client: c}
+	c.NotificationTemplatesOps = &NotificationTemplatesOpsService{client: c}
 	c.OAuthApplicationTypes = &OAuthApplicationTypesService{client: c}
+	c.OAuthConsentRequests = &OAuthConsentRequestsService{client: c}
+	c.OAuthDeviceRequests = &OAuthDeviceRequestsService{client: c}
 	c.OAuthGrants = &OAuthGrantsService{client: c}
 	c.OAuthPublishers = &OAuthPublishersService{client: c}
 	c.OPA = &OPAService{client: c}
@@ -145,7 +162,9 @@ func (c *Client) wireCatalog() {
 	c.OrgRoleSets = &OrgRoleSetsService{client: c}
 	c.OrgTemplates = &OrgTemplatesService{client: c}
 	c.OrganizationConnections = &OrganizationConnectionsService{client: c}
+	c.OrganizationInvitations = &OrganizationInvitationsService{client: c}
 	c.PasskeyCampaigns = &PasskeyCampaignsService{client: c}
+	c.PermissionAliases = &PermissionAliasesService{client: c}
 	c.ProvisioningConnectors = &ProvisioningConnectorsService{client: c}
 	c.Provisioning = &ProvisioningService{client: c}
 	c.RateLimitOverrides = &RateLimitOverridesService{client: c}
@@ -155,6 +174,7 @@ func (c *Client) wireCatalog() {
 	c.RefreshTokens = &RefreshTokensService{client: c}
 	c.Region = &RegionService{client: c}
 	c.ResourceRoleAssignments = &ResourceRoleAssignmentsService{client: c}
+	c.Revocations = &RevocationsService{client: c}
 	c.RiskSignals = &RiskSignalsService{client: c}
 	c.RiskyUsers = &RiskyUsersService{client: c}
 	c.SAMLIDP = &SAMLIDPService{client: c}
@@ -167,7 +187,9 @@ func (c *Client) wireCatalog() {
 	c.UserImports = &UserImportsService{client: c}
 	c.WSFedConnections = &WSFedConnectionsService{client: c}
 	c.WebBotAuth = &WebBotAuthService{client: c}
+	c.WebhookDlq = &WebhookDlqService{client: c}
 	c.WebhookEndpointsOps = &WebhookEndpointsOpsService{client: c}
+	c.WhoamiAPI = &WhoamiService{client: c}
 	c.WorkflowApprovals = &WorkflowApprovalsService{client: c}
 	c.WorkflowTemplates = &WorkflowTemplatesService{client: c}
 	c.WorkflowTriggers = &WorkflowTriggersService{client: c}

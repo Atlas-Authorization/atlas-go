@@ -76,6 +76,27 @@ func (s *APIKeysService) ListFullIter(ctx context.Context, query APIKeysListFull
 	})
 }
 
+// TokenFull: Mint a short-lived, JWKS-signed access JWT (token_use:api_key, jti) whose exp is clamped to the
+// smallest of the request, the key expiry and the org ceiling; scopes + constraints are embedded
+// so a resource verifies it OFFLINE against the instance JWKS. When the key registered a
+// public_key, the token also carries cnf.jkt (proof-of-possession) and a resource additionally
+// checks a holder-signed proof. Authenticate with (1) an sk_ bearer + the ak_ in the body, (2) an
+// Authorization: Bearer ak_… that self-mints for itself, or (3) no bearer + x-publishable-key
+// naming the instance with the ak_ in the body. A key_pair key's signed assertion is accepted in
+// the same places: Authorization: Bearer <assertion> (self-mint), or an sk_ bearer or publishable
+// key with the assertion in the body field assertion. The token's lifetime never exceeds the
+// assertion's exp, and a token minted from a key_pair key carries no cnf. A key only ever mints
+// within its own instance. The api_keys:read scope applies ONLY to the sk_ path; the ak_ and
+// publishable-key paths are self-scoped.
+// POST /v1/api_keys/token.
+func (s *APIKeysService) TokenFull(ctx context.Context, params APIKeysTokenFullParams, opts ...RequestOption) (*APIKeyToken2, error) {
+	out := &APIKeyToken2{}
+	if err := s.client.do(ctx, "POST", "/v1/api_keys/token", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SimulateFull: What-if: describe a request (stage, ip, application, orgs, roles, country, risk level, device
 // trust, auth methods, whether MFA was verified) and see the decision, the policies that matched
 // and the unmet step-up requirements. Pass `policy_id` to test one policy even if it is disabled.
@@ -119,6 +140,17 @@ func (s *ActionsService) TestFull(ctx context.Context, id string, params Actions
 func (s *AttackProtectionService) GetFull(ctx context.Context, opts ...RequestOption) (*AttackProtection2, error) {
 	out := &AttackProtection2{}
 	if err := s.client.do(ctx, "GET", "/v1/attack_protection", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateFull: Start a Better Auth import (status `uploading`). Then upload the sealed bundle with PUT
+// …/parts/{part} and call …/finalize. Nothing is written to users until apply.
+// POST /v1/better_auth_imports.
+func (s *BetterAuthImportsService) CreateFull(ctx context.Context, params BetterAuthImportsCreateFullParams, opts ...RequestOption) (*BetterAuthImportsCreateFullResult, error) {
+	out := &BetterAuthImportsCreateFullResult{}
+	if err := s.client.do(ctx, "POST", "/v1/better_auth_imports", nil, params, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -224,6 +256,30 @@ func (s *BrandingService) UpdateFull(ctx context.Context, params BrandingPatch, 
 		return nil, err
 	}
 	return out, nil
+}
+
+// ConnectionsDeleteOAuthClientFullQuery holds the query parameters of ConnectionsService.DeleteOAuthClientFull.
+type ConnectionsDeleteOAuthClientFullQuery struct {
+	// The id of the OAuth client to move this client's connections to before deleting it.
+	RehomeTo string
+}
+
+func (q ConnectionsDeleteOAuthClientFullQuery) values() url.Values {
+	v := url.Values{}
+	if q.RehomeTo != "" {
+		v.Set("rehome_to", q.RehomeTo)
+	}
+	return v
+}
+
+// DeleteOAuthClientFull: Delete an owner OAuth client and its sealed secret. 409 while connections still hold tokens it
+// issued (they could no longer refresh), unless `rehome_to` names another client of the same
+// provider and environment: every connection is then moved to it first (each proven with a
+// refresh, as POST /v1/connections/rehome does) and the client is deleted only when all of them
+// moved.
+// DELETE /v1/connections/oauth_clients/{id}.
+func (s *ConnectionsService) DeleteOAuthClientFull(ctx context.Context, id string, query ConnectionsDeleteOAuthClientFullQuery, opts ...RequestOption) error {
+	return s.client.do(ctx, "DELETE", "/v1/connections/oauth_clients/"+url.PathEscape(id), query.values(), nil, nil, opts...)
 }
 
 // ConnectionsImportFullQuery holds the query parameters of ConnectionsService.ImportFull.
@@ -345,6 +401,37 @@ func (s *ConnectionsService) RevokeFull(ctx context.Context, id string, params m
 func (s *ConnectionsService) SetOAuthClientsFull(ctx context.Context, params ConnectionsSetOAuthClientsFullParams, opts ...RequestOption) (*ConnectionsSetOAuthClientsFullResult, error) {
 	out := &ConnectionsSetOAuthClientsFullResult{}
 	if err := s.client.do(ctx, "PUT", "/v1/connections/oauth_clients", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CustomOAuthProvidersListFullQuery holds the query parameters of CustomOAuthProvidersService.ListFull.
+type CustomOAuthProvidersListFullQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q CustomOAuthProvidersListFullQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListFull: List the instance's custom OAuth 2.0 / OpenID Connect login providers. The client secret is
+// never returned (has_secret only).
+// GET /v1/custom_oauth_providers.
+func (s *CustomOAuthProvidersService) ListFull(ctx context.Context, query CustomOAuthProvidersListFullQuery, opts ...RequestOption) (*ListPage[CustomOAuthProvidersListFullItem], error) {
+	out := &ListPage[CustomOAuthProvidersListFullItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/custom_oauth_providers", query.values(), nil, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -978,11 +1065,70 @@ func (s *MCPGatewaysService) CreateFull(ctx context.Context, params MCPGatewaysC
 	return out, nil
 }
 
+// MachinesListGrantsFullQuery holds the query parameters of MachinesService.ListGrantsFull.
+type MachinesListGrantsFullQuery struct {
+	// true to include ended grants. Default false.
+	IncludeEnded string
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q MachinesListGrantsFullQuery) values() url.Values {
+	v := url.Values{}
+	if q.IncludeEnded != "" {
+		v.Set("include_ended", q.IncludeEnded)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListGrantsFull: List the resource servers a machine may obtain tokens for, and up to which scopes.
+// `include_ended=true` adds the grants that were ended (kept 90 days) with their end reason, actor
+// and time.
+// GET /v1/machines/{id}/grants.
+func (s *MachinesService) ListGrantsFull(ctx context.Context, id string, query MachinesListGrantsFullQuery, opts ...RequestOption) (*CursorPage[MachineGrant2], error) {
+	out := &CursorPage[MachineGrant2]{}
+	if err := s.client.do(ctx, "GET", "/v1/machines/"+url.PathEscape(id)+"/grants", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListGrantsFullIter walks every page of ListGrantsFull, fetching the next one on demand.
+func (s *MachinesService) ListGrantsFullIter(ctx context.Context, id string, query MachinesListGrantsFullQuery, opts ...RequestOption) *Iterator[MachineGrant2] {
+	return Paginate(func(cursor string) (*CursorPage[MachineGrant2], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.ListGrantsFull(ctx, id, q, opts...)
+	})
+}
+
 // CreateFull: Create a named machine (M2M) identity; returns the machine secret (mk_) ONCE.
 // POST /v1/machines.
 func (s *MachinesService) CreateFull(ctx context.Context, params MachinesCreateFullParams, opts ...RequestOption) (*MachineWithSecret2, error) {
 	out := &MachineWithSecret2{}
 	if err := s.client.do(ctx, "POST", "/v1/machines", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetFull: Read the instance's BYOK email and SMS provider config: transport, from-address and which secret
+// keys are set. Never returns a secret value.
+// GET /v1/messaging_providers.
+func (s *MessagingProvidersService) GetFull(ctx context.Context, opts ...RequestOption) (*MessagingProvidersGetFullResult, error) {
+	out := &MessagingProvidersGetFullResult{}
+	if err := s.client.do(ctx, "GET", "/v1/messaging_providers", nil, nil, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -996,6 +1142,18 @@ func (s *MachinesService) CreateFull(ctx context.Context, params MachinesCreateF
 func (s *MessagingProvidersService) SetSMSFull(ctx context.Context, params MessagingProvidersSetSMSFullParams, opts ...RequestOption) (*MessagingProvider2, error) {
 	out := &MessagingProvider2{}
 	if err := s.client.do(ctx, "PUT", "/v1/messaging_providers/sms", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateFull: Create a tenant-defined notification template: a name (unique per instance), a subject and body
+// with `{{variables}}`, and the category whose per-user preference gates it. A duplicate name is a
+// 409.
+// POST /v1/notification_templates.
+func (s *NotificationTemplatesOpsService) CreateFull(ctx context.Context, params NotificationTemplatesOpsCreateFullParams, opts ...RequestOption) (*NotificationTemplatesOpsCreateFullResult, error) {
+	out := &NotificationTemplatesOpsCreateFullResult{}
+	if err := s.client.do(ctx, "POST", "/v1/notification_templates", nil, params, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -1243,6 +1401,21 @@ func (s *OrganizationsService) UpdatePolicyFull(ctx context.Context, id string, 
 func (s *OrganizationsService) CreateInvitationFull(ctx context.Context, id string, params OrganizationsCreateInvitationFullParams, opts ...RequestOption) (*OrganizationInvitation2, error) {
 	out := &OrganizationInvitation2{}
 	if err := s.client.do(ctx, "POST", "/v1/organizations/"+url.PathEscape(id)+"/invitations", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ResendInvitationFull: Resend a pending invitation: same id and role, a fresh expiry, and organizationInvitation.resent
+// so your mailer sends it again. With organizations.invitationEmail "atlas", an email invitation
+// is mailed again by Atlas with a fresh single-use link built from the body's `redirect_url`
+// (required then unless the instance sets organizations.invitationRedirectUrl; `email_sent` in the
+// response says whether it went out). 404 for an invitation of another organization; 409 when it
+// is no longer pending.
+// POST /v1/organizations/{id}/invitations/{invitationId}/resend.
+func (s *OrganizationsService) ResendInvitationFull(ctx context.Context, id string, invitationID string, params OrganizationsResendInvitationFullParams, opts ...RequestOption) (*OrganizationsResendInvitationFullResult, error) {
+	out := &OrganizationsResendInvitationFullResult{}
+	if err := s.client.do(ctx, "POST", "/v1/organizations/"+url.PathEscape(id)+"/invitations/"+url.PathEscape(invitationID)+"/resend", nil, params, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -1721,6 +1894,49 @@ func (s *UsersService) GetMinorStatusFull(ctx context.Context, id string, opts .
 	return out, nil
 }
 
+// UsersListOrganizationMembershipsFullQuery holds the query parameters of UsersService.ListOrganizationMembershipsFull.
+type UsersListOrganizationMembershipsFullQuery struct {
+	// Page size. Defaults to 20; values above 100 are capped at 100.
+	Limit *int64
+	// Cursor: return only items after this id. Pass the `next_cursor` (or the last item id) of the
+	// previous page.
+	StartingAfter string
+}
+
+func (q UsersListOrganizationMembershipsFullQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListOrganizationMembershipsFull: List the organizations a user belongs to with each membership's role, the org's resolved plan,
+// and the join time. The server-side counterpart to the session `orgs` claim, for background jobs
+// that hold no session token. Cursor-paginated.
+// GET /v1/users/{id}/organization_memberships.
+func (s *UsersService) ListOrganizationMembershipsFull(ctx context.Context, id string, query UsersListOrganizationMembershipsFullQuery, opts ...RequestOption) (*CursorPage[UsersListOrganizationMembershipsFullItem], error) {
+	out := &CursorPage[UsersListOrganizationMembershipsFullItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/users/"+url.PathEscape(id)+"/organization_memberships", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListOrganizationMembershipsFullIter walks every page of ListOrganizationMembershipsFull, fetching the next one on demand.
+func (s *UsersService) ListOrganizationMembershipsFullIter(ctx context.Context, id string, query UsersListOrganizationMembershipsFullQuery, opts ...RequestOption) *Iterator[UsersListOrganizationMembershipsFullItem] {
+	return Paginate(func(cursor string) (*CursorPage[UsersListOrganizationMembershipsFullItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.ListOrganizationMembershipsFull(ctx, id, q, opts...)
+	})
+}
+
 // GetReferralFull: The user's stored referral result: where attribution stands (pending, attributed, none, failed,
 // held, flagged), who referred them, the platform's notes, the id the platform knows them by, and
 // their own code. Read from Atlas, never from the platform. 404 when the user was never reported.
@@ -1802,7 +2018,9 @@ func (s *UsersService) CreateFull(ctx context.Context, params UsersCreateFullPar
 
 // CreateIdentityFull: Merge a secondary user into this primary: moves the secondary's provider accounts and verified
 // identifiers over (skipping collisions), re-points org memberships without escalating role,
-// revokes the secondary's sessions and retires it. Never clears the primary's MFA or ban.
+// revokes the secondary's sessions and retires it. Never clears the primary's MFA or ban. Fires
+// user.merged (via identity_link). A pre_user_merge Action can refuse it (403 ACTION_BLOCKED); two
+// different external ids answer 409 unless external_id is keep_target or keep_source.
 // POST /v1/users/{id}/identities.
 func (s *UsersService) CreateIdentityFull(ctx context.Context, id string, params UsersCreateIdentityFullParams, opts ...RequestOption) (*UsersCreateIdentityFullResult, error) {
 	out := &UsersCreateIdentityFullResult{}
@@ -1851,6 +2069,39 @@ func (s *VCService) ListCredentialTypesFullIter(ctx context.Context, query VCLis
 		}
 		return s.ListCredentialTypesFull(ctx, q, opts...)
 	})
+}
+
+// CreateFull: Register a webhook endpoint: an HTTPS url (any receiver), or an event destination (AWS
+// EventBridge, Google Cloud Pub/Sub, Cloudflare Queues) with your own credentials. Omit
+// enabled_events for "*". `active: false` creates it switched off: nothing is delivered until
+// PATCH { active: true }, and POST /v1/webhook_endpoints/{id}/test still works on it. `secret`
+// sets your own signing secret (whsec_ + at least 32 characters; 422 otherwise); without it Atlas
+// generates one. The signing secret is returned in this response only. Send Idempotency-Key to
+// make a retried create return the first result. Idempotent create: `external_ref` returns the
+// existing object on a repeat (200, `idempotent_replay: true`, no secret re-shown); `metadata`
+// tags it (filter lists with ?metadata[key]=value).
+// POST /v1/webhook_endpoints.
+func (s *WebhookEndpointsOpsService) CreateFull(ctx context.Context, params WebhookEndpointsOpsCreateFullParams, opts ...RequestOption) (*WebhookEndpointCreate, error) {
+	out := &WebhookEndpointCreate{}
+	if err := s.client.do(ctx, "POST", "/v1/webhook_endpoints", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetFull: Introspect the presented credential: a secret key, a partner link, an access token, or a
+// publishable key (as `Authorization: Bearer pk_…` or `X-Atlas-Publishable-Key`). Returns the
+// key's id, type, prefix, environment, scopes (and presets expanded), the preset it was minted
+// with when its scopes are exactly a named preset, what it may mint (`can_mint`), owner,
+// created/expires/last-used, the resource it is scoped to, the route prefixes it can reach, the
+// instance (id, environment, issuer) and the account. Changes nothing. No scope required.
+// GET /v1/whoami.
+func (s *WhoamiService) GetFull(ctx context.Context, opts ...RequestOption) (*WhoamiGetFullResult, error) {
+	out := &WhoamiGetFullResult{}
+	if err := s.client.do(ctx, "GET", "/v1/whoami", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // CreateFull: Create a lifecycle workflow. Steps are notify, disable, delete, invite, add_to_org,
