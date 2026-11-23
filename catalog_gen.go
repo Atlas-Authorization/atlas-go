@@ -968,6 +968,144 @@ func (s *AllowlistIdentifiersService) Delete(ctx context.Context, id string, opt
 	return out, nil
 }
 
+// AnalyticsListCaptchaQuery holds the query parameters of AnalyticsService.ListCaptcha.
+type AnalyticsListCaptchaQuery struct {
+	// Window start: Unix epoch milliseconds or an ISO 8601 time.
+	From string
+	// Window end (exclusive). Defaults to now.
+	To string
+	// Window length in days ending at `to`, used when `from` is absent. Default 30, at most 180.
+	Days *int64
+	// Bucket size for time series.
+	Granularity string
+	// Only members of this organization (a per-organization slice). Not available for failures or the
+	// journey funnel.or the journey funnel.
+	OrganizationID string
+	// Response format. csv and parquet return the `data` rows as a file (parquet: one uncompressed row
+	// group, every column required).
+	Format string
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q AnalyticsListCaptchaQuery) values() url.Values {
+	v := url.Values{}
+	if q.From != "" {
+		v.Set("from", q.From)
+	}
+	if q.To != "" {
+		v.Set("to", q.To)
+	}
+	if q.Days != nil {
+		v.Set("days", strconv.FormatInt(*q.Days, 10))
+	}
+	if q.Granularity != "" {
+		v.Set("granularity", q.Granularity)
+	}
+	if q.OrganizationID != "" {
+		v.Set("organization_id", q.OrganizationID)
+	}
+	if q.Format != "" {
+		v.Set("format", q.Format)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListCaptcha: Captcha challenges per provider and flow: issued, passed, failed, refused, and the solve rate
+// (passed over passed plus failed). No organization slice. A provider that records no issue event
+// shows 0 issued.
+// GET /v1/analytics/captcha.
+func (s *AnalyticsService) ListCaptcha(ctx context.Context, query AnalyticsListCaptchaQuery, opts ...RequestOption) (*AnalyticsListCaptchaResult, error) {
+	out := &AnalyticsListCaptchaResult{}
+	if err := s.client.do(ctx, "GET", "/v1/analytics/captcha", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AnalyticsListSMSQuery holds the query parameters of AnalyticsService.ListSMS.
+type AnalyticsListSMSQuery struct {
+	// What one message costs you at your provider.
+	RatePerMessage *float64
+	// Three-letter code echoed back with the estimate.
+	Currency string
+	// Window start: Unix epoch milliseconds or an ISO 8601 time.
+	From string
+	// Window end (exclusive). Defaults to now.
+	To string
+	// Window length in days ending at `to`, used when `from` is absent. Default 30, at most 180.
+	Days *int64
+	// Bucket size for time series.
+	Granularity string
+	// Only members of this organization (a per-organization slice). Not available for failures or the
+	// journey funnel.or the journey funnel.
+	OrganizationID string
+	// Response format. csv and parquet return the `data` rows as a file (parquet: one uncompressed row
+	// group, every column required).
+	Format string
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q AnalyticsListSMSQuery) values() url.Values {
+	v := url.Values{}
+	if q.RatePerMessage != nil {
+		v.Set("rate_per_message", strconv.FormatFloat(*q.RatePerMessage, 'f', -1, 64))
+	}
+	if q.Currency != "" {
+		v.Set("currency", q.Currency)
+	}
+	if q.From != "" {
+		v.Set("from", q.From)
+	}
+	if q.To != "" {
+		v.Set("to", q.To)
+	}
+	if q.Days != nil {
+		v.Set("days", strconv.FormatInt(*q.Days, 10))
+	}
+	if q.Granularity != "" {
+		v.Set("granularity", q.Granularity)
+	}
+	if q.OrganizationID != "" {
+		v.Set("organization_id", q.OrganizationID)
+	}
+	if q.Format != "" {
+		v.Set("format", q.Format)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListSMS: SMS messages by destination country: sent, delivered, failed. Atlas sends through your own
+// provider, which bills you; pass `rate_per_message` (and optionally `currency`) to add
+// `estimated_cost` (messages times that rate, not a billed amount). No organization slice.
+// GET /v1/analytics/sms.
+func (s *AnalyticsService) ListSMS(ctx context.Context, query AnalyticsListSMSQuery, opts ...RequestOption) (*AnalyticsListSMSResult, error) {
+	out := &AnalyticsListSMSResult{}
+	if err := s.client.do(ctx, "GET", "/v1/analytics/sms", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AppCatalogListCustomPresetsQuery holds the query parameters of AppCatalogService.ListCustomPresets.
 type AppCatalogListCustomPresetsQuery struct {
 	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
@@ -3402,11 +3540,13 @@ func (s *ConnectionProviderTopicsService) Get(ctx context.Context, opts ...Reque
 	return out, nil
 }
 
-// Set: Replace the instance's business topics: { topics: { shopify: [...], ebay: [...] } }, up to 50
-// per provider, spelled as the provider spells them (Shopify orders/create; eBay Trading events
-// such as ItemSold, or Commerce Notification topic ids in UPPER_SNAKE_CASE). Connections made
-// afterwards subscribe automatically; call POST /v1/connections/{id}/provider_subscriptions/sync
-// for existing ones. A topic not listed here is acknowledged and ignored on delivery.
+// Set: Replace the instance's business topics: { topics: { shopify: [...], ebay: [...], bigcommerce:
+// [...], square: [...], etsy: [...], tiktok_shop: [...] } }, up to 50 per provider (or ["*"] to
+// pass every topic the provider sends through as connection.provider_event with the raw payload),
+// spelled as the provider spells them (Shopify orders/create; eBay Trading events such as
+// ItemSold, or Commerce Notification topic ids in UPPER_SNAKE_CASE). Connections made afterwards
+// subscribe automatically; call POST /v1/connections/{id}/provider_subscriptions/sync for existing
+// ones. A topic not listed here is acknowledged and ignored on delivery.
 // PUT /v1/connection_provider_topics.
 func (s *ConnectionProviderTopicsService) Set(ctx context.Context, params ConnectionProviderTopicsSetParams, opts ...RequestOption) (*ConnectionProviderTopicsSetResult, error) {
 	out := &ConnectionProviderTopicsSetResult{}
@@ -3419,6 +3559,49 @@ func (s *ConnectionProviderTopicsService) Set(ctx context.Context, params Connec
 // ConnectionProvidersService is the generated surface of /v1/connection_providers.
 type ConnectionProvidersService struct {
 	client *Client
+}
+
+// ConnectionProvidersListPoliciesQuery holds the query parameters of ConnectionProvidersService.ListPolicies.
+type ConnectionProvidersListPoliciesQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q ConnectionProvidersListPoliciesQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListPolicies: List every provider that has a stored instance policy, in the shape of the single-provider read
+// (unique_external_id, whether a webhook secret or dev id is stored, events_url). Secrets are
+// never returned.
+// GET /v1/connection_providers/policies.
+func (s *ConnectionProvidersService) ListPolicies(ctx context.Context, query ConnectionProvidersListPoliciesQuery, opts ...RequestOption) (*CursorPage[ConnectionProvidersListPoliciesItem], error) {
+	out := &CursorPage[ConnectionProvidersListPoliciesItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/connection_providers/policies", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListPoliciesIter walks every page of ListPolicies, fetching the next one on demand.
+func (s *ConnectionProvidersService) ListPoliciesIter(ctx context.Context, query ConnectionProvidersListPoliciesQuery, opts ...RequestOption) *Iterator[ConnectionProvidersListPoliciesItem] {
+	return Paginate(func(cursor string) (*CursorPage[ConnectionProvidersListPoliciesItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.ListPolicies(ctx, q, opts...)
+	})
 }
 
 // GetPolicy: Read the instance policy for one provider's connections: unique_external_id, whether a webhook
@@ -3485,6 +3668,55 @@ func (s *ConnectionReconnectSettingsService) Set(ctx context.Context, params Con
 	return out, nil
 }
 
+// ConnectionTemplatesService is the generated surface of /v1/connection_templates.
+type ConnectionTemplatesService struct {
+	client *Client
+}
+
+// ConnectionTemplatesListQuery holds the query parameters of ConnectionTemplatesService.List.
+type ConnectionTemplatesListQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q ConnectionTemplatesListQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// List: The marketplace connection templates (Discogs, Trade Me, BrickLink, Cardmarket, WooCommerce,
+// Bonanza, Poizon, browser-session cookie jars, RSA-signed OAuth 1.0a): for each, the connection
+// kind, whether the owner authorizes or you enter the secrets, which secret fields, the hosts to
+// allow and the config to send. Read-only.
+// GET /v1/connection_templates.
+func (s *ConnectionTemplatesService) List(ctx context.Context, query ConnectionTemplatesListQuery, opts ...RequestOption) (*CursorPage[ConnectionTemplatesListItem], error) {
+	out := &CursorPage[ConnectionTemplatesListItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/connection_templates", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListIter walks every page of List, fetching the next one on demand.
+func (s *ConnectionTemplatesService) ListIter(ctx context.Context, query ConnectionTemplatesListQuery, opts ...RequestOption) *Iterator[ConnectionTemplatesListItem] {
+	return Paginate(func(cursor string) (*CursorPage[ConnectionTemplatesListItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.List(ctx, q, opts...)
+	})
+}
+
 // CompleteOAuth: Finish a connect whose OAuth client has its own `redirect_uri`: your page received the
 // provider's redirect (code and state) and forwards both here. The state is bound to the client it
 // was started with, so a code forwarded against another client, another instance, or a
@@ -3516,6 +3748,24 @@ func (s *ConnectionsService) CompleteOAuth(ctx context.Context, params Connectio
 func (s *ConnectionsService) RegisterOAuthClient(ctx context.Context, params ConnectionsRegisterOAuthClientParams, opts ...RequestOption) (map[string]interface{}, error) {
 	var out map[string]interface{}
 	if err := s.client.do(ctx, "POST", "/v1/connections/oauth_clients/register", nil, params, &out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Rehome: Move OAuth connections from one owner client to another (a retired owner client you can now
+// delete, two clients merged). Both clients must be the same provider and environment. When both
+// are the same provider app (same client_id) every token stays valid and the rows simply move.
+// Otherwise (verify, the default and the only allowed mode) one real refresh is made per
+// connection with the TARGET client's credentials and only connections the provider accepts move;
+// the others stay on the old client untouched and are reported failed with a reason (a failed
+// probe changes no status). Token-family siblings move together. Dry run reports what would move
+// without calling the provider. Never returns tokens. Idempotent on Idempotency-Key; audited as
+// connection.rehomed (ids and counts).
+// POST /v1/connections/rehome.
+func (s *ConnectionsService) Rehome(ctx context.Context, params ConnectionsRehomeParams, opts ...RequestOption) (*ConnectionsRehomeResult, error) {
+	out := &ConnectionsRehomeResult{}
+	if err := s.client.do(ctx, "POST", "/v1/connections/rehome", nil, params, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -4983,6 +5233,31 @@ func (s *DiagnosticsService) GetTrace(ctx context.Context, id string, opts ...Re
 	return out, nil
 }
 
+// Get: Read one custom domain: the same object as a list item, including a path mount's verification
+// file and what the last failed check observed.
+// GET /v1/domains/{id}.
+func (s *DomainsService) Get(ctx context.Context, id string, opts ...RequestOption) (*CustomDomain2, error) {
+	out := &CustomDomain2{}
+	if err := s.client.do(ctx, "GET", "/v1/domains/"+url.PathEscape(id), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RotateVerification: Issue a new random verification token for a path-mounted domain and return the domain with the
+// new `verification.token` and `url`. The previous token keeps verifying for 24 hours
+// (`verification.previous_url`, `previous_valid_until`). Use it when a CDN cache has stored a
+// wrong answer for the old URL: the new URL has never been requested, so nothing is cached for it.
+// A CNAME domain has no token (400).
+// POST /v1/domains/{id}/verification/rotate.
+func (s *DomainsService) RotateVerification(ctx context.Context, id string, params map[string]interface{}, opts ...RequestOption) (*CustomDomain2, error) {
+	out := &CustomDomain2{}
+	if err := s.client.do(ctx, "POST", "/v1/domains/"+url.PathEscape(id)+"/verification/rotate", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Consume: Spend units of a plan feature for a user or organization, atomically and exactly once per
 // `idempotency_key`. The answer is the decision (200 whether allowed or not; `reason` is
 // `not_entitled` or `limit_reached`); a retry with the same key replays it and never spends twice.
@@ -5826,6 +6101,69 @@ type GrantsService struct {
 	client *Client
 }
 
+// GrantsListQuery holds the query parameters of GrantsService.List.
+type GrantsListQuery struct {
+	// Only this user's grants.
+	UserID string
+	// Only grants held by this OAuth client (its public client_id).
+	ClientID string
+	// Only this kind of grant. Default all.
+	Type string
+	// Only grants in this state. Default active.
+	Status string
+	// Page size. Defaults to 50; values above 100 are capped at 100.
+	Limit *int64
+	// The `next_cursor` of the previous page.
+	StartingAfter string
+}
+
+func (q GrantsListQuery) values() url.Values {
+	v := url.Values{}
+	if q.UserID != "" {
+		v.Set("user_id", q.UserID)
+	}
+	if q.ClientID != "" {
+		v.Set("client_id", q.ClientID)
+	}
+	if q.Type != "" {
+		v.Set("type", q.Type)
+	}
+	if q.Status != "" {
+		v.Set("status", q.Status)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// List: List every grant in one cursor-paged list: users' consent grants and OpenID Grant Management
+// grants, told apart by `type`. Filter by `user_id`, `client_id` (the public client id), `type`
+// (consent, managed, all) and `status` (active by default; revoking a consent removes it, so
+// revoked grants are managed ones).
+// GET /v1/grants.
+func (s *GrantsService) List(ctx context.Context, query GrantsListQuery, opts ...RequestOption) (*CursorPage[GrantsListItem], error) {
+	out := &CursorPage[GrantsListItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/grants", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListIter walks every page of List, fetching the next one on demand.
+func (s *GrantsService) ListIter(ctx context.Context, query GrantsListQuery, opts ...RequestOption) *Iterator[GrantsListItem] {
+	return Paginate(func(cursor string) (*CursorPage[GrantsListItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.List(ctx, q, opts...)
+	})
+}
+
 // Consume: Take an amount from one of a grant's counters, atomically. A denial is a 200 decision with
 // `allowed: false`.
 // POST /v1/grants/{grantType}/{id}/consume.
@@ -5862,6 +6200,27 @@ func (s *GrantsService) Refund(ctx context.Context, grantType string, id string,
 func (s *GrantsService) GetUsage(ctx context.Context, grantType string, id string, opts ...RequestOption) (*GrantsGetUsageResult, error) {
 	out := &GrantsGetUsageResult{}
 	if err := s.client.do(ctx, "GET", "/v1/grants/"+url.PathEscape(grantType)+"/"+url.PathEscape(id)+"/usage", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Get: Read one grant of either kind, with its metadata.
+// GET /v1/grants/{id}.
+func (s *GrantsService) Get(ctx context.Context, id string, opts ...RequestOption) (*GrantsGetResult, error) {
+	out := &GrantsGetResult{}
+	if err := s.client.do(ctx, "GET", "/v1/grants/"+url.PathEscape(id), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Update: Change a grant's `metadata` (secret key only). The keys you send are merged into what is stored:
+// a key sent as null is removed. The result is at most 4 KB of JSON. Audited; idempotent.
+// PATCH /v1/grants/{id}.
+func (s *GrantsService) Update(ctx context.Context, id string, params GrantsUpdateParams, opts ...RequestOption) (*GrantsUpdateResult, error) {
+	out := &GrantsUpdateResult{}
+	if err := s.client.do(ctx, "PATCH", "/v1/grants/"+url.PathEscape(id), nil, params, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -6532,6 +6891,19 @@ func (s *InstanceService) RestoreConfigSnapshot(ctx context.Context, id string, 
 	return out, nil
 }
 
+// UpdateCookieConsent: Change part of the cookie-consent setting: the fields sent are merged over the stored setting
+// and the rest is kept (PUT replaces the whole setting). `null` clears a field; sending site_id
+// drops a stored site reference and the other way round. With no stored setting, script_url is
+// required. The answer and warnings are those of PUT.
+// PATCH /v1/instance/cookie_consent.
+func (s *InstanceService) UpdateCookieConsent(ctx context.Context, params InstanceUpdateCookieConsentParams, opts ...RequestOption) (*InstanceUpdateCookieConsentResult, error) {
+	out := &InstanceUpdateCookieConsentResult{}
+	if err := s.client.do(ctx, "PATCH", "/v1/instance/cookie_consent", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GetDataKeyProvider: Customer-managed encryption status: whether it is on, the key provider, the data key versions,
 // the last health check and how long a revoked key keeps working before Atlas fails closed.
 // GET /v1/instance/data_key_provider.
@@ -6817,6 +7189,55 @@ func (s *InstanceService) CreateExportsRevokeLink(ctx context.Context, id string
 	return out, nil
 }
 
+// GetHooksBeforeFirstSession: Read the before_first_session hook: the endpoint Atlas calls once per user, after their email is
+// verified and before their first session token, so your app can link the account and stamp its
+// own external_id on that very token. The signing secret is reported as signing_secret_set only.
+// GET /v1/instance/hooks/before_first_session.
+func (s *InstanceService) GetHooksBeforeFirstSession(ctx context.Context, opts ...RequestOption) (*InstanceGetHooksBeforeFirstSessionResult, error) {
+	out := &InstanceGetHooksBeforeFirstSessionResult{}
+	if err := s.client.do(ctx, "GET", "/v1/instance/hooks/before_first_session", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UpdateHooksBeforeFirstSession: Update the before_first_session hook. Only the fields you send change; null clears. Atlas POSTs
+// {"type":"before_first_session","data":{user_id,email,email_verified,provider,provider_user_id,name,external_id}}
+// signed like a webhook (atlas-id, atlas-timestamp, atlas-signature). Answer 200
+// {"external_id":"…"} to set it: it is stored only when the user has none and no other user holds
+// it (never overwritten). A timeout or failure never blocks the sign-in (it is audited and counted
+// in failed_calls). Not called for impersonation or anonymous guests.
+// PATCH /v1/instance/hooks/before_first_session.
+func (s *InstanceService) UpdateHooksBeforeFirstSession(ctx context.Context, params InstanceUpdateHooksBeforeFirstSessionParams, opts ...RequestOption) (*InstanceUpdateHooksBeforeFirstSessionResult, error) {
+	out := &InstanceUpdateHooksBeforeFirstSessionResult{}
+	if err := s.client.do(ctx, "PATCH", "/v1/instance/hooks/before_first_session", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteHooksBeforeFirstSession: Turn the hook off and clear its url and signing secret, the same as PATCH with {enabled:false,
+// url:null, signing_secret:null}. Audited. Idempotent.
+// DELETE /v1/instance/hooks/before_first_session.
+func (s *InstanceService) DeleteHooksBeforeFirstSession(ctx context.Context, opts ...RequestOption) (*InstanceDeleteHooksBeforeFirstSessionResult, error) {
+	out := &InstanceDeleteHooksBeforeFirstSessionResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/instance/hooks/before_first_session", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// TestHookBeforeFirstSession: Send a signed sample call (a user that does not exist) to the hook and report its answer.
+// Nothing is stored on any user.
+// POST /v1/instance/hooks/before_first_session/test.
+func (s *InstanceService) TestHookBeforeFirstSession(ctx context.Context, opts ...RequestOption) (*InstanceTestHookBeforeFirstSessionResult, error) {
+	out := &InstanceTestHookBeforeFirstSessionResult{}
+	if err := s.client.do(ctx, "POST", "/v1/instance/hooks/before_first_session/test", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GetImpersonationPolicy: The instance's staff impersonation policy: require_reason, reason_codes, max_duration_seconds,
 // require_approval, read_only_default and notify_user.
 // GET /v1/instance/impersonation_policy.
@@ -6903,6 +7324,65 @@ func (s *InstanceService) GetImport(ctx context.Context, id string, opts ...Requ
 	return out, nil
 }
 
+// GetIntegrationsForwarding: Read the stored sign-up forwarding for a destination: its managed endpoint, active flag and
+// non-secret settings. The destination key is never returned. 404 when sign-ups are not forwarded
+// there.
+// GET /v1/instance/integrations/forwarding/{destination}.
+func (s *InstanceService) GetIntegrationsForwarding(ctx context.Context, destination string, opts ...RequestOption) (*InstanceGetIntegrationsForwardingResult, error) {
+	out := &InstanceGetIntegrationsForwardingResult{}
+	if err := s.client.do(ctx, "GET", "/v1/instance/integrations/forwarding/"+url.PathEscape(destination), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SetIntegrationsForwarding: Forward every sign-up (`user.created`) to Lucida, Hermetica or Seolyticize with your own server
+// key, or to any HTTPS webhook.
+// PUT /v1/instance/integrations/forwarding/{destination}.
+func (s *InstanceService) SetIntegrationsForwarding(ctx context.Context, destination string, params InstanceSetIntegrationsForwardingParams, opts ...RequestOption) (*InstanceSetIntegrationsForwardingResult, error) {
+	out := &InstanceSetIntegrationsForwardingResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/instance/integrations/forwarding/"+url.PathEscape(destination), nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteIntegrationsForwarding: Stop forwarding sign-ups to a destination (removes its managed endpoint).
+// DELETE /v1/instance/integrations/forwarding/{destination}.
+func (s *InstanceService) DeleteIntegrationsForwarding(ctx context.Context, destination string, opts ...RequestOption) error {
+	return s.client.do(ctx, "DELETE", "/v1/instance/integrations/forwarding/"+url.PathEscape(destination), nil, nil, nil, opts...)
+}
+
+// InstanceListIntegrationsHealthQuery holds the query parameters of InstanceService.ListIntegrationsHealth.
+type InstanceListIntegrationsHealthQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q InstanceListIntegrationsHealthQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListIntegrationsHealth: Every connected integration and receiver with its last delivery status and time, in one list.
+// GET /v1/instance/integrations/health.
+func (s *InstanceService) ListIntegrationsHealth(ctx context.Context, query InstanceListIntegrationsHealthQuery, opts ...RequestOption) (*InstanceListIntegrationsHealthResult, error) {
+	out := &InstanceListIntegrationsHealthResult{}
+	if err := s.client.do(ctx, "GET", "/v1/instance/integrations/health", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InstanceListIntegrationsMintsQuery holds the query parameters of InstanceService.ListIntegrationsMints.
 type InstanceListIntegrationsMintsQuery struct {
 	// Page size. Defaults to 50; values above 100 are capped at 100.
@@ -6961,6 +7441,17 @@ func (q InstanceTestIntegrationQuery) values() url.Values {
 func (s *InstanceService) TestIntegration(ctx context.Context, product string, query InstanceTestIntegrationQuery, opts ...RequestOption) (*InstanceTestIntegrationResult, error) {
 	out := &InstanceTestIntegrationResult{}
 	if err := s.client.do(ctx, "POST", "/v1/instance/integrations/"+url.PathEscape(product)+"/test", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetIssuers: The token issuers a verifier should accept: the active one, the planned one while a domain claim
+// is pending, and earlier ones still in their overlap window.
+// GET /v1/instance/issuers.
+func (s *InstanceService) GetIssuers(ctx context.Context, opts ...RequestOption) (*InstanceGetIssuersResult, error) {
+	out := &InstanceGetIssuersResult{}
+	if err := s.client.do(ctx, "GET", "/v1/instance/issuers", nil, nil, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -7194,16 +7685,51 @@ func (s *InstanceService) ListScopes(ctx context.Context, query InstanceListScop
 	return out, nil
 }
 
-// SetScopes: Replace the scope catalogue. Each scope has a `name`, a `label` and a `description` per locale
+// InstanceSetScopesQuery holds the query parameters of InstanceService.SetScopesWithQuery.
+type InstanceSetScopesQuery struct {
+	// atomic (default) or partial.
+	Mode string
+	// reject (default) or truncate.
+	TooLong string
+}
+
+func (q InstanceSetScopesQuery) values() url.Values {
+	v := url.Values{}
+	if q.Mode != "" {
+		v.Set("mode", q.Mode)
+	}
+	if q.TooLong != "" {
+		v.Set("too_long", q.TooLong)
+	}
+	return v
+}
+
+// SetScopesWithQuery: Replace the scope catalogue. Each scope has a `name`, a `label` and a `description` per locale
 // ({ "en": "…", "es": "…" }), `sensitive`, and `requires_verified_client`. The consent screen
 // shows the label and description in the user's language (falling back to its base language, then
 // `en`). A scope with `requires_verified_client` is refused at /oauth2/authorize with
 // `invalid_scope` unless the app's status is `approved` or that scope is in the client's
 // `approved_scopes` (per-scope review). The owner and testers of a client still in development may
 // request it too. A client still needs the scope in its allowed scopes to request it.
+// `requires_client_level` (`any`, `verified` or `certified`) sets the level a client needs
+// (`requires_verified_client: true` means `verified`; the stricter wins); a `certified` client is
+// an approved one the instance has certified (PATCH /v1/oauth_clients/{id} `certified`).
+// `owner_exempt: true` lets the developer who owns a client request the scope with it on their own
+// account whatever the client's level. A name ending `:*` (`listings:*`) is a wildcard entry: it
+// covers every `listings:<anything>` for gating, consent text and released claims, and a client or
+// grant that holds `listings:*` holds each of them. By default the whole list is checked and
+// nothing is written if any entry is bad (422, one problem per field). `?mode=partial` applies the
+// valid entries and answers 200 with `rejected: [{ index, name, errors }]` (a rejected entry
+// leaves the scope of that name as it was). `?too_long=truncate` cuts over-long labels and
+// descriptions instead of refusing them and lists each cut in `warnings`.
 // PUT /v1/instance/scopes.
+func (s *InstanceService) SetScopesWithQuery(ctx context.Context, query InstanceSetScopesQuery, params InstanceSetScopesParams, opts ...RequestOption) error {
+	return s.client.do(ctx, "PUT", "/v1/instance/scopes", query.values(), params, nil, opts...)
+}
+
+// SetScopes calls SetScopesWithQuery without the query (the signature it shipped with).
 func (s *InstanceService) SetScopes(ctx context.Context, params InstanceSetScopesParams, opts ...RequestOption) error {
-	return s.client.do(ctx, "PUT", "/v1/instance/scopes", nil, params, nil, opts...)
+	return s.SetScopesWithQuery(ctx, InstanceSetScopesQuery{}, params, opts...)
 }
 
 // InstanceListSecretKeysQuery holds the query parameters of InstanceService.ListSecretKeys.
@@ -7251,17 +7777,21 @@ func (s *InstanceService) ListSecretKeysIter(ctx context.Context, query Instance
 
 // CreateSecretKey: Alias of POST /v1/secret_keys. Create a scoped secret key: `name`, `scopes[]` (refused when
 // unknown, or when the calling key does not hold them; presets `read_only`, `privacy:execute`,
-// `privacy:grants:revoke`; or `preset: "app-runtime"` for an app server runtime key), `expires_at`
-// (at most a year; default one year; "never" is refused), `allowed_ips` (CIDRs), `allowed_origins`
-// (browser origins; a request with another Origin gets 403 ORIGIN_NOT_ALLOWED), `owner` (default:
-// the creating person or key), `external_ref` (idempotent create: a repeat returns the existing
-// key, 200, idempotent_replay, no secret), `metadata` (tags; filter the list with
-// ?metadata[key]=value) and `key_format` (`atlas`, the default `atlas_<env>_sk_…`, or `legacy`
-// `sk_<env>_…`). The secret is returned once. Minting with an operator token needs multi-factor
-// sign-in within 5 minutes (403 STEP_UP_REQUIRED). Send `X-Secret-Recipient: x25519:<public key>`
-// to receive the secret sealed (libsodium sealed box) as `sealed_secret` instead of in plaintext.
-// Example: a data-rights tool's key, { "name": "DSAR executor", "scopes": ["privacy:execute",
-// "privacy:grants:revoke"], "expires_at": "2027-04-01" }.
+// `privacy:grants:revoke`; or `preset: "app-runtime"` for an app server runtime key, or `preset:
+// "integrations"` for the key a connected platform (consent manager, referral or support platform)
+// connects with, or `preset: "provisioning"` for a deploy-script key that configures the instance:
+// instance settings, domains, messaging providers, integrations, webhooks, OAuth clients and
+// providers, redirect URLs, branding and keys, with no user, session or organization-member
+// access), `expires_at` (at most a year; default one year; "never" is refused), `allowed_ips`
+// (CIDRs), `allowed_origins` (browser origins; a request with another Origin gets 403
+// ORIGIN_NOT_ALLOWED), `owner` (default: the creating person or key), `external_ref` (idempotent
+// create: a repeat returns the existing key, 200, idempotent_replay, no secret), `metadata` (tags;
+// filter the list with ?metadata[key]=value) and `key_format` (`atlas`, the default
+// `atlas_<env>_sk_…`, or `legacy` `sk_<env>_…`). The secret is returned once. Minting with an
+// operator token needs multi-factor sign-in within 5 minutes (403 STEP_UP_REQUIRED). Send
+// `X-Secret-Recipient: x25519:<public key>` to receive the secret sealed (libsodium sealed box) as
+// `sealed_secret` instead of in plaintext. Example: a data-rights tool's key, { "name": "DSAR
+// executor", "scopes": ["privacy:execute", "privacy:grants:revoke"], "expires_at": "2027-04-01" }.
 // POST /v1/instance/secret_keys.
 func (s *InstanceService) CreateSecretKey(ctx context.Context, params InstanceCreateSecretKeyParams, opts ...RequestOption) (*InstanceCreateSecretKeyResult, error) {
 	out := &InstanceCreateSecretKeyResult{}
@@ -7302,6 +7832,105 @@ func (s *InstanceService) SetSigningKeySchedule(ctx context.Context, params Inst
 func (s *InstanceService) DeleteSigningKeySchedule(ctx context.Context, opts ...RequestOption) (*InstanceDeleteSigningKeyScheduleResult, error) {
 	out := &InstanceDeleteSigningKeyScheduleResult{}
 	if err := s.client.do(ctx, "DELETE", "/v1/instance/signing_key_schedule", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// InstanceListStagingCopiesQuery holds the query parameters of InstanceService.ListStagingCopies.
+type InstanceListStagingCopiesQuery struct {
+	// Page size, 1-100 (default 20).
+	Limit *int64
+	// A copy id: return the ones after it.
+	StartingAfter string
+	// Only clones or only previews.
+	Kind string
+}
+
+func (q InstanceListStagingCopiesQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	if q.Kind != "" {
+		v.Set("kind", q.Kind)
+	}
+	return v
+}
+
+// ListStagingCopies: The staging copies and previews of this instance, newest first (deleted ones are left out).
+// GET /v1/instance/staging_copies.
+func (s *InstanceService) ListStagingCopies(ctx context.Context, query InstanceListStagingCopiesQuery, opts ...RequestOption) (*CursorPage[InstanceListStagingCopiesItem], error) {
+	out := &CursorPage[InstanceListStagingCopiesItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/instance/staging_copies", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListStagingCopiesIter walks every page of ListStagingCopies, fetching the next one on demand.
+func (s *InstanceService) ListStagingCopiesIter(ctx context.Context, query InstanceListStagingCopiesQuery, opts ...RequestOption) *Iterator[InstanceListStagingCopiesItem] {
+	return Paginate(func(cursor string) (*CursorPage[InstanceListStagingCopiesItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.ListStagingCopies(ctx, q, opts...)
+	})
+}
+
+// CreateStagingCopy: Make a staging copy of this instance with its own secret key: a new development-mode instance of
+// the same app, with or without data (same body and rules as the platform clone route, without
+// secret_key_preset: the key it answers with holds the app-runtime preset). For an instance that
+// is not provisioned under a platform app. The copy never carries secrets (configuration secrets
+// are removed; API keys and provider connections are not copied), private metadata of users and
+// organizations, webhook endpoints, signing keys, passwords or second factors. The new instance is
+// in development mode: no email or SMS is sent until it has its own provider keys. Needs
+// instance:write (and users:read when include has users). Honours Idempotency-Key; a repeat for a
+// live ref returns it (200, no secret). Audited.
+// POST /v1/instance/staging_copies.
+func (s *InstanceService) CreateStagingCopy(ctx context.Context, params InstanceCreateStagingCopyParams, opts ...RequestOption) (*InstanceCreateStagingCopyResult, error) {
+	out := &InstanceCreateStagingCopyResult{}
+	if err := s.client.do(ctx, "POST", "/v1/instance/staging_copies", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetStagingCopy: One staging copy: status, what was copied, what could not be placed.
+// GET /v1/instance/staging_copies/{id}.
+func (s *InstanceService) GetStagingCopy(ctx context.Context, id string, opts ...RequestOption) (*InstanceGetStagingCopyResult, error) {
+	out := &InstanceGetStagingCopyResult{}
+	if err := s.client.do(ctx, "GET", "/v1/instance/staging_copies/"+url.PathEscape(id), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteStagingCopy: Delete a staging copy together with its instance and everything in it. Only an instance a copy
+// created can be removed this way. Audited.
+// DELETE /v1/instance/staging_copies/{id}.
+func (s *InstanceService) DeleteStagingCopy(ctx context.Context, id string, opts ...RequestOption) (*InstanceDeleteStagingCopyResult, error) {
+	out := &InstanceDeleteStagingCopyResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/instance/staging_copies/"+url.PathEscape(id), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RefreshStagingCopy: Bring a completed staging copy up to date in place: the same instance, keys and host, with this
+// instance's configuration merged in again (and the data sections asked for, at most the ones it
+// was made with, up to 2000 rows each). synthetic_users { count (1-500), seed } adds seeded test
+// users (example.com addresses, the same seed gives the same users, so repeating it adds none
+// twice). ttl_hours extends a preview. Emails stay masked consistently, so a refresh does not
+// duplicate users. Audited.
+// POST /v1/instance/staging_copies/{id}/refresh.
+func (s *InstanceService) RefreshStagingCopy(ctx context.Context, id string, params InstanceRefreshStagingCopyParams, opts ...RequestOption) (*InstanceRefreshStagingCopyResult, error) {
+	out := &InstanceRefreshStagingCopyResult{}
+	if err := s.client.do(ctx, "POST", "/v1/instance/staging_copies/"+url.PathEscape(id)+"/refresh", nil, params, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -8174,11 +8803,82 @@ func (s *MachineTrustPoliciesService) Test(ctx context.Context, id string, param
 	return out, nil
 }
 
+// MachinesListRevokedQuery holds the query parameters of MachinesService.ListRevoked.
+type MachinesListRevokedQuery struct {
+	// Cursor: the `next_cursor` of the previous page (the same value `since` takes). Wins over since
+	// when both are sent.
+	StartingAfter string
+	// Where to resume: the `next_cursor` of the previous poll, or on a first poll a floor as an
+	// ISO-8601 timestamp or epoch ms.
+	Since string
+	// Page size, 1 to 100. Default 50.
+	Limit string
+}
+
+func (q MachinesListRevokedQuery) values() url.Values {
+	v := url.Values{}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	if q.Since != "" {
+		v.Set("since", q.Since)
+	}
+	if q.Limit != "" {
+		v.Set("limit", q.Limit)
+	}
+	return v
+}
+
+// ListRevoked: The machine deny feed: machines revoked and machine grants ended since a cursor
+// (since=<iso|cursor>), oldest first, so a service that verifies machine tokens offline can deny a
+// revoked machine within one poll. A `machine` entry denies every token with that `sub` issued
+// before `revoked_at`; a `machine_grant` entry denies tokens with that `sub` and `aud` (the
+// `audience`) issued before it. Readable with an sk_ bearer or a publishable key; a publishable
+// key sees ids, audiences and times only. The revocation stream carries the same events as pushes.
+// GET /v1/machines/revoked.
+func (s *MachinesService) ListRevoked(ctx context.Context, query MachinesListRevokedQuery, opts ...RequestOption) (*CursorPage[MachinesListRevokedItem], error) {
+	out := &CursorPage[MachinesListRevokedItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/machines/revoked", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListRevokedIter walks every page of ListRevoked, fetching the next one on demand.
+func (s *MachinesService) ListRevokedIter(ctx context.Context, query MachinesListRevokedQuery, opts ...RequestOption) *Iterator[MachinesListRevokedItem] {
+	return Paginate(func(cursor string) (*CursorPage[MachinesListRevokedItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.ListRevoked(ctx, q, opts...)
+	})
+}
+
 // UpdateGrant: Change a machine's grant in place: scopes, constraints or expiry. 409 once the grant has
 // expired.
 // PATCH /v1/machines/{id}/grants/{grantId}.
 func (s *MachinesService) UpdateGrant(ctx context.Context, id string, grantID string, params MachinesUpdateGrantParams, opts ...RequestOption) error {
 	return s.client.do(ctx, "PATCH", "/v1/machines/"+url.PathEscape(id)+"/grants/"+url.PathEscape(grantID), nil, params, nil, opts...)
+}
+
+// MessageLinksService is the generated surface of /v1/message_links.
+type MessageLinksService struct {
+	client *Client
+}
+
+// Create: Mint a link to the hosted unsubscribe (type `unsubscribe`, needs `category`) or the hosted
+// email-preference page (type `preferences`) for one address, for your own pages and mail. Atlas
+// fills the same links in for you when you send with `unsubscribe: true` or put
+// {{unsubscribe_url}} / {{preferences_url}} in a message. The link works for that address and
+// category only and does not expire. Audited. → 201.
+// POST /v1/message_links.
+func (s *MessageLinksService) Create(ctx context.Context, params MessageLinksCreateParams, opts ...RequestOption) (*MessageLinksCreateResult, error) {
+	out := &MessageLinksCreateResult{}
+	if err := s.client.do(ctx, "POST", "/v1/message_links", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // MessageReceiversService is the generated surface of /v1/message_receivers.
@@ -8268,6 +8968,8 @@ type MessagesListQuery struct {
 	Status string
 	// Only this template.
 	Template string
+	// Only `auth` or `transactional` messages.
+	Category string
 	// Only this provider (`resend`, `ses`, `twilio`, ...).
 	Provider string
 	// Only messages to this address or number (looked up by its keyed hash; the address is never
@@ -8293,6 +8995,9 @@ func (q MessagesListQuery) values() url.Values {
 	}
 	if q.Template != "" {
 		v.Set("template", q.Template)
+	}
+	if q.Category != "" {
+		v.Set("category", q.Category)
 	}
 	if q.Provider != "" {
 		v.Set("provider", q.Provider)
@@ -8339,6 +9044,25 @@ func (s *MessagesService) ListIter(ctx context.Context, query MessagesListQuery,
 		}
 		return s.List(ctx, q, opts...)
 	})
+}
+
+// Create: Send a transactional email from your app through your own email provider and its failover. Give
+// `to` (one address, or up to 10, each sent separately) and either `template` (the name or id of a
+// template from POST /v1/notification_templates, with `data` variables) or `subject` with `html`
+// and/or `text`, sent exactly as you wrote them. The message is recorded in the ledger (GET
+// /v1/messages) with category `transactional`, your `category` and `tags`, and your provider's
+// delivery callbacks fill in its timeline; bounces and complaints suppress the address like
+// sign-in mail. An address on the suppression list is not sent to: the message is recorded with
+// status `suppressed` and returned. Returns 422 when the instance has no email provider of its own
+// (Atlas never sends your mail from its own sender). Accepts an Idempotency-Key. One address
+// returns the message; several return a list.
+// POST /v1/messages.
+func (s *MessagesService) Create(ctx context.Context, params MessagesCreateParams, opts ...RequestOption) (*MessagesCreateResult, error) {
+	out := &MessagesCreateResult{}
+	if err := s.client.do(ctx, "POST", "/v1/messages", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // MessagesGetSummaryQuery holds the query parameters of MessagesService.GetSummary.
@@ -8652,12 +9376,17 @@ func (s *MigrationsService) ExchangeBetterAuth(ctx context.Context, params Migra
 type MigrationsGetStatusQuery struct {
 	// Days without legacy use before it counts as unused. Default 14.
 	QuietDays *int64
+	// true: do not let imported users who never signed in on Atlas block `safe_to_delete_old_auth`.
+	AcceptUnmigrated *bool
 }
 
 func (q MigrationsGetStatusQuery) values() url.Values {
 	v := url.Values{}
 	if q.QuietDays != nil {
 		v.Set("quiet_days", strconv.FormatInt(*q.QuietDays, 10))
+	}
+	if q.AcceptUnmigrated != nil {
+		v.Set("accept_unmigrated", strconv.FormatBool(*q.AcceptUnmigrated))
 	}
 	return v
 }
@@ -8666,13 +9395,31 @@ func (q MigrationsGetStatusQuery) values() url.Values {
 // social, none; imported = has an external_id), bridged sessions, imported legacy sessions still
 // live, failed bridge attempts by reason, daily use per source, and `safe_to_delete_old_auth` with
 // the blockers that keep it false (recent use, live sessions, an open dual-run window, an enabled
-// bridge, or `no_enabled_source` when no bridge or verifier was ever enabled or used, so nothing
-// has been proven quiet). `quiet_days` (default 14, max 90) sets how long the old auth must be
-// unused.
+// bridge, `unmigrated_users` (imported users who never signed in on Atlas and hold no session;
+// counted in `unmigrated_users` with a `unmigrated_user_sample` of ids), or `no_enabled_source`
+// when no bridge or verifier was ever enabled or used, so nothing has been proven quiet).
+// `quiet_days` (default 14, max 90) sets how long the old auth must be unused.
 // GET /v1/migrations/status.
 func (s *MigrationsService) GetStatus(ctx context.Context, query MigrationsGetStatusQuery, opts ...RequestOption) (*MigrationsGetStatusResult, error) {
 	out := &MigrationsGetStatusResult{}
 	if err := s.client.do(ctx, "GET", "/v1/migrations/status", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateSession: Bulk-import live legacy sessions (up to 1000 a call) so the bridge can answer from Atlas alone
+// (`mode: session_table`) and close early: the old system no longer has to be reachable for a
+// person to cross over. Each row names the legacy session (`token`, or its SHA-256 hex as
+// `token_hash`), the person (an Atlas `user_id` or your `external_id`) and `expires_at`;
+// `mfa_verified` carries a completed second factor. Rows that cannot be linked to a person or have
+// expired are reported in `errors` (`user_not_found`, `session_expired`, `invalid_row`,
+// `unknown_field`, `already_exchanged`), never guessed. Re-sending a row only refreshes it, so a
+// retry is safe. `dry_run: true` validates and counts without writing.
+// POST /v1/migrations/{source}/sessions.
+func (s *MigrationsService) CreateSession(ctx context.Context, source string, params MigrationsCreateSessionParams, opts ...RequestOption) (*MigrationsCreateSessionResult, error) {
+	out := &MigrationsCreateSessionResult{}
+	if err := s.client.do(ctx, "POST", "/v1/migrations/"+url.PathEscape(source)+"/sessions", nil, params, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -8686,6 +9433,124 @@ func (s *MigrationsService) GetStatus(ctx context.Context, query MigrationsGetSt
 func (s *MigrationsService) Verify(ctx context.Context, source string, params MigrationsVerifyParams, opts ...RequestOption) (*MigrationsVerifyResult, error) {
 	out := &MigrationsVerifyResult{}
 	if err := s.client.do(ctx, "POST", "/v1/migrations/"+url.PathEscape(source)+"/verify", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// NativeAppsService is the generated surface of /v1/native_apps.
+type NativeAppsService struct {
+	client *Client
+}
+
+// NativeAppsListQuery holds the query parameters of NativeAppsService.List.
+type NativeAppsListQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q NativeAppsListQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// List: List the registered native apps with their callback URLs.
+// GET /v1/native_apps.
+func (s *NativeAppsService) List(ctx context.Context, query NativeAppsListQuery, opts ...RequestOption) (*CursorPage[NativeAppsListItem], error) {
+	out := &CursorPage[NativeAppsListItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/native_apps", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListIter walks every page of List, fetching the next one on demand.
+func (s *NativeAppsService) ListIter(ctx context.Context, query NativeAppsListQuery, opts ...RequestOption) *Iterator[NativeAppsListItem] {
+	return Paginate(func(cursor string) (*CursorPage[NativeAppsListItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.List(ctx, q, opts...)
+	})
+}
+
+// Create: Register a native app. A development app (platform development, no store identity) needs
+// allowed_users (1 to 100) and expires_at (at most 90 days ahead) and may use exp:// callbacks on
+// production. An ios app needs bundle_id and team_id; an android app needs package_name and
+// sha256_cert_fingerprints; every app needs 1 to 10 callback_urls. The app is added to the Apple
+// App Site Association and Android Digital Asset Links files served on the Frontend API host
+// (https callbacks on that host become Universal / App Links) and to the passkey app origins. 409
+// when the same app is already registered.
+// POST /v1/native_apps.
+func (s *NativeAppsService) Create(ctx context.Context, params NativeAppsCreateParams, opts ...RequestOption) (*NativeAppsCreateResult, error) {
+	out := &NativeAppsCreateResult{}
+	if err := s.client.do(ctx, "POST", "/v1/native_apps", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetPublishableKey: Read which registered native apps may use the instance publishable key (an empty list = any).
+// GET /v1/native_apps/publishable_key.
+func (s *NativeAppsService) GetPublishableKey(ctx context.Context, opts ...RequestOption) (*NativeAppsGetPublishableKeyResult, error) {
+	out := &NativeAppsGetPublishableKeyResult{}
+	if err := s.client.do(ctx, "GET", "/v1/native_apps/publishable_key", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SetPublishableKey: Restrict the publishable key to the listed native apps (an empty list removes the restriction).
+// With a restriction, a native Frontend API request must send `X-Atlas-App-Id` with one of these
+// ids (403 APP_NOT_ALLOWED otherwise); web requests, which carry an Origin header and no app id,
+// are not affected. 400 NATIVE_APP_NOT_REGISTERED for an id that is not registered.
+// PUT /v1/native_apps/publishable_key.
+func (s *NativeAppsService) SetPublishableKey(ctx context.Context, params NativeAppsSetPublishableKeyParams, opts ...RequestOption) (*NativeAppsSetPublishableKeyResult, error) {
+	out := &NativeAppsSetPublishableKeyResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/native_apps/publishable_key", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Get: Fetch one registered native app.
+// GET /v1/native_apps/{id}.
+func (s *NativeAppsService) Get(ctx context.Context, id string, opts ...RequestOption) (*NativeAppsGetResult, error) {
+	out := &NativeAppsGetResult{}
+	if err := s.client.do(ctx, "GET", "/v1/native_apps/"+url.PathEscape(id), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Update: Change a native app: only the fields you send change; callback_urls is replaced as a whole. The
+// platform cannot be changed. A development app may have expires_at extended (at most 90 days from
+// now) and allowed_users changed.
+// PATCH /v1/native_apps/{id}.
+func (s *NativeAppsService) Update(ctx context.Context, id string, params NativeAppsUpdateParams, opts ...RequestOption) (*NativeAppsUpdateResult, error) {
+	out := &NativeAppsUpdateResult{}
+	if err := s.client.do(ctx, "PATCH", "/v1/native_apps/"+url.PathEscape(id), nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Delete: Unregister a native app. Its callbacks stop working at once, and it is removed from the
+// publishable key restriction.
+// DELETE /v1/native_apps/{id}.
+func (s *NativeAppsService) Delete(ctx context.Context, id string, opts ...RequestOption) (*NativeAppsDeleteResult, error) {
+	out := &NativeAppsDeleteResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/native_apps/"+url.PathEscape(id), nil, nil, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -8736,6 +9601,56 @@ func (s *OAuthApplicationTypesService) ListIter(ctx context.Context, query OAuth
 		}
 		return s.List(ctx, q, opts...)
 	})
+}
+
+// OAuthClientsListConsentsQuery holds the query parameters of OAuthClientsService.ListConsents.
+type OAuthClientsListConsentsQuery struct {
+	// active (default), revoked or all.
+	Status string
+	// Page size.
+	Limit *int64
+	// The next_cursor of the previous page.
+	StartingAfter string
+}
+
+func (q OAuthClientsListConsentsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Status != "" {
+		v.Set("status", q.Status)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListConsents: The users who authorized one OAuth client, one cursor page at a time: user id, granted scopes,
+// when they first authorized it and when it was last used. status is active (default), revoked or
+// all. The path takes the oac_ id or the public client_id. The developer can read the same list at
+// GET /oauth2/register/{client_id}/consents with the client's registration_access_token.
+// GET /v1/oauth_clients/{id}/consents.
+func (s *OAuthClientsService) ListConsents(ctx context.Context, id string, query OAuthClientsListConsentsQuery, opts ...RequestOption) (*OAuthClientsListConsentsResult, error) {
+	out := &OAuthClientsListConsentsResult{}
+	if err := s.client.do(ctx, "GET", "/v1/oauth_clients/"+url.PathEscape(id)+"/consents", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RevokeConsent: Revoke the consents users gave one OAuth client, and their refresh and access tokens, the same
+// way revoking a single grant does: every active consent, or only the users in user_ids. The app
+// receives grant.revoked per user and the instance gets the usual token revocation events.
+// Audited. Idempotent.
+// POST /v1/oauth_clients/{id}/consents/revoke.
+func (s *OAuthClientsService) RevokeConsent(ctx context.Context, id string, params OAuthClientsRevokeConsentParams, opts ...RequestOption) (*OAuthClientsRevokeConsentResult, error) {
+	out := &OAuthClientsRevokeConsentResult{}
+	if err := s.client.do(ctx, "POST", "/v1/oauth_clients/"+url.PathEscape(id)+"/consents/revoke", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // SetOrganizationAccess: Set who may use an application. `open` (default): any organization. `restricted`: only
@@ -8867,9 +9782,10 @@ func (q OAuthClientsListUsageQuery) values() url.Values {
 }
 
 // ListUsage: Per-day usage of one OAuth client for the last `days` days (1 to 90, default 30): token endpoint
-// calls, access tokens issued, distinct active users, errors and rate-limited calls, with totals.
-// The path takes the oac_ id or the public client_id. The developer can read the same report at
-// GET /oauth2/register/{client_id}/usage with the client's registration_access_token.
+// calls, access tokens issued, distinct active users, errors and rate-limited calls, with totals,
+// a per-day errors_by_code breakdown and the latest error (code, endpoint, time). The path takes
+// the oac_ id or the public client_id. The developer can read the same report at GET
+// /oauth2/register/{client_id}/usage with the client's registration_access_token.
 // GET /v1/oauth_clients/{id}/usage.
 func (s *OAuthClientsService) ListUsage(ctx context.Context, id string, query OAuthClientsListUsageQuery, opts ...RequestOption) (*OAuthClientsListUsageResult, error) {
 	out := &OAuthClientsListUsageResult{}
@@ -8908,6 +9824,120 @@ func (s *OAuthClientsService) SetWebhook(ctx context.Context, id string, params 
 // DELETE /v1/oauth_clients/{id}/webhook.
 func (s *OAuthClientsService) DeleteWebhook(ctx context.Context, id string, opts ...RequestOption) error {
 	return s.client.do(ctx, "DELETE", "/v1/oauth_clients/"+url.PathEscape(id)+"/webhook", nil, nil, nil, opts...)
+}
+
+// OAuthConsentRequestsService is the generated surface of /v1/oauth_consent_requests.
+type OAuthConsentRequestsService struct {
+	client *Client
+}
+
+// OAuthConsentRequestsSetSwitchAccountQuery holds the query parameters of OAuthConsentRequestsService.SetSwitchAccount.
+type OAuthConsentRequestsSetSwitchAccountQuery struct {
+	// The consent_challenge your consent page received from /oauth2/authorize.
+	ConsentChallenge string
+}
+
+func (q OAuthConsentRequestsSetSwitchAccountQuery) values() url.Values {
+	v := url.Values{}
+	if q.ConsentChallenge != "" {
+		v.Set("consent_challenge", q.ConsentChallenge)
+	}
+	return v
+}
+
+// SetSwitchAccount: The signed-in user is not the person who should grant this application access. Returns
+// redirect_to: the application's original authorization request restarted with prompt=login, so
+// the visitor signs in again (as another account) and a fresh consent challenge follows. Needs
+// request_url on the challenge. Audited.
+// PUT /v1/oauth_consent_requests/switch_account.
+func (s *OAuthConsentRequestsService) SetSwitchAccount(ctx context.Context, query OAuthConsentRequestsSetSwitchAccountQuery, opts ...RequestOption) (*OAuthConsentRequestsSetSwitchAccountResult, error) {
+	out := &OAuthConsentRequestsSetSwitchAccountResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/oauth_consent_requests/switch_account", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// OAuthDeviceRequestsService is the generated surface of /v1/oauth_device_requests.
+type OAuthDeviceRequestsService struct {
+	client *Client
+}
+
+// OAuthDeviceRequestsGetQuery holds the query parameters of OAuthDeviceRequestsService.Get.
+type OAuthDeviceRequestsGetQuery struct {
+	// The device_challenge your device-approval page received from /oauth2/device.
+	DeviceChallenge string
+}
+
+func (q OAuthDeviceRequestsGetQuery) values() url.Values {
+	v := url.Values{}
+	if q.DeviceChallenge != "" {
+		v.Set("device_challenge", q.DeviceChallenge)
+	}
+	return v
+}
+
+// Get: Read a device challenge: the signed-in user, the code they typed, and the application and scopes
+// the device asks for. Your device_url page receives the challenge after the person enters their
+// code.
+// GET /v1/oauth_device_requests.
+func (s *OAuthDeviceRequestsService) Get(ctx context.Context, query OAuthDeviceRequestsGetQuery, opts ...RequestOption) (*OAuthDeviceRequestsGetResult, error) {
+	out := &OAuthDeviceRequestsGetResult{}
+	if err := s.client.do(ctx, "GET", "/v1/oauth_device_requests", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// OAuthDeviceRequestsSetAcceptQuery holds the query parameters of OAuthDeviceRequestsService.SetAccept.
+type OAuthDeviceRequestsSetAcceptQuery struct {
+	// The device_challenge your device-approval page received from /oauth2/device.
+	DeviceChallenge string
+}
+
+func (q OAuthDeviceRequestsSetAcceptQuery) values() url.Values {
+	v := url.Values{}
+	if q.DeviceChallenge != "" {
+		v.Set("device_challenge", q.DeviceChallenge)
+	}
+	return v
+}
+
+// SetAccept: Approve a device challenge. Following redirect_to (in the same browser) binds the signed-in user
+// to the device code, records the consent and signs the device in. The link is single-use and
+// valid for five minutes. Audited.
+// PUT /v1/oauth_device_requests/accept.
+func (s *OAuthDeviceRequestsService) SetAccept(ctx context.Context, query OAuthDeviceRequestsSetAcceptQuery, opts ...RequestOption) (*OAuthDeviceRequestsSetAcceptResult, error) {
+	out := &OAuthDeviceRequestsSetAcceptResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/oauth_device_requests/accept", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// OAuthDeviceRequestsSetRejectQuery holds the query parameters of OAuthDeviceRequestsService.SetReject.
+type OAuthDeviceRequestsSetRejectQuery struct {
+	// The device_challenge your device-approval page received from /oauth2/device.
+	DeviceChallenge string
+}
+
+func (q OAuthDeviceRequestsSetRejectQuery) values() url.Values {
+	v := url.Values{}
+	if q.DeviceChallenge != "" {
+		v.Set("device_challenge", q.DeviceChallenge)
+	}
+	return v
+}
+
+// SetReject: Deny a device challenge. Following redirect_to marks the code denied, so the device's next poll
+// gets access_denied. Audited.
+// PUT /v1/oauth_device_requests/reject.
+func (s *OAuthDeviceRequestsService) SetReject(ctx context.Context, query OAuthDeviceRequestsSetRejectQuery, opts ...RequestOption) (*OAuthDeviceRequestsSetRejectResult, error) {
+	out := &OAuthDeviceRequestsSetRejectResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/oauth_device_requests/reject", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // OAuthGrantsService is the generated surface of /v1/oauth_grants.
@@ -9412,6 +10442,69 @@ func (s *OrganizationConnectionsService) Accept(ctx context.Context, id string, 
 		return nil, err
 	}
 	return out, nil
+}
+
+// OrganizationInvitationsService is the generated surface of /v1/organization_invitations.
+type OrganizationInvitationsService struct {
+	client *Client
+}
+
+// OrganizationInvitationsListQuery holds the query parameters of OrganizationInvitationsService.List.
+type OrganizationInvitationsListQuery struct {
+	// Only invitations for this address.
+	Email string
+	// Only invitations in this state.
+	Status string
+	// Only invitations of this organization.
+	OrganizationID string
+	// Page size, 1 to 100 (default 20).
+	Limit string
+	// The next_cursor of the previous page.
+	StartingAfter string
+}
+
+func (q OrganizationInvitationsListQuery) values() url.Values {
+	v := url.Values{}
+	if q.Email != "" {
+		v.Set("email", q.Email)
+	}
+	if q.Status != "" {
+		v.Set("status", q.Status)
+	}
+	if q.OrganizationID != "" {
+		v.Set("organization_id", q.OrganizationID)
+	}
+	if q.Limit != "" {
+		v.Set("limit", q.Limit)
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// List: Search organization invitations across every organization of the instance, newest first: by
+// invited `email` (exact, case-insensitive), `status` or `organization_id`. Each row carries the
+// organization name and slug. Secret key only (it is a lookup by address). Pages with `limit` and
+// `starting_after`.
+// GET /v1/organization_invitations.
+func (s *OrganizationInvitationsService) List(ctx context.Context, query OrganizationInvitationsListQuery, opts ...RequestOption) (*CursorPage[map[string]interface{}], error) {
+	out := &CursorPage[map[string]interface{}]{}
+	if err := s.client.do(ctx, "GET", "/v1/organization_invitations", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListIter walks every page of List, fetching the next one on demand.
+func (s *OrganizationInvitationsService) ListIter(ctx context.Context, query OrganizationInvitationsListQuery, opts ...RequestOption) *Iterator[map[string]interface{}] {
+	return Paginate(func(cursor string) (*CursorPage[map[string]interface{}], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.List(ctx, q, opts...)
+	})
 }
 
 // CreateAppWebhookEndpoint: Register an endpoint that receives the app's own events for this organization. Deliveries are
@@ -10177,6 +11270,1093 @@ func (s *OrganizationsService) TestWebhookEndpoint(ctx context.Context, id strin
 	return out, nil
 }
 
+// GetActionRegistry: The action registry of the instance: namespaces with their active version and counts, publisher
+// and reviewer keys.
+// GET /v1/pca/action-registry.
+func (s *PCAService) GetActionRegistry(ctx context.Context, opts ...RequestOption) (*PCAGetActionRegistryResult, error) {
+	out := &PCAGetActionRegistryResult{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListActionRegistryActionsQuery holds the query parameters of PCAService.ListActionRegistryActions.
+type PCAListActionRegistryActionsQuery struct {
+	// Case-insensitive text matched against the verb, title, description and aliases.
+	Q string
+	// Only actions in this review state.
+	State string
+	// Only actions of this namespace.
+	Ns string
+	// The most actions to return.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListActionRegistryActionsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Q != "" {
+		v.Set("q", q.Q)
+	}
+	if q.State != "" {
+		v.Set("state", q.State)
+	}
+	if q.Ns != "" {
+		v.Set("ns", q.Ns)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListActionRegistryActions: Search the active actions by text, state and namespace.
+// GET /v1/pca/action-registry/actions.
+func (s *PCAService) ListActionRegistryActions(ctx context.Context, query PCAListActionRegistryActionsQuery, opts ...RequestOption) (*ListPage[PCAListActionRegistryActionsItem], error) {
+	out := &ListPage[PCAListActionRegistryActionsItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry/actions", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetActionRegistryAction: One action: policy card, effective profile, business rules and history.
+// GET /v1/pca/action-registry/actions/{verb}.
+func (s *PCAService) GetActionRegistryAction(ctx context.Context, verb string, opts ...RequestOption) (*PCAGetActionRegistryActionResult, error) {
+	out := &PCAGetActionRegistryActionResult{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry/actions/"+url.PathEscape(verb), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ReviewActionRegistryAction: Open a published action for review: its active definition and business rules become a draft (409
+// when one already exists), so an action published unconfirmed can be confirmed. Takes no body.
+// Audited.
+// POST /v1/pca/action-registry/actions/{verb}/review.
+func (s *PCAService) ReviewActionRegistryAction(ctx context.Context, verb string, params map[string]interface{}, opts ...RequestOption) (*PCAReviewActionRegistryActionResult, error) {
+	out := &PCAReviewActionRegistryActionResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/action-registry/actions/"+url.PathEscape(verb)+"/review", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListActionRegistryDraftsQuery holds the query parameters of PCAService.ListActionRegistryDrafts.
+type PCAListActionRegistryDraftsQuery struct {
+	// Only drafts of this action namespace.
+	Ns string
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListActionRegistryDraftsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Ns != "" {
+		v.Set("ns", q.Ns)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListActionRegistryDrafts: The review queue: drafts with their review view, policy card, lint, business rules in plain
+// sentences and the diff against the active version, the riskiest first.
+// GET /v1/pca/action-registry/drafts.
+func (s *PCAService) ListActionRegistryDrafts(ctx context.Context, query PCAListActionRegistryDraftsQuery, opts ...RequestOption) (*ListPage[PCAListActionRegistryDraftsItem], error) {
+	out := &ListPage[PCAListActionRegistryDraftsItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry/drafts", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetActionRegistryDraft: One draft with its review view.
+// GET /v1/pca/action-registry/drafts/{verb}.
+func (s *PCAService) GetActionRegistryDraft(ctx context.Context, verb string, opts ...RequestOption) (*PCAGetActionRegistryDraftResult, error) {
+	out := &PCAGetActionRegistryDraftResult{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry/drafts/"+url.PathEscape(verb), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UpdateActionRegistryDraft: Edit a draft (title, description, effects, params, reversibility, compensates, traits, business
+// rules). Re-validated; any edit drops a confirmation and a rules review. Audited.
+// PATCH /v1/pca/action-registry/drafts/{verb}.
+func (s *PCAService) UpdateActionRegistryDraft(ctx context.Context, verb string, params PCAUpdateActionRegistryDraftParams, opts ...RequestOption) (*PCAUpdateActionRegistryDraftResult, error) {
+	out := &PCAUpdateActionRegistryDraftResult{}
+	if err := s.client.do(ctx, "PATCH", "/v1/pca/action-registry/drafts/"+url.PathEscape(verb), nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteActionRegistryDraft: Remove a draft from the review queue. Audited.
+// DELETE /v1/pca/action-registry/drafts/{verb}.
+func (s *PCAService) DeleteActionRegistryDraft(ctx context.Context, verb string, opts ...RequestOption) (*PCADeleteActionRegistryDraftResult, error) {
+	out := &PCADeleteActionRegistryDraftResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/pca/action-registry/drafts/"+url.PathEscape(verb), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ConfirmActionRegistryDraft: Confirm a draft: the reviewer's signed attestation (and, for widened rules, a signed rules
+// review), with a passkey assertion over a challenge committing to exactly those signatures. The
+// passkey must be an active credential of an active reviewer whose pinned reviewer key signed; a
+// publisher key never confirms. Audited.
+// POST /v1/pca/action-registry/drafts/{verb}/confirm.
+func (s *PCAService) ConfirmActionRegistryDraft(ctx context.Context, verb string, params PCAConfirmActionRegistryDraftParams, opts ...RequestOption) (*PCAConfirmActionRegistryDraftResult, error) {
+	out := &PCAConfirmActionRegistryDraftResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/action-registry/drafts/"+url.PathEscape(verb)+"/confirm", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateActionRegistryImport: Import actions from a source: a URL the server fetches (https, public addresses only, at most 8
+// MiB; MCP servers are read with initialize + tools/list) or pasted text. Every result is
+// unreviewed or suggested and lands as a draft; with track, the URL is kept as a source. Audited.
+// POST /v1/pca/action-registry/imports.
+func (s *PCAService) CreateActionRegistryImport(ctx context.Context, params PCACreateActionRegistryImportParams, opts ...RequestOption) (*PCACreateActionRegistryImportResult, error) {
+	out := &PCACreateActionRegistryImportResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/action-registry/imports", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAGetActionRegistryNamespacesDiffQuery holds the query parameters of PCAService.GetActionRegistryNamespacesDiff.
+type PCAGetActionRegistryNamespacesDiffQuery struct {
+	// The version to compare from (MAJOR.MINOR.PATCH).
+	From string
+	// The version to compare to (MAJOR.MINOR.PATCH).
+	To string
+}
+
+func (q PCAGetActionRegistryNamespacesDiffQuery) values() url.Values {
+	v := url.Values{}
+	if q.From != "" {
+		v.Set("from", q.From)
+	}
+	if q.To != "" {
+		v.Set("to", q.To)
+	}
+	return v
+}
+
+// GetActionRegistryNamespacesDiff: The semantic diff between two stored versions, and whether the move needs a reviewer.
+// GET /v1/pca/action-registry/namespaces/{ns}/diff.
+func (s *PCAService) GetActionRegistryNamespacesDiff(ctx context.Context, ns string, query PCAGetActionRegistryNamespacesDiffQuery, opts ...RequestOption) (*PCAGetActionRegistryNamespacesDiffResult, error) {
+	out := &PCAGetActionRegistryNamespacesDiffResult{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry/namespaces/"+url.PathEscape(ns)+"/diff", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SetActionRegistryNamespacesPin: Activate and pin a stored version (later publishes are staged). Audited.
+// PUT /v1/pca/action-registry/namespaces/{ns}/pin.
+func (s *PCAService) SetActionRegistryNamespacesPin(ctx context.Context, ns string, params PCASetActionRegistryNamespacesPinParams, opts ...RequestOption) (*PCASetActionRegistryNamespacesPinResult, error) {
+	out := &PCASetActionRegistryNamespacesPinResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/pca/action-registry/namespaces/"+url.PathEscape(ns)+"/pin", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteActionRegistryNamespacesPin: Unpin a namespace (later publishes activate again). Audited.
+// DELETE /v1/pca/action-registry/namespaces/{ns}/pin.
+func (s *PCAService) DeleteActionRegistryNamespacesPin(ctx context.Context, ns string, opts ...RequestOption) (*PCADeleteActionRegistryNamespacesPinResult, error) {
+	out := &PCADeleteActionRegistryNamespacesPinResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/pca/action-registry/namespaces/"+url.PathEscape(ns)+"/pin", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListActionRegistryNamespacesVersionsQuery holds the query parameters of PCAService.ListActionRegistryNamespacesVersions.
+type PCAListActionRegistryNamespacesVersionsQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListActionRegistryNamespacesVersionsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListActionRegistryNamespacesVersions: The version history of a namespace.
+// GET /v1/pca/action-registry/namespaces/{ns}/versions.
+func (s *PCAService) ListActionRegistryNamespacesVersions(ctx context.Context, ns string, query PCAListActionRegistryNamespacesVersionsQuery, opts ...RequestOption) (*ListPage[PCAListActionRegistryNamespacesVersionsItem], error) {
+	out := &ListPage[PCAListActionRegistryNamespacesVersionsItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry/namespaces/"+url.PathEscape(ns)+"/versions", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetActionRegistryNamespacesVersion: One stored version: pack, rules, traits, deprecated actions and changes.
+// GET /v1/pca/action-registry/namespaces/{ns}/versions/{version}.
+func (s *PCAService) GetActionRegistryNamespacesVersion(ctx context.Context, ns string, version string, opts ...RequestOption) (*PCAGetActionRegistryNamespacesVersionResult, error) {
+	out := &PCAGetActionRegistryNamespacesVersionResult{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry/namespaces/"+url.PathEscape(ns)+"/versions/"+url.PathEscape(version), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateActionRegistryPack: Publish a signed pack (with business rules and custom traits) as the next version of its
+// namespace. 409 when it widens without a reviewer. Audited.
+// POST /v1/pca/action-registry/packs.
+func (s *PCAService) CreateActionRegistryPack(ctx context.Context, params PCACreateActionRegistryPackParams, opts ...RequestOption) (*PCACreateActionRegistryPackResult, error) {
+	out := &PCACreateActionRegistryPackResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/action-registry/packs", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PublishActionRegistry: Publish the drafts of a namespace as its next version: the active actions overlaid with the
+// drafts (removal drafts deprecate their action), the business rules and rules reviews, signed
+// with the instance's publisher key. 409 (reason_code widen_unreviewed) when an action or its
+// rules widen without a reviewer's signature. Audited.
+// POST /v1/pca/action-registry/publish.
+func (s *PCAService) PublishActionRegistry(ctx context.Context, params PCAPublishActionRegistryParams, opts ...RequestOption) (*PCAPublishActionRegistryResult, error) {
+	out := &PCAPublishActionRegistryResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/action-registry/publish", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateActionRegistryPublisherKey: Pin a publisher key (kid, Ed25519 public key). Audited.
+// POST /v1/pca/action-registry/publisher-keys.
+func (s *PCAService) CreateActionRegistryPublisherKey(ctx context.Context, params PCACreateActionRegistryPublisherKeyParams, opts ...RequestOption) (*PCACreateActionRegistryPublisherKeyResult, error) {
+	out := &PCACreateActionRegistryPublisherKeyResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/action-registry/publisher-keys", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteActionRegistryPublisherKey: Revoke a publisher key. Audited.
+// DELETE /v1/pca/action-registry/publisher-keys/{kid}.
+func (s *PCAService) DeleteActionRegistryPublisherKey(ctx context.Context, kid string, opts ...RequestOption) (map[string]interface{}, error) {
+	var out map[string]interface{}
+	if err := s.client.do(ctx, "DELETE", "/v1/pca/action-registry/publisher-keys/"+url.PathEscape(kid), nil, nil, &out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListActionRegistryReviewersQuery holds the query parameters of PCAService.ListActionRegistryReviewers.
+type PCAListActionRegistryReviewersQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListActionRegistryReviewersQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListActionRegistryReviewers: The reviewers who may confirm action definitions, with their keys and passkeys.
+// GET /v1/pca/action-registry/reviewers.
+func (s *PCAService) ListActionRegistryReviewers(ctx context.Context, query PCAListActionRegistryReviewersQuery, opts ...RequestOption) (*ListPage[PCAListActionRegistryReviewersItem], error) {
+	out := &ListPage[PCAListActionRegistryReviewersItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry/reviewers", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateActionRegistryReviewersEnrolment: Create a single-use reviewer enrolment link (24 hours). The reviewer creates a passkey and a
+// reviewer key on the hosted page; the key is pinned with the reviewer role. Audited.
+// POST /v1/pca/action-registry/reviewers/enrolments.
+func (s *PCAService) CreateActionRegistryReviewersEnrolment(ctx context.Context, params PCACreateActionRegistryReviewersEnrolmentParams, opts ...RequestOption) (*PCACreateActionRegistryReviewersEnrolmentResult, error) {
+	out := &PCACreateActionRegistryReviewersEnrolmentResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/action-registry/reviewers/enrolments", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteActionRegistryReviewer: Remove a reviewer: the reviewer key is unpinned (its confirmations stop counting) and every
+// passkey revoked. Audited.
+// DELETE /v1/pca/action-registry/reviewers/{id}.
+func (s *PCAService) DeleteActionRegistryReviewer(ctx context.Context, id string, opts ...RequestOption) (*PCADeleteActionRegistryReviewerResult, error) {
+	out := &PCADeleteActionRegistryReviewerResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/pca/action-registry/reviewers/"+url.PathEscape(id), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListActionRegistrySourcesQuery holds the query parameters of PCAService.ListActionRegistrySources.
+type PCAListActionRegistrySourcesQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListActionRegistrySourcesQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListActionRegistrySources: The tracked import sources, with their schedule and last sync.
+// GET /v1/pca/action-registry/sources.
+func (s *PCAService) ListActionRegistrySources(ctx context.Context, query PCAListActionRegistrySourcesQuery, opts ...RequestOption) (*ListPage[PCAListActionRegistrySourcesItem], error) {
+	out := &ListPage[PCAListActionRegistrySourcesItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry/sources", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateActionRegistrySource: Track a source for manual or scheduled (hourly / daily) sync. Audited.
+// POST /v1/pca/action-registry/sources.
+func (s *PCAService) CreateActionRegistrySource(ctx context.Context, params PCACreateActionRegistrySourceParams, opts ...RequestOption) (*PCACreateActionRegistrySourceResult, error) {
+	out := &PCACreateActionRegistrySourceResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/action-registry/sources", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UpdateActionRegistrySource: Change a source: URL, verb (jsonschema) or schedule. Audited.
+// PATCH /v1/pca/action-registry/sources/{id}.
+func (s *PCAService) UpdateActionRegistrySource(ctx context.Context, id string, params PCAUpdateActionRegistrySourceParams, opts ...RequestOption) (*PCAUpdateActionRegistrySourceResult, error) {
+	out := &PCAUpdateActionRegistrySourceResult{}
+	if err := s.client.do(ctx, "PATCH", "/v1/pca/action-registry/sources/"+url.PathEscape(id), nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteActionRegistrySource: Stop tracking a source (its drafts stay in the queue). Audited.
+// DELETE /v1/pca/action-registry/sources/{id}.
+func (s *PCAService) DeleteActionRegistrySource(ctx context.Context, id string, opts ...RequestOption) (*PCADeleteActionRegistrySourceResult, error) {
+	out := &PCADeleteActionRegistrySourceResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/pca/action-registry/sources/"+url.PathEscape(id), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SyncActionRegistrySource: Sync a source now: added and changed operations become unreviewed drafts, removed ones removal
+// drafts; unchanged ones are left as they are. Audited.
+// POST /v1/pca/action-registry/sources/{id}/sync.
+func (s *PCAService) SyncActionRegistrySource(ctx context.Context, id string, params map[string]interface{}, opts ...RequestOption) (*PCASyncActionRegistrySourceResult, error) {
+	out := &PCASyncActionRegistrySourceResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/action-registry/sources/"+url.PathEscape(id)+"/sync", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListActionRegistryTemplatesQuery holds the query parameters of PCAService.ListActionRegistryTemplates.
+type PCAListActionRegistryTemplatesQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListActionRegistryTemplatesQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListActionRegistryTemplates: The starter packs (e-commerce, fintech, healthcare, SaaS admin, developer tools).
+// GET /v1/pca/action-registry/templates.
+func (s *PCAService) ListActionRegistryTemplates(ctx context.Context, query PCAListActionRegistryTemplatesQuery, opts ...RequestOption) (*ListPage[PCAListActionRegistryTemplatesItem], error) {
+	out := &ListPage[PCAListActionRegistryTemplatesItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/action-registry/templates", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ApplyActionRegistryTemplate: Add a starter pack's actions (with their business rules and examples) to a namespace as drafts.
+// Never confirmed. Audited.
+// POST /v1/pca/action-registry/templates/{id}/apply.
+func (s *PCAService) ApplyActionRegistryTemplate(ctx context.Context, id string, params PCAApplyActionRegistryTemplateParams, opts ...RequestOption) (*ListPage[PCAApplyActionRegistryTemplateItem], error) {
+	out := &ListPage[PCAApplyActionRegistryTemplateItem]{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/action-registry/templates/"+url.PathEscape(id)+"/apply", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetApprovalsSettings: Approval channel settings of this instance (secrets are reported as set / not set, never
+// returned).
+// GET /v1/pca/approvals/settings.
+func (s *PCAService) GetApprovalsSettings(ctx context.Context, opts ...RequestOption) (*PCAGetApprovalsSettingsResult, error) {
+	out := &PCAGetApprovalsSettingsResult{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/approvals/settings", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SetApprovalsSettings: Update the approval channels (push, email, sms, slack, webhook), default member channels, the
+// Slack webhook and the CIBA identity provider. Omitted fields are kept; null clears. Audited.
+// PUT /v1/pca/approvals/settings.
+func (s *PCAService) SetApprovalsSettings(ctx context.Context, params PCASetApprovalsSettingsParams, opts ...RequestOption) (*PCASetApprovalsSettingsResult, error) {
+	out := &PCASetApprovalsSettingsResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/pca/approvals/settings", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListApproversQuery holds the query parameters of PCAService.ListApprovers.
+type PCAListApproversQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListApproversQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListApprovers: List passkey approvers with their members, devices and quorum.
+// GET /v1/pca/approvers.
+func (s *PCAService) ListApprovers(ctx context.Context, query PCAListApproversQuery, opts ...RequestOption) (*ListPage[PCAListApproversItem], error) {
+	out := &ListPage[PCAListApproversItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/approvers", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateApproversEnrolment: Create a single-use passkey enrolment link (24 hours): a new approver bound to a user / org /
+// machine, a delegate of an existing approver, or another device of a member. Adding to an
+// existing approver needs one of its passkeys on the enrolment page. Audited.
+// POST /v1/pca/approvers/enrolments.
+func (s *PCAService) CreateApproversEnrolment(ctx context.Context, params PCACreateApproversEnrolmentParams, opts ...RequestOption) (*PCACreateApproversEnrolmentResult, error) {
+	out := &PCACreateApproversEnrolmentResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/approvers/enrolments", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetApprover: One passkey approver with its members, devices and quorum.
+// GET /v1/pca/approvers/{id}.
+func (s *PCAService) GetApprover(ctx context.Context, id string, opts ...RequestOption) (*PCAGetApproverResult, error) {
+	out := &PCAGetApproverResult{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/approvers/"+url.PathEscape(id), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UpdateApprover: Change an approver: quorum, display name, or disable it (a disabled approver cannot approve).
+// Audited.
+// PATCH /v1/pca/approvers/{id}.
+func (s *PCAService) UpdateApprover(ctx context.Context, id string, params PCAUpdateApproverParams, opts ...RequestOption) (*PCAUpdateApproverResult, error) {
+	out := &PCAUpdateApproverResult{}
+	if err := s.client.do(ctx, "PATCH", "/v1/pca/approvers/"+url.PathEscape(id), nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteApproversCredential: Revoke a passkey: its wrapped principal key copy is deleted and it can no longer approve.
+// Audited.
+// DELETE /v1/pca/approvers/{id}/credentials/{credentialId}.
+func (s *PCAService) DeleteApproversCredential(ctx context.Context, id string, credentialID string, opts ...RequestOption) (*PCADeleteApproversCredentialResult, error) {
+	out := &PCADeleteApproversCredentialResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/pca/approvers/"+url.PathEscape(id)+"/credentials/"+url.PathEscape(credentialID), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UpdateApproversMember: Change a member's notification channels, contact details or status. Audited.
+// PATCH /v1/pca/approvers/{id}/members/{memberId}.
+func (s *PCAService) UpdateApproversMember(ctx context.Context, id string, memberID string, params PCAUpdateApproversMemberParams, opts ...RequestOption) (*PCAUpdateApproversMemberResult, error) {
+	out := &PCAUpdateApproversMemberResult{}
+	if err := s.client.do(ctx, "PATCH", "/v1/pca/approvers/"+url.PathEscape(id)+"/members/"+url.PathEscape(memberID), nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateBeacon: Issue a dead-man liveness beacon. PRINCIPAL path (no Authorization header): submit `beacon`, a
+// v2 beacon signed with the grant principal's own key (scope = a grant_ref they issued, or '*'):
+// the principal halts their agents just by withholding, without trusting the operator. OPERATOR
+// path (`sk_` + `pca:write`): the server signs with the guardian key (`scope`, `validity_ms`).
+// `seq` must strictly increase per (scope, issuer) (409 on replay); validity is hard-capped at one
+// hour. A pure-PQ or hybrid principal beacon is accepted only under the PQ key pinned for the
+// issuer (POST /v1/pca/pq-pins), and only after the issuer check is it charged to the per-source
+// pqVerifyUnitsPerSourcePerMin budget (429 when exhausted) and verified, Ed25519 half first.
+// Beacons gate adjudication only when `auth_config.pca.beacons` is enabled.
+// POST /v1/pca/beacons.
+func (s *PCAService) CreateBeacon(ctx context.Context, params PCACreateBeaconParams, opts ...RequestOption) (*PCACreateBeaconResult, error) {
+	out := &PCACreateBeaconResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/beacons", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAGetBondAccountsQuery holds the query parameters of PCAService.GetBondAccounts.
+type PCAGetBondAccountsQuery struct {
+	// The account to read.
+	Account string
+}
+
+func (q PCAGetBondAccountsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Account != "" {
+		v.Set("account", q.Account)
+	}
+	return v
+}
+
+// GetBondAccounts: A bond account's balance (?account=<principal_pub>; also `escrow` and `atlas-treasury`).
+// GET /v1/pca/bond-accounts.
+func (s *PCAService) GetBondAccounts(ctx context.Context, query PCAGetBondAccountsQuery, opts ...RequestOption) (*PCAGetBondAccountsResult, error) {
+	out := &PCAGetBondAccountsResult{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/bond-accounts", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateBondAccount: Credit a depositor's bond escrow balance (funds the optimistic fast path). The depositor account
+// is the grant's principal_pub; bonds are sized from server policy exposure and debited atomically
+// at claim open. Audited.
+// POST /v1/pca/bond-accounts.
+func (s *PCAService) CreateBondAccount(ctx context.Context, params PCACreateBondAccountParams, opts ...RequestOption) (*PCACreateBondAccountResult, error) {
+	out := &PCACreateBondAccountResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/bond-accounts", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateConstitution: Register the grant's CONSTITUTION: a principal-signed set of invariants (never / never_unless /
+// cap / rate / never_after / require_prior / require_approval_over) the agent must never violate
+// whatever its permissions say. Verified against the grant principal's key, immutable once set (a
+// different constitution is 409), and enforced on every action inside the admission transaction
+// with a hash-chained, server-persisted monitor state. Public (the signature is the authority) or
+// `sk_` + pca:write (still principal-signed).
+// POST /v1/pca/constitutions.
+func (s *PCAService) CreateConstitution(ctx context.Context, params PCACreateConstitutionParams, opts ...RequestOption) (*PCACreateConstitutionResult, error) {
+	out := &PCACreateConstitutionResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/constitutions", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListGrantsQuery holds the query parameters of PCAService.ListGrants.
+type PCAListGrantsQuery struct {
+	// Only grants issued by this principal public key.
+	Principal string
+	// Only grants held by this agent (holder) public key.
+	Agent string
+	// Only grants in this status.
+	Status string
+	// The most grants to return.
+	Limit *int64
+	// The `next_cursor` of the previous page.
+	Cursor string
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListGrantsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Principal != "" {
+		v.Set("principal", q.Principal)
+	}
+	if q.Agent != "" {
+		v.Set("agent", q.Agent)
+	}
+	if q.Status != "" {
+		v.Set("status", q.Status)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.Cursor != "" {
+		v.Set("cursor", q.Cursor)
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListGrants: List registered grants (grant management): filter by principal, agent (holder) and status;
+// keyset pagination.
+// GET /v1/pca/grants.
+func (s *PCAService) ListGrants(ctx context.Context, query PCAListGrantsQuery, opts ...RequestOption) (*CursorPage[PCAListGrantsItem], error) {
+	out := &CursorPage[PCAListGrantsItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/grants", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListGrantsIter walks every page of ListGrants, fetching the next one on demand.
+func (s *PCAService) ListGrantsIter(ctx context.Context, query PCAListGrantsQuery, opts ...RequestOption) *Iterator[PCAListGrantsItem] {
+	return Paginate(func(cursor string) (*CursorPage[PCAListGrantsItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.ListGrants(ctx, q, opts...)
+	})
+}
+
+// GetGrant: Inspect a grant: the signed chain, its content digest, remaining trust budget,
+// revoked-capability count and the current signed revocation epoch.
+// GET /v1/pca/grants/{grantRef}.
+func (s *PCAService) GetGrant(ctx context.Context, grantRef string, opts ...RequestOption) (*PCAGetGrantResult, error) {
+	out := &PCAGetGrantResult{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/grants/"+url.PathEscape(grantRef), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCADeleteGrantQuery holds the query parameters of PCAService.DeleteGrant.
+type PCADeleteGrantQuery struct {
+	// `grant` revokes this grant; `agent` revokes every active grant of its principal and holder
+	// (operator key only).
+	Scope string
+}
+
+func (q PCADeleteGrantQuery) values() url.Values {
+	v := url.Values{}
+	if q.Scope != "" {
+		v.Set("scope", q.Scope)
+	}
+	return v
+}
+
+// DeleteGrant: Revoke a grant (scope=grant) or every active grant of its principal and agent (scope=agent,
+// operator only). Operator `sk_` + pca:write, or with no Authorization header the principal's
+// signature (principal_sig) over the root revocation message. The signed revocation epoch is
+// bumped in the same transaction.
+// DELETE /v1/pca/grants/{grantRef}.
+func (s *PCAService) DeleteGrant(ctx context.Context, grantRef string, query PCADeleteGrantQuery, params PCADeleteGrantParams, opts ...RequestOption) (*PCADeleteGrantResult, error) {
+	out := &PCADeleteGrantResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/pca/grants/"+url.PathEscape(grantRef), query.values(), params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AmendGrant: Amend a grant's authority statement. `narrow`, or any change that is provably not wider, is
+// signed by the holder or the principal and revises the grant in place (revision + 1; a signature
+// names the revision, so it cannot be replayed). A change that widens or is incomparable needs the
+// PRINCIPAL's signature, a spent step-up and `new_grant_ref` (a registered active grant of the
+// same principal and agent); it creates that successor's statement (`supersedes`) and kills the
+// old grant. Public (the signature is the authority) or `sk_` + pca:write (still signed).
+// POST /v1/pca/grants/{grantRef}/amend.
+func (s *PCAService) AmendGrant(ctx context.Context, grantRef string, params PCAAmendGrantParams, opts ...RequestOption) (*PCAAmendGrantResult, error) {
+	out := &PCAAmendGrantResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/grants/"+url.PathEscape(grantRef)+"/amend", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SetGrantsAuthority: Enrol a grant into management: the principal signs its initial authority statement at revision 0
+// (the signature covers {grant, rev: 0, action: 'replace', authority digest} under the grant-amend
+// domain). Once; afterwards use amend. Admission then enforces the statement as an extra
+// tighten-only ceiling. Public (the signature is the authority) or `sk_` + pca:write (still
+// principal-signed).
+// PUT /v1/pca/grants/{grantRef}/authority.
+func (s *PCAService) SetGrantsAuthority(ctx context.Context, grantRef string, params PCASetGrantsAuthorityParams, opts ...RequestOption) (*PCASetGrantsAuthorityResult, error) {
+	out := &PCASetGrantsAuthorityResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/pca/grants/"+url.PathEscape(grantRef)+"/authority", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListGrantsNeedsQuery holds the query parameters of PCAService.ListGrantsNeeds.
+type PCAListGrantsNeedsQuery struct {
+	// Only need requests in this status.
+	Status string
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListGrantsNeedsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Status != "" {
+		v.Set("status", q.Status)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListGrantsNeeds: A grant's need requests, optionally filtered by status.
+// GET /v1/pca/grants/{grantRef}/needs.
+func (s *PCAService) ListGrantsNeeds(ctx context.Context, grantRef string, query PCAListGrantsNeedsQuery, opts ...RequestOption) (*ListPage[map[string]interface{}], error) {
+	out := &ListPage[map[string]interface{}]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/grants/"+url.PathEscape(grantRef)+"/needs", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateGrantsNeed: File typed needs (incremental authorization). The grant holder signs them at the current
+// revision (need-request domain), or the operator files them. Nothing changes until the principal
+// approves.
+// POST /v1/pca/grants/{grantRef}/needs.
+func (s *PCAService) CreateGrantsNeed(ctx context.Context, grantRef string, params PCACreateGrantsNeedParams, opts ...RequestOption) (*PCACreateGrantsNeedResult, error) {
+	out := &PCACreateGrantsNeedResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/grants/"+url.PathEscape(grantRef)+"/needs", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// StepUpGrant: Issue a single-use step-up challenge for a grant (valid 5 minutes). The principal signs its
+// nonce on its own device; a widening spends one.
+// POST /v1/pca/grants/{grantRef}/step-up.
+func (s *PCAService) StepUpGrant(ctx context.Context, grantRef string, params map[string]interface{}, opts ...RequestOption) (*PCAStepUpGrantResult, error) {
+	out := &PCAStepUpGrantResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/grants/"+url.PathEscape(grantRef)+"/step-up", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ApproveGrantStepUp: Approve a step-up challenge with the grant principal's signature over {grant, challenge, nonce}
+// (grant-step-up domain). Once.
+// POST /v1/pca/grants/{grantRef}/step-up/{challengeId}/approve.
+func (s *PCAService) ApproveGrantStepUp(ctx context.Context, grantRef string, challengeID string, params PCAApproveGrantStepUpParams, opts ...RequestOption) (*PCAApproveGrantStepUpResult, error) {
+	out := &PCAApproveGrantStepUpResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/grants/"+url.PathEscape(grantRef)+"/step-up/"+url.PathEscape(challengeID)+"/approve", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RotateGuardian: Rotate the guardian signing key: a new keypair and epoch + 1; the previous public key is
+// retained so STHs, revocation epochs and receipts signed under it still verify. New signatures
+// use the new epoch. Audited.
+// POST /v1/pca/guardian/rotate.
+func (s *PCAService) RotateGuardian(ctx context.Context, params map[string]interface{}, opts ...RequestOption) (*PCARotateGuardianResult, error) {
+	out := &PCARotateGuardianResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/guardian/rotate", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListIntentMapsObservationsQuery holds the query parameters of PCAService.ListIntentMapsObservations.
+type PCAListIntentMapsObservationsQuery struct {
+	// Page size, 1 to 200 (default 50).
+	Limit *int64
+	// Cursor from the previous page.
+	After string
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListIntentMapsObservationsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.After != "" {
+		v.Set("after", q.After)
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListIntentMapsObservations: List the runtime observations recorded against a map, oldest first. Paginate with `after` = the
+// previous page `next_cursor`.
+// GET /v1/pca/intent/maps/{digest}/observations.
+func (s *PCAService) ListIntentMapsObservations(ctx context.Context, digest string, query PCAListIntentMapsObservationsQuery, opts ...RequestOption) (*CursorPage[map[string]interface{}], error) {
+	out := &CursorPage[map[string]interface{}]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/intent/maps/"+url.PathEscape(digest)+"/observations", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListIntentMapsObservationsIter walks every page of ListIntentMapsObservations, fetching the next one on demand.
+func (s *PCAService) ListIntentMapsObservationsIter(ctx context.Context, digest string, query PCAListIntentMapsObservationsQuery, opts ...RequestOption) *Iterator[map[string]interface{}] {
+	return Paginate(func(cursor string) (*CursorPage[map[string]interface{}], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.ListIntentMapsObservations(ctx, digest, q, opts...)
+	})
+}
+
+// CreateIntentSchema: Anchor a site's signed action schema (Intent Layer v2, `pca-action-schema` v1 served at
+// /.well-known/pca-actions.json). The schema is verified against the site's discovery keys
+// (`keys`, the `intent.schema_keys` of its /.well-known/pca-configuration; the suite comes from
+// the key entry), content-addressed (`actionSchemaDigest`) and appended to the instance's intent
+// transparency log (kind `schema`), so a site cannot show different schemas to different users
+// without detection. Audited. 201 anchored, 200 already anchored.
+// POST /v1/pca/intent/schemas.
+func (s *PCAService) CreateIntentSchema(ctx context.Context, params PCACreateIntentSchemaParams, opts ...RequestOption) (*PCACreateIntentSchemaResult, error) {
+	out := &PCACreateIntentSchemaResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/intent/schemas", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ApproveNeed: Approve a need request. The principal signs the approved needs at the current revision
+// (need-approve domain); the approved list must name the same verbs and resources in order, and an
+// amount may only be lowered, and only on a need marked adjustable. Needs a spent step-up and
+// `new_grant_ref` (the registered successor); the result is a successor grant with the merged
+// authority.
+// POST /v1/pca/needs/{needId}/approve.
+func (s *PCAService) ApproveNeed(ctx context.Context, needID string, params PCAApproveNeedParams, opts ...RequestOption) (*PCAApproveNeedResult, error) {
+	out := &PCAApproveNeedResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/needs/"+url.PathEscape(needID)+"/approve", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DenyNeed: Deny a need request: the principal's signature over the empty approval of this need at the
+// current revision, or the operator key.
+// POST /v1/pca/needs/{needId}/deny.
+func (s *PCAService) DenyNeed(ctx context.Context, needID string, params PCADenyNeedParams, opts ...RequestOption) (*PCADenyNeedResult, error) {
+	out := &PCADenyNeedResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/needs/"+url.PathEscape(needID)+"/deny", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeletePqPin: Remove an identity PQ key pin (the rotation step: delete, then the identity registers a new
+// binding at a HIGHER epoch; the delete leaves a tombstone holding the last epoch, so the removed
+// binding and every older one is refused). Pure-PQ and hybrid artifacts from that identity are
+// refused until it is re-pinned. Audited.
+// DELETE /v1/pca/pq-pins/{identity}.
+func (s *PCAService) DeletePqPin(ctx context.Context, identity string, opts ...RequestOption) (*PCADeletePqPinResult, error) {
+	out := &PCADeletePqPinResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/pca/pq-pins/"+url.PathEscape(identity), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListPrincipalsQuery holds the query parameters of PCAService.ListPrincipals.
+type PCAListPrincipalsQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListPrincipalsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListPrincipals: The instance's enrolled principals (public key, bound subject, status).
+// GET /v1/pca/principals.
+func (s *PCAService) ListPrincipals(ctx context.Context, query PCAListPrincipalsQuery, opts ...RequestOption) (*ListPage[PCAListPrincipalsItem], error) {
+	out := &ListPage[PCAListPrincipalsItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/principals", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreatePrincipal: Enrol a principal public key, binding it to an Atlas identity (user, org, or machine) in this
+// instance. A grant whose issuer is an enrolled active principal registers as the `verified` tier;
+// an unenrolled issuer is accepted only as `unverified`. Audited.
+// POST /v1/pca/principals.
+func (s *PCAService) CreatePrincipal(ctx context.Context, params PCACreatePrincipalParams, opts ...RequestOption) (*PCACreatePrincipalResult, error) {
+	out := &PCACreatePrincipalResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/principals", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeletePrincipal: Disable an enrolled principal. Its existing verified grants are denied at adjudication and no
+// new verified grant can be registered under it. Audited.
+// DELETE /v1/pca/principals/{principalPub}.
+func (s *PCAService) DeletePrincipal(ctx context.Context, principalPub string, opts ...RequestOption) (*PCADeletePrincipalResult, error) {
+	out := &PCADeletePrincipalResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/pca/principals/"+url.PathEscape(principalPub), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateUndoRecord: Register an undo record with the hosted undo ledger. The record's receipt chain must verify
+// against the instance's undo signer (auth_config.pca.undoSigner); 409 when none is configured.
+// Idempotent on the record id: the same record again returns the stored one, different content
+// under the same id is a 409. Audited.
+// POST /v1/pca/undo/records.
+func (s *PCAService) CreateUndoRecord(ctx context.Context, params PCACreateUndoRecordParams, opts ...RequestOption) (*PCACreateUndoRecordResult, error) {
+	out := &PCACreateUndoRecordResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/undo/records", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetUndoRecord: A stored undo record (without its encoded PCActn) and the veto waiting on it, if any.
+// GET /v1/pca/undo/records/{id}.
+func (s *PCAService) GetUndoRecord(ctx context.Context, id string, opts ...RequestOption) (*PCAGetUndoRecordResult, error) {
+	out := &PCAGetUndoRecordResult{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/undo/records/"+url.PathEscape(id), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SetUndoRecord: Replace an undo record after a transition. Accepted only when the new receipt chain verifies,
+// the stored receipts are a prefix of it, the record identity (id, audience, grant, holder,
+// principal, compensation, window, PCActn) is unchanged and `ver` increases. Moving to vetoed,
+// compensated or compensation_failed settles a pending veto; finalizing while a veto is pending is
+// a 409. Audited.
+// PUT /v1/pca/undo/records/{id}.
+func (s *PCAService) SetUndoRecord(ctx context.Context, id string, params PCASetUndoRecordParams, opts ...RequestOption) (*PCASetUndoRecordResult, error) {
+	out := &PCASetUndoRecordResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/pca/undo/records/"+url.PathEscape(id), nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PCAListUndoVetoesQuery holds the query parameters of PCAService.ListUndoVetoes.
+type PCAListUndoVetoesQuery struct {
+	// Page size, 1..200.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PCAListUndoVetoesQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListUndoVetoes: Vetoes received by the instance that the resource server has not applied yet, oldest first
+// (?limit 1..200, default 100), each with the principal's token. The resource server re-verifies
+// the token as of the veto time, applies the veto and PUTs the signed record.
+// GET /v1/pca/undo/vetoes.
+func (s *PCAService) ListUndoVetoes(ctx context.Context, query PCAListUndoVetoesQuery, opts ...RequestOption) (*ListPage[PCAListUndoVetoesItem], error) {
+	out := &ListPage[PCAListUndoVetoesItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/pca/undo/vetoes", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateWorkflowReceipt: Issue a guardian-signed step receipt for a step of a workflow the grant principal committed
+// (K5). The operator reports the outcome and outputs of an executed step; the receipt chains to
+// the earlier receipts and lets a later step be admitted.
+// POST /v1/pca/workflow-receipts.
+func (s *PCAService) CreateWorkflowReceipt(ctx context.Context, params PCACreateWorkflowReceiptParams, opts ...RequestOption) (*PCACreateWorkflowReceiptResult, error) {
+	out := &PCACreateWorkflowReceiptResult{}
+	if err := s.client.do(ctx, "POST", "/v1/pca/workflow-receipts", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Delete: Remove the partner platform setting and the partner token stored for it. Deliveries to its
 // receiver answer 404 afterwards.
 // DELETE /v1/partner_platforms/{partner}.
@@ -10328,6 +12508,100 @@ func (s *PasskeyCampaignsService) Delete(ctx context.Context, id string, opts ..
 	return out, nil
 }
 
+// PermissionAliasesService is the generated surface of /v1/permission_aliases.
+type PermissionAliasesService struct {
+	client *Client
+}
+
+// PermissionAliasesListQuery holds the query parameters of PermissionAliasesService.List.
+type PermissionAliasesListQuery struct {
+	// Page size, 1-500. Without limit (and without starting_after) the whole list is returned.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q PermissionAliasesListQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// List: List permission aliases: legacy keys that stand for a canonical permission key.
+// GET /v1/permission_aliases.
+func (s *PermissionAliasesService) List(ctx context.Context, query PermissionAliasesListQuery, opts ...RequestOption) (*CursorPage[PermissionAliasesListItem], error) {
+	out := &CursorPage[PermissionAliasesListItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/permission_aliases", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListIter walks every page of List, fetching the next one on demand.
+func (s *PermissionAliasesService) ListIter(ctx context.Context, query PermissionAliasesListQuery, opts ...RequestOption) *Iterator[PermissionAliasesListItem] {
+	return Paginate(func(cursor string) (*CursorPage[PermissionAliasesListItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.List(ctx, q, opts...)
+	})
+}
+
+// Create: Create or repoint a permission alias from a body ({ alias, permission_key }); the same write as
+// PUT /v1/permission_aliases/{alias}.
+// POST /v1/permission_aliases.
+func (s *PermissionAliasesService) Create(ctx context.Context, params PermissionAliasesCreateParams, opts ...RequestOption) (*PermissionAliasesCreateResult, error) {
+	out := &PermissionAliasesCreateResult{}
+	if err := s.client.do(ctx, "POST", "/v1/permission_aliases", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Set: Create or repoint an alias. Writes that take permission keys (role grants, seat permissions,
+// invitations, implies) accept the alias and store the canonical key; tokens always carry the
+// canonical key. The alias must not be a permission key, and the target must be an existing
+// permission.
+// PUT /v1/permission_aliases/{alias}.
+func (s *PermissionAliasesService) Set(ctx context.Context, alias string, params PermissionAliasesSetParams, opts ...RequestOption) (*PermissionAliasesSetResult, error) {
+	out := &PermissionAliasesSetResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/permission_aliases/"+url.PathEscape(alias), nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Delete: Remove an alias. Writes that still send it are then refused or dropped as an unknown key.
+// DELETE /v1/permission_aliases/{alias}.
+func (s *PermissionAliasesService) Delete(ctx context.Context, alias string, opts ...RequestOption) (*PermissionAliasesDeleteResult, error) {
+	out := &PermissionAliasesDeleteResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/permission_aliases/"+url.PathEscape(alias), nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Rename: Rename a custom permission. The key moves in one transaction everywhere Atlas stores it (the
+// permission, seats, invitations, implies, aliases; role grants follow by id) and the old key
+// becomes an alias, so code and imports that still send it keep working. Sessions minted before
+// the rename carry the old key until they refresh. System permissions cannot be renamed.
+// permission.updated is sent with previous_key.
+// POST /v1/permissions/{id}/rename.
+func (s *PermissionsService) Rename(ctx context.Context, id string, params PermissionsRenameParams, opts ...RequestOption) (*PermissionsRenameResult, error) {
+	out := &PermissionsRenameResult{}
+	if err := s.client.do(ctx, "POST", "/v1/permissions/"+url.PathEscape(id)+"/rename", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PlatformListAppsInstancesClonesQuery holds the query parameters of PlatformService.ListAppsInstancesClones.
 type PlatformListAppsInstancesClonesQuery struct {
 	// Page size, 1-100 (default 20).
@@ -10417,12 +12691,34 @@ func (s *PlatformService) DeleteAppsInstancesClone(ctx context.Context, id strin
 	return out, nil
 }
 
+// RefreshAppInstanceClone: Bring a completed clone or preview up to date in place (same instance, keys and host); same body
+// and rules as POST /v1/instance/staging_copies/{id}/refresh. Needs platform:apps:write.
+// POST /v1/platform/apps/{id}/instances/{instanceId}/clones/{cloneId}/refresh.
+func (s *PlatformService) RefreshAppInstanceClone(ctx context.Context, id string, instanceID string, cloneID string, params PlatformRefreshAppInstanceCloneParams, opts ...RequestOption) (*PlatformRefreshAppInstanceCloneResult, error) {
+	out := &PlatformRefreshAppInstanceCloneResult{}
+	if err := s.client.doAuth(ctx, authPlatform, "POST", "/v1/platform/apps/"+url.PathEscape(id)+"/instances/"+url.PathEscape(instanceID)+"/clones/"+url.PathEscape(cloneID)+"/refresh", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CreateAppsNarrowSecretKey: Narrow the secret keys of an app after onboarding: a key holding every scope becomes a runtime
 // key, with no new secret.
 // POST /v1/platform/apps/{id}/narrow_secret_keys.
 func (s *PlatformService) CreateAppsNarrowSecretKey(ctx context.Context, id string, params PlatformCreateAppsNarrowSecretKeyParams, opts ...RequestOption) (*PlatformCreateAppsNarrowSecretKeyResult, error) {
 	out := &PlatformCreateAppsNarrowSecretKeyResult{}
 	if err := s.client.doAuth(ctx, authPlatform, "POST", "/v1/platform/apps/"+url.PathEscape(id)+"/narrow_secret_keys", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RenewAppProvisioningKey: Extend the `provisioning` key of an app created with `secret_key_profile: "web_app"` by another
+// 24 hours.
+// POST /v1/platform/apps/{id}/provisioning_key/renew.
+func (s *PlatformService) RenewAppProvisioningKey(ctx context.Context, id string, params PlatformRenewAppProvisioningKeyParams, opts ...RequestOption) (*PlatformRenewAppProvisioningKeyResult, error) {
+	out := &PlatformRenewAppProvisioningKeyResult{}
+	if err := s.client.doAuth(ctx, authPlatform, "POST", "/v1/platform/apps/"+url.PathEscape(id)+"/provisioning_key/renew", nil, params, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -11309,6 +13605,110 @@ func (s *ResourceServersService) ListRevokedTokens(ctx context.Context, id strin
 	return out, nil
 }
 
+// RevocationsService is the generated surface of /v1/revocations.
+type RevocationsService struct {
+	client *Client
+}
+
+// RevocationsListQuery holds the query parameters of RevocationsService.List.
+type RevocationsListQuery struct {
+	// Resume after this position (the `next_cursor` of the previous answer, a whole number). Anything
+	// else is a 400. Omit, with no `since`, to start from now.
+	After string
+	// Start from a point in time (ISO 8601 or epoch ms) instead of a cursor.
+	Since string
+	// Only these kinds, comma separated: session, user_sessions, token_family, grant, api_key,
+	// machine, machine_grant, user. An unknown kind is a 400.
+	Kinds string
+	// Most events in one answer, 1 to 100. Default 100.
+	Limit string
+	// Seconds to wait for an event when there is none yet, 0 to 30. Default 0.
+	Wait string
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q RevocationsListQuery) values() url.Values {
+	v := url.Values{}
+	if q.After != "" {
+		v.Set("after", q.After)
+	}
+	if q.Since != "" {
+		v.Set("since", q.Since)
+	}
+	if q.Kinds != "" {
+		v.Set("kinds", q.Kinds)
+	}
+	if q.Limit != "" {
+		v.Set("limit", q.Limit)
+	}
+	if q.Wait != "" {
+		v.Set("wait", q.Wait)
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// List: Long-poll the revocation stream: one ordered list of everything that ended a session, a
+// refresh-token family, an API key, a machine, a machine grant or a person's access, each with
+// ids, reason and actor. Resume by cursor: pass the `next_cursor` of the previous answer as
+// `after`. With neither `after` nor `since` it answers empty with a `next_cursor` that points at
+// "now", so a new consumer starts from this moment. `wait` (seconds, up to 30) holds the request
+// open until an event arrives. Order is commit order: the cursor is a sequence number assigned to
+// what has committed, so a consumer that follows it never skips an event, however late it
+// committed. Retention is the event log's (90 days), and webhook endpoints subscribed to the same
+// event types are its second channel. Delivery is at-least-once and in order; keep your handler
+// idempotent.
+// GET /v1/revocations.
+func (s *RevocationsService) List(ctx context.Context, query RevocationsListQuery, opts ...RequestOption) (*RevocationsListResult, error) {
+	out := &RevocationsListResult{}
+	if err := s.client.do(ctx, "GET", "/v1/revocations", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RevocationsGetStreamQuery holds the query parameters of RevocationsService.GetStream.
+type RevocationsGetStreamQuery struct {
+	// Resume after this position (the SSE `id` of the last event you handled). `Last-Event-ID` does
+	// the same. Omit both to start from now.
+	After string
+	// Start from a point in time (ISO 8601 or epoch ms).
+	Since string
+	// Only these kinds, comma separated: session, user_sessions, token_family, grant, api_key,
+	// machine, machine_grant, user.
+	Kinds string
+}
+
+func (q RevocationsGetStreamQuery) values() url.Values {
+	v := url.Values{}
+	if q.After != "" {
+		v.Set("after", q.After)
+	}
+	if q.Since != "" {
+		v.Set("since", q.Since)
+	}
+	if q.Kinds != "" {
+		v.Set("kinds", q.Kinds)
+	}
+	return v
+}
+
+// GetStream: Server-Sent Events stream of the revocation stream (the same events as `GET /v1/revocations`).
+// Each `revocation` event carries the frame as JSON and its `seq` as the SSE `id`; resume with
+// `Last-Event-ID` or `after`. A `ready` event carries the cursor the stream started from, a `:
+// keep-alive` comment arrives every 15 seconds, and a `reconnect` event ends a connection after an
+// hour: reconnect with the last id. At most 20 streams may be open per instance (429 beyond). Same
+// `kinds` and `since` filters. `@atlasauth/backend` `revocationStream` and
+// `createRevocationMirror` consume it with reconnect, backoff and resume.
+// GET /v1/revocations/stream.
+func (s *RevocationsService) GetStream(ctx context.Context, query RevocationsGetStreamQuery, opts ...RequestOption) error {
+	return s.client.do(ctx, "GET", "/v1/revocations/stream", query.values(), nil, nil, opts...)
+}
+
 // Replay: What-if replay: re-score the recorded sign-ins of the last `days` days (1 to 30) under the
 // current risk policy and under the policy with `candidate` applied (any of step_up_threshold,
 // on_high_risk_no_factor, weights, signals, level_actions, baseline, as in PATCH
@@ -11799,6 +14199,99 @@ func (s *SCIMTokensService) Rotate(ctx context.Context, id string, params SCIMTo
 	return out, nil
 }
 
+// AddSubjectAlt: Add a subject to a stream (8.1.3.2). 200, empty body.
+// POST /v1/ssf/add_subject.
+func (s *SSFService) AddSubjectAlt(ctx context.Context, params SSFAddSubjectAltParams, opts ...RequestOption) (map[string]interface{}, error) {
+	var out map[string]interface{}
+	if err := s.client.do(ctx, "POST", "/v1/ssf/add_subject", nil, params, &out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SSFGetConfigurationQuery holds the query parameters of SSFService.GetConfiguration.
+type SSFGetConfigurationQuery struct {
+	// The stream to read (omit to list all of the receiver's streams).
+	StreamID string
+}
+
+func (q SSFGetConfigurationQuery) values() url.Values {
+	v := url.Values{}
+	if q.StreamID != "" {
+		v.Set("stream_id", q.StreamID)
+	}
+	return v
+}
+
+// GetConfiguration: Read one stream (?stream_id) or all of the receiver's streams (8.1.1.2). Another receiver's
+// stream is 404.
+// GET /v1/ssf/configuration.
+func (s *SSFService) GetConfiguration(ctx context.Context, query SSFGetConfigurationQuery, opts ...RequestOption) (map[string]interface{}, error) {
+	var out map[string]interface{}
+	if err := s.client.do(ctx, "GET", "/v1/ssf/configuration", query.values(), nil, &out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Configuration: Create an event stream (OpenID SSF 1.0 8.1.1.1). Receiver-supplied members: events_requested,
+// delivery, description. Poll delivery by default (the transmitter assigns the endpoint); push
+// needs an https endpoint_url. One stream per receiver (a second is 409). The stream belongs to
+// the creating API key.
+// POST /v1/ssf/configuration.
+func (s *SSFService) Configuration(ctx context.Context, params SSFConfigurationParams, opts ...RequestOption) (*SSFConfigurationResult, error) {
+	out := &SSFConfigurationResult{}
+	if err := s.client.do(ctx, "POST", "/v1/ssf/configuration", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SetConfiguration: Replace a stream (8.1.1.4): a missing receiver-supplied member is deleted.
+// PUT /v1/ssf/configuration.
+func (s *SSFService) SetConfiguration(ctx context.Context, params SSFSetConfigurationParams, opts ...RequestOption) (map[string]interface{}, error) {
+	var out map[string]interface{}
+	if err := s.client.do(ctx, "PUT", "/v1/ssf/configuration", nil, params, &out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UpdateConfiguration: Update a stream (8.1.1.3): only the members present change; transmitter-supplied members must
+// match; the delivery method cannot change.
+// PATCH /v1/ssf/configuration.
+func (s *SSFService) UpdateConfiguration(ctx context.Context, params SSFUpdateConfigurationParams, opts ...RequestOption) (map[string]interface{}, error) {
+	var out map[string]interface{}
+	if err := s.client.do(ctx, "PATCH", "/v1/ssf/configuration", nil, params, &out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SSFDeleteConfigurationQuery holds the query parameters of SSFService.DeleteConfiguration.
+type SSFDeleteConfigurationQuery struct {
+	// The stream to delete.
+	StreamID string
+}
+
+func (q SSFDeleteConfigurationQuery) values() url.Values {
+	v := url.Values{}
+	if q.StreamID != "" {
+		v.Set("stream_id", q.StreamID)
+	}
+	return v
+}
+
+// DeleteConfiguration: Delete a stream (?stream_id, 8.1.1.5): 204.
+// DELETE /v1/ssf/configuration.
+func (s *SSFService) DeleteConfiguration(ctx context.Context, query SSFDeleteConfigurationQuery, params map[string]interface{}, opts ...RequestOption) (map[string]interface{}, error) {
+	var out map[string]interface{}
+	if err := s.client.do(ctx, "DELETE", "/v1/ssf/configuration", query.values(), params, &out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CreateEvent: Raise a Shared Signals event for one of your users: the CAEP and RISC events Atlas has no flow
 // for (opt-in, opt-out-initiated, opt-out-cancelled, opt-out-effective, identifier-recycled,
 // recovery-activated ...). It reaches every stream that asked for the event and whose subject
@@ -11806,6 +14299,27 @@ func (s *SCIMTokensService) Rotate(ctx context.Context, id string, params SCIMTo
 // POST /v1/ssf/events.
 func (s *SSFService) CreateEvent(ctx context.Context, params SSFCreateEventParams, opts ...RequestOption) error {
 	return s.client.do(ctx, "POST", "/v1/ssf/events", nil, params, nil, opts...)
+}
+
+// GetMetadata: SSF transmitter configuration metadata (issuer, delivery methods, the five management
+// endpoints).
+// GET /v1/ssf/metadata.
+func (s *SSFService) GetMetadata(ctx context.Context, opts ...RequestOption) (*SSFGetMetadataResult, error) {
+	out := &SSFGetMetadataResult{}
+	if err := s.client.do(ctx, "GET", "/v1/ssf/metadata", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RemoveSubjectAlt: Remove a subject from a stream (8.1.3.3). 204; an unknown subject is ignored.
+// POST /v1/ssf/remove_subject.
+func (s *SSFService) RemoveSubjectAlt(ctx context.Context, params SSFRemoveSubjectAltParams, opts ...RequestOption) (map[string]interface{}, error) {
+	var out map[string]interface{}
+	if err := s.client.do(ctx, "POST", "/v1/ssf/remove_subject", nil, params, &out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // SSFGetStatusQuery holds the query parameters of SSFService.GetStatus.
@@ -11870,6 +14384,17 @@ func (s *SSFService) ListStreamsSubjects(ctx context.Context, id string, query S
 	return out, nil
 }
 
+// PollStream: Poll a stream (RFC 8936): acknowledge with ack, report invalid SETs with setErrs, receive up to
+// maxEvents unacknowledged SETs.
+// POST /v1/ssf/streams/{streamId}/poll.
+func (s *SSFService) PollStream(ctx context.Context, streamID string, params SSFPollStreamParams, opts ...RequestOption) (*SSFPollStreamResult, error) {
+	out := &SSFPollStreamResult{}
+	if err := s.client.do(ctx, "POST", "/v1/ssf/streams/"+url.PathEscape(streamID)+"/poll", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AddSubject: SSF 1.0 add subject: start (or, on an ALL stream, resume) events for one subject on a stream.
 // Subject formats: iss_sub (this issuer), email, phone_number, opaque, account, did, uri. 200 with
 // an empty body.
@@ -11883,6 +14408,17 @@ func (s *SSFService) AddSubject(ctx context.Context, params SSFAddSubjectParams,
 // POST /v1/ssf/subjects/remove.
 func (s *SSFService) RemoveSubject(ctx context.Context, params SSFRemoveSubjectParams, opts ...RequestOption) error {
 	return s.client.do(ctx, "POST", "/v1/ssf/subjects/remove", nil, params, nil, opts...)
+}
+
+// Verification: Request a verification event (8.1.4.2): 204, and a signed SET carrying the optional state is
+// delivered on the stream (pushed, or retained for polling).
+// POST /v1/ssf/verification.
+func (s *SSFService) Verification(ctx context.Context, params SSFVerificationParams, opts ...RequestOption) (map[string]interface{}, error) {
+	var out map[string]interface{}
+	if err := s.client.do(ctx, "POST", "/v1/ssf/verification", nil, params, &out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // Verify: SSF 1.0 verification endpoint: queue a verification event carrying `state` for the stream named
@@ -12311,6 +14847,21 @@ func (q SessionsListRevokedQuery) values() url.Values {
 func (s *SessionsService) ListRevoked(ctx context.Context, query SessionsListRevokedQuery, opts ...RequestOption) (*SessionsListRevokedResult, error) {
 	out := &SessionsListRevokedResult{}
 	if err := s.client.do(ctx, "GET", "/v1/sessions/revoked", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SetActiveOrganization: Set (or clear, with organization_id null) the active organization of a session from your
+// backend. The user must hold a seat in it (or in an ancestor with role inheritance on) and meet
+// its second-factor policy, as for their own switch: an organization they are not in is 404, a
+// policy that needs a second factor is 403 STEP_UP_REQUIRED. The next token minted for the session
+// (refresh or getToken) carries that organization claims. An ended session is 409; an unknown id,
+// or one of another instance, is 404. Returns the session with last_active_organization_id.
+// PUT /v1/sessions/{id}/active_organization.
+func (s *SessionsService) SetActiveOrganization(ctx context.Context, id string, params SessionsSetActiveOrganizationParams, opts ...RequestOption) (*Session2, error) {
+	out := &Session2{}
+	if err := s.client.do(ctx, "PUT", "/v1/sessions/"+url.PathEscape(id)+"/active_organization", nil, params, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -12766,6 +15317,74 @@ func (s *UsersService) CancelBulkAction(ctx context.Context, id string, opts ...
 	return out, nil
 }
 
+// SetByExternalID: Create-or-update the user keyed by your own id (external_id, the path segment, URL-encoded): 201
+// with the new user when none holds it (the body is that of POST /v1/users, email_address
+// required, external_id from the path), else 200 with the existing user updated (only first_name,
+// last_name, image_url, public_metadata, private_metadata, unsafe_metadata, password and
+// referral_code apply; email fields and the other create-only fields are ignored). Two calls
+// racing for a new external_id create exactly one user. When nobody holds the id but a user
+// already has the address, the answer is 409 IDENTIFIER_EXISTS with meta.user_id; send
+// link_by_verified_email: true to adopt that user instead (200), which works only when the address
+// is verified in Atlas and the user has no external_id yet (a different id is never overwritten).
+// Emits user.created or user.updated.
+// PUT /v1/users/by_external_id/{external_id}.
+func (s *UsersService) SetByExternalID(ctx context.Context, externalID string, params UsersSetByExternalIDParams, opts ...RequestOption) (*User2, error) {
+	out := &User2{}
+	if err := s.client.do(ctx, "PUT", "/v1/users/by_external_id/"+url.PathEscape(externalID), nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UsersListDeletedQuery holds the query parameters of UsersService.ListDeleted.
+type UsersListDeletedQuery struct {
+	// Unix milliseconds or an ISO 8601 timestamp. Users deleted at or after it are returned.
+	Since string
+	// Page size.
+	Limit *int64
+	// The `next_cursor` of the previous page.
+	StartingAfter string
+}
+
+func (q UsersListDeletedQuery) values() url.Values {
+	v := url.Values{}
+	if q.Since != "" {
+		v.Set("since", q.Since)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListDeleted: Reconcile missed `user.deleted` webhooks: every user deleted at or after `since`, oldest first,
+// as `id`, `external_id` and `deleted_at`. Nothing else about the person is returned. Page with
+// `starting_after` = the previous `next_cursor`. Rows exist until the personal-data scrub
+// (`compliance.retention.deletedUserGraceDays`, default 30 days), so reconcile at least that
+// often; failed deliveries themselves are listed by `GET /v1/webhook_dlq?event_type=user.deleted`.
+// GET /v1/users/deleted.
+func (s *UsersService) ListDeleted(ctx context.Context, query UsersListDeletedQuery, opts ...RequestOption) (*CursorPage[UsersListDeletedItem], error) {
+	out := &CursorPage[UsersListDeletedItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/users/deleted", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListDeletedIter walks every page of ListDeleted, fetching the next one on demand.
+func (s *UsersService) ListDeletedIter(ctx context.Context, query UsersListDeletedQuery, opts ...RequestOption) *Iterator[UsersListDeletedItem] {
+	return Paginate(func(cursor string) (*CursorPage[UsersListDeletedItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.ListDeleted(ctx, q, opts...)
+	})
+}
+
 // CreateDeletedAddress: Remember email addresses and E.164 phone numbers of accounts that were deleted before this
 // instance recorded deletions, so deletedUserReturn "block" refuses them. Same keyed, unreadable
 // hash a delete writes. Up to 5000 per call, safe to repeat. The answer counts new, already
@@ -12980,6 +15599,56 @@ func (s *UsersService) DeleteApprovalDevice(ctx context.Context, id string, devi
 	return out, nil
 }
 
+// UsersListApprovalRequestsQuery holds the query parameters of UsersService.ListApprovalRequests.
+type UsersListApprovalRequestsQuery struct {
+	// pending, approved, denied, expired or cancelled.
+	Status string
+	// Page size, 1 to 100. Default 25.
+	Limit *int64
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q UsersListApprovalRequestsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Status != "" {
+		v.Set("status", q.Status)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListApprovalRequests: Everything one user has open, in one list: approval requests about them (filter with `status`;
+// `limit` 1 to 100, default 25) and, while `status` is pending or absent, their sign-in "approve
+// in your app" requests (`kind: "sign_in_approval"`, with `purpose`, the shuffled `choices` and
+// `requested_from`; the right number is never included). Replaces keeping your own pointer to the
+// latest request. Needs `approvals:read` (a key with `users:read` keeps working).
+// GET /v1/users/{id}/approval_requests.
+func (s *UsersService) ListApprovalRequests(ctx context.Context, id string, query UsersListApprovalRequestsQuery, opts ...RequestOption) (*CursorPage[UsersListApprovalRequestsItem], error) {
+	out := &CursorPage[UsersListApprovalRequestsItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/users/"+url.PathEscape(id)+"/approval_requests", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListApprovalRequestsIter walks every page of ListApprovalRequests, fetching the next one on demand.
+func (s *UsersService) ListApprovalRequestsIter(ctx context.Context, id string, query UsersListApprovalRequestsQuery, opts ...RequestOption) *Iterator[UsersListApprovalRequestsItem] {
+	return Paginate(func(cursor string) (*CursorPage[UsersListApprovalRequestsItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.ListApprovalRequests(ctx, id, q, opts...)
+	})
+}
+
 // CancelApprovalRequest: Withdraw a pending transaction-approval request so the device can no longer answer it. 404 for a
 // request that is not this user's, 409 once it is approved, denied, expired or already cancelled.
 // Emits approval_request.cancelled.
@@ -13011,6 +15680,39 @@ func (s *UsersService) Contain(ctx context.Context, id string, params UsersConta
 func (s *UsersService) DeleteCookieConsent(ctx context.Context, id string, opts ...RequestOption) (*UsersDeleteCookieConsentResult, error) {
 	out := &UsersDeleteCookieConsentResult{}
 	if err := s.client.do(ctx, "DELETE", "/v1/users/"+url.PathEscape(id)+"/cookie_consents", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateDelegationToken: Mint a short-lived delegation token so your server can act as this user for one purpose. The
+// token is limited to a named `audience` and a list of `scopes` (both must be on the instance's
+// `delegationTokens` settings), lives at most 300 seconds (default 120), and carries an `act`
+// claim naming `actor.sub`, so a service can see it is not the user themselves. Refused for
+// banned, deleted and impersonation-protected users, and for an `org_id` the user does not belong
+// to. Every mint is audited on the user's trail as `user.delegation_token_issued` (the token
+// itself is never stored). Rate limited per key and per user. Send an Idempotency-Key to make a
+// retry return the same token.
+// POST /v1/users/{id}/delegation_tokens.
+func (s *UsersService) CreateDelegationToken(ctx context.Context, id string, params UsersCreateDelegationTokenParams, opts ...RequestOption) (*UsersCreateDelegationTokenResult, error) {
+	out := &UsersCreateDelegationTokenResult{}
+	if err := s.client.do(ctx, "POST", "/v1/users/"+url.PathEscape(id)+"/delegation_tokens", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UpdateDeletion: Move a scheduled deletion to a new date. Send exactly one of `effective_at` (ISO 8601, not in
+// the past) or `grace_seconds` (from now). The user's deletion date, the in-flight erasure
+// request's scheduled date and the reminder plan all move together; the person is mailed the new
+// date and `user.deletion_rescheduled` is emitted. The `pre_user_deletion` Actions are asked again
+// for the new date (a refusal is 403 ACTION_BLOCKED) and a legal hold refuses the move. 409 when
+// the user has no scheduled deletion, the deletion is paused (resume it with POST
+// /v1/users/{id}/deletion/reconfirm first) or the user is already erased. Returns the user.
+// PATCH /v1/users/{id}/deletion.
+func (s *UsersService) UpdateDeletion(ctx context.Context, id string, params UsersUpdateDeletionParams, opts ...RequestOption) (*User2, error) {
+	out := &User2{}
+	if err := s.client.do(ctx, "PATCH", "/v1/users/"+url.PathEscape(id)+"/deletion", nil, params, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -13267,6 +15969,99 @@ func (s *UsersService) ResyncReferral(ctx context.Context, id string, opts ...Re
 func (s *UsersService) Release(ctx context.Context, id string, opts ...RequestOption) (*UsersReleaseResult, error) {
 	out := &UsersReleaseResult{}
 	if err := s.client.do(ctx, "POST", "/v1/users/"+url.PathEscape(id)+"/release", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UsersListRiskSignalsQuery holds the query parameters of UsersService.ListRiskSignals.
+type UsersListRiskSignalsQuery struct {
+	// Keep only live signals (`active`), or every one (`all`, the default).
+	Status string
+	// Page size, 1-200 (default 50).
+	Limit *int64
+	// The `next_cursor` of the previous page (epoch milliseconds).
+	Before string
+	// Cursor: return only items after this one. Pass the previous page's `next_cursor` (the last
+	// item's id). An unknown cursor is a 400.
+	StartingAfter string
+}
+
+func (q UsersListRiskSignalsQuery) values() url.Values {
+	v := url.Values{}
+	if q.Status != "" {
+		v.Set("status", q.Status)
+	}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.Before != "" {
+		v.Set("before", q.Before)
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	return v
+}
+
+// ListRiskSignals: The risk signals reported for one user, newest first; `status=active` keeps only live ones. Page
+// with `before`.
+// GET /v1/users/{id}/risk_signals.
+func (s *UsersService) ListRiskSignals(ctx context.Context, id string, query UsersListRiskSignalsQuery, opts ...RequestOption) (*CursorPage[UsersListRiskSignalsItem], error) {
+	out := &CursorPage[UsersListRiskSignalsItem]{}
+	if err := s.client.do(ctx, "GET", "/v1/users/"+url.PathEscape(id)+"/risk_signals", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListRiskSignalsIter walks every page of ListRiskSignals, fetching the next one on demand.
+func (s *UsersService) ListRiskSignalsIter(ctx context.Context, id string, query UsersListRiskSignalsQuery, opts ...RequestOption) *Iterator[UsersListRiskSignalsItem] {
+	return Paginate(func(cursor string) (*CursorPage[UsersListRiskSignalsItem], error) {
+		q := query
+		if cursor != "" {
+			q.StartingAfter = cursor
+		}
+		return s.ListRiskSignals(ctx, id, q, opts...)
+	})
+}
+
+// CreateRiskSignal: Raise one user's sign-in risk for a window. The same signal as POST /v1/risk_signals with the
+// user named by the path. While it is live and risk-based MFA is on, it adds points to every
+// sign-in evaluation of that user (low 10, medium 25, high 50, critical 100; the total is capped
+// at 100), which can turn into a second factor, an enrolment or a block under the instance's risk
+// policy. It never lowers friction. ttl_seconds 60 to 2592000, default 3600; it expires by itself.
+// Honours Idempotency-Key. Emits risk_signal.created.
+// POST /v1/users/{id}/risk_signals.
+func (s *UsersService) CreateRiskSignal(ctx context.Context, id string, params UsersCreateRiskSignalParams, opts ...RequestOption) (*UsersCreateRiskSignalResult, error) {
+	out := &UsersCreateRiskSignalResult{}
+	if err := s.client.do(ctx, "POST", "/v1/users/"+url.PathEscape(id)+"/risk_signals", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteRiskSignal: End every live risk signal on one user now. Their points leave the next evaluation; the rows
+// stay readable with status `revoked`. Recorded once in the audit log. Safe to repeat: with
+// nothing live, it clears nothing.
+// DELETE /v1/users/{id}/risk_signals.
+func (s *UsersService) DeleteRiskSignal(ctx context.Context, id string, opts ...RequestOption) (*UsersDeleteRiskSignalResult, error) {
+	out := &UsersDeleteRiskSignalResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/users/"+url.PathEscape(id)+"/risk_signals", nil, nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetSecuritySummary: One read of how the account is protected: password and when it last changed, sign-in methods the
+// user can use right now, linked providers, verified second factors, recovery codes left,
+// passkeys, remembered browsers and device keys, and the open sessions (count and the newest). Ids
+// and labels only: never a password hash, second-factor secret, recovery code, credential id or
+// key material.
+// GET /v1/users/{id}/security_summary.
+func (s *UsersService) GetSecuritySummary(ctx context.Context, id string, opts ...RequestOption) (*UsersGetSecuritySummaryResult, error) {
+	out := &UsersGetSecuritySummaryResult{}
+	if err := s.client.do(ctx, "GET", "/v1/users/"+url.PathEscape(id)+"/security_summary", nil, nil, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -13569,6 +16364,50 @@ func (s *WebBotAuthService) DeleteDirectory(ctx context.Context, id string, opts
 	return out, nil
 }
 
+// WebhookDlqService is the generated surface of /v1/webhook_dlq.
+type WebhookDlqService struct {
+	client *Client
+}
+
+// WebhookDlqListQuery holds the query parameters of WebhookDlqService.List.
+type WebhookDlqListQuery struct {
+	// Page size. Defaults to 50; values above 1000 are capped at 1000.
+	Limit *int64
+	// Cursor: return only items after this id. Pass the `next_cursor` (or the last item id) of the
+	// previous page.
+	StartingAfter string
+	// Only deliveries of this event type (comma-separated for several).
+	EventType string
+}
+
+func (q WebhookDlqListQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit != nil {
+		v.Set("limit", strconv.FormatInt(*q.Limit, 10))
+	}
+	if q.StartingAfter != "" {
+		v.Set("starting_after", q.StartingAfter)
+	}
+	if q.EventType != "" {
+		v.Set("event_type", q.EventType)
+	}
+	return v
+}
+
+// List: The dead-letter queue of the whole instance: deliveries that used every attempt on any endpoint,
+// newest first, each with `endpoint_id`, the payload that was sent, the last response and the
+// error. Narrow it with `event_type` (for example `user.deleted`) to find every failed delivery of
+// one event; acknowledge or requeue per endpoint with the endpoint dlq routes. Cursor:
+// `starting_after` with the `next_cursor` of the previous page.
+// GET /v1/webhook_dlq.
+func (s *WebhookDlqService) List(ctx context.Context, query WebhookDlqListQuery, opts ...RequestOption) (*WebhookDlqListResult, error) {
+	out := &WebhookDlqListResult{}
+	if err := s.client.do(ctx, "GET", "/v1/webhook_dlq", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WebhookEndpointsOpsService is the generated surface of /v1/webhook_endpoints.
 type WebhookEndpointsOpsService struct {
 	client *Client
@@ -13581,6 +16420,8 @@ type WebhookEndpointsOpsListDlqQuery struct {
 	// Cursor: return only items after this id. Pass the `next_cursor` (or the last item id) of the
 	// previous page.
 	StartingAfter string
+	// Only deliveries of this event type (comma-separated for several).
+	EventType string
 }
 
 func (q WebhookEndpointsOpsListDlqQuery) values() url.Values {
@@ -13590,6 +16431,9 @@ func (q WebhookEndpointsOpsListDlqQuery) values() url.Values {
 	}
 	if q.StartingAfter != "" {
 		v.Set("starting_after", q.StartingAfter)
+	}
+	if q.EventType != "" {
+		v.Set("event_type", q.EventType)
 	}
 	return v
 }
@@ -13922,6 +16766,11 @@ type LegacyAuthConnectionService struct {
 	client *Client
 }
 
+// NotificationTemplatesOpsService is the generated surface of /v1/notification_templates.
+type NotificationTemplatesOpsService struct {
+	client *Client
+}
+
 // ResourceRoleAssignmentsService is the generated surface of /v1/resource_role_assignments.
 type ResourceRoleAssignmentsService struct {
 	client *Client
@@ -13929,5 +16778,10 @@ type ResourceRoleAssignmentsService struct {
 
 // UserImportsService is the generated surface of /v1/user_imports.
 type UserImportsService struct {
+	client *Client
+}
+
+// WhoamiService is the generated surface of /v1/whoami.
+type WhoamiService struct {
 	client *Client
 }

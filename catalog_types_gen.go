@@ -1220,6 +1220,62 @@ type AllowlistIdentifiersDeleteResult struct {
 	Deleted bool   `json:"deleted"`
 }
 
+// AnalyticsListCaptchaResultWindow is a typed object of the Backend API.
+type AnalyticsListCaptchaResultWindow struct {
+	From           *int64  `json:"from,omitempty"`
+	To             *int64  `json:"to,omitempty"`
+	Granularity    *string `json:"granularity,omitempty"`
+	OrganizationID *string `json:"organization_id,omitempty"`
+}
+
+// AnalyticsListCaptchaResultDataItem is a typed object of the Backend API.
+type AnalyticsListCaptchaResultDataItem struct {
+	Provider  *string  `json:"provider,omitempty"`
+	Flow      *string  `json:"flow,omitempty"`
+	Issued    *int64   `json:"issued,omitempty"`
+	Passed    *int64   `json:"passed,omitempty"`
+	Failed    *int64   `json:"failed,omitempty"`
+	Blocked   *int64   `json:"blocked,omitempty"`
+	SolveRate *float64 `json:"solve_rate,omitempty"`
+}
+
+// AnalyticsListCaptchaResult is a typed object of the Backend API.
+type AnalyticsListCaptchaResult struct {
+	Object    *string                              `json:"object,omitempty"`
+	Window    *AnalyticsListCaptchaResultWindow    `json:"window,omitempty"`
+	Issued    *int64                               `json:"issued,omitempty"`
+	Passed    *int64                               `json:"passed,omitempty"`
+	Failed    *int64                               `json:"failed,omitempty"`
+	Blocked   *int64                               `json:"blocked,omitempty"`
+	SolveRate *float64                             `json:"solve_rate,omitempty"`
+	Data      []AnalyticsListCaptchaResultDataItem `json:"data,omitempty"`
+}
+
+// AnalyticsListSMSResultWindow is a typed object of the Backend API.
+type AnalyticsListSMSResultWindow struct {
+	From           *int64  `json:"from,omitempty"`
+	To             *int64  `json:"to,omitempty"`
+	Granularity    *string `json:"granularity,omitempty"`
+	OrganizationID *string `json:"organization_id,omitempty"`
+}
+
+// AnalyticsListSMSResultDataItem is a typed object of the Backend API.
+type AnalyticsListSMSResultDataItem struct {
+	Country       *string  `json:"country,omitempty"`
+	Messages      *int64   `json:"messages,omitempty"`
+	Delivered     *int64   `json:"delivered,omitempty"`
+	Failed        *int64   `json:"failed,omitempty"`
+	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
+}
+
+// AnalyticsListSMSResult is a typed object of the Backend API.
+type AnalyticsListSMSResult struct {
+	Object *string                          `json:"object,omitempty"`
+	Window *AnalyticsListSMSResultWindow    `json:"window,omitempty"`
+	Total  *int64                           `json:"total,omitempty"`
+	Data   []AnalyticsListSMSResultDataItem `json:"data,omitempty"`
+}
+
 // APIKeysListPostureResultThresholds is a typed object of the Backend API.
 type APIKeysListPostureResultThresholds struct {
 	StaleDays     *int64 `json:"stale_days,omitempty"`
@@ -1381,11 +1437,15 @@ type AppCatalogVoteRequestResult struct {
 
 // ApprovalRequestsListItemApprovers is a typed object of the Backend API.
 type ApprovalRequestsListItemApprovers struct {
-	// One of: subject, users, role.
+	// One of: subject, users, role, group.
 	Mode           *string  `json:"mode,omitempty"`
 	UserIDs        []string `json:"user_ids,omitempty"`
 	OrganizationID *string  `json:"organization_id,omitempty"`
 	Role           *string  `json:"role,omitempty"`
+	// Present when several roles of the organization were named.
+	Roles []string `json:"roles,omitempty"`
+	// Present in mode `group`.
+	GroupID *string `json:"group_id,omitempty"`
 	// How many distinct approvers must approve.
 	Required *int64 `json:"required,omitempty"`
 }
@@ -1395,9 +1455,12 @@ type ApprovalRequestsListItemDecisionsItem struct {
 	ApproverUserID *string `json:"approver_user_id,omitempty"`
 	// One of: approve, deny.
 	Decision *string `json:"decision,omitempty"`
-	// One of: device_key, passkey, number_match.
+	// `step_up` means the approver decided with a fresh step-up for the request's step-up policy
+	// instead of a device signature. One of: device_key, passkey, step_up, number_match.
 	Method *string `json:"method,omitempty"`
-	KeyID  *string `json:"key_id,omitempty"`
+	// The free-text note the approver left with this decision.
+	Note  *string `json:"note,omitempty"`
+	KeyID *string `json:"key_id,omitempty"`
 	// The trusted device the decision came from; null when it came from a device that is not trusted.
 	TrustedDeviceID *string `json:"trusted_device_id,omitempty"`
 	DecidedAt       *int64  `json:"decided_at,omitempty"`
@@ -1426,8 +1489,12 @@ type ApprovalRequestsListItem struct {
 	Binding          *string `json:"binding,omitempty"`
 	RequireSignature *bool   `json:"require_signature,omitempty"`
 	// The request only accepts an approval from a trusted device.
-	RequireTrustedDevice *bool                              `json:"require_trusted_device,omitempty"`
-	Approvers            *ApprovalRequestsListItemApprovers `json:"approvers,omitempty"`
+	RequireTrustedDevice *bool `json:"require_trusted_device,omitempty"`
+	// The user the request is about cannot decide it.
+	ExcludeRequester *bool `json:"exclude_requester,omitempty"`
+	// The step-up policy an approver may satisfy instead of a device signature.
+	StepUpPolicy *string                            `json:"step_up_policy,omitempty"`
+	Approvers    *ApprovalRequestsListItemApprovers `json:"approvers,omitempty"`
 	// SHA-256 of the canonical request (base64url): what an approver signs.
 	Digest *string `json:"digest,omitempty"`
 	// The exact text the approver is shown and signs.
@@ -1440,15 +1507,23 @@ type ApprovalRequestsListItem struct {
 }
 
 // ApprovalRequestsCreateParamsApprovers: Who decides. Leave out for the v1 flow (the user answers on their own device with number
-// matching). Name `user_ids` (1 to 20) or an `organization_id` with a `role`; `required` of them
-// must approve (default 1, at most the number of user ids). Any one denial ends the request. A
-// role with fewer holders than `required` is refused with 422 (`meta.reason` =
-// `approvers_insufficient`). A request with approvers always needs signed approvals.
+// matching). Name `user_ids` (1 to 20), a `group_id` (every member of the group may decide), or an
+// `organization_id` with a `role` (or up to 10 `roles`; a holder of any of them may decide). A
+// role or group is the way to name a big set: "any 2 of ops" is the role `ops` with `required: 2`.
+// `required` of them must approve (default 1; at most the number of user ids, and at most 50 for a
+// role or group). Membership is read when someone decides, so leaving the group or role ends the
+// right to decide. Any one denial ends the request. A role or group with fewer members than
+// `required` is refused with 422 (`meta.reason` = `approvers_insufficient`). A request with
+// approvers always needs signed approvals.
 type ApprovalRequestsCreateParamsApprovers struct {
 	UserIDs        []string `json:"user_ids,omitempty"`
 	OrganizationID *string  `json:"organization_id,omitempty"`
 	// An organization role key; members holding it may decide.
-	Role     *string `json:"role,omitempty"`
+	Role *string `json:"role,omitempty"`
+	// Several role keys of `organization_id`; a holder of any may decide. Not together with `role`.
+	Roles []string `json:"roles,omitempty"`
+	// A group; its members may decide. Not together with `user_ids` or `organization_id`.
+	GroupID  *string `json:"group_id,omitempty"`
 	Required *int64  `json:"required,omitempty"`
 }
 
@@ -1463,13 +1538,26 @@ type ApprovalRequestsCreateParams struct {
 	// How long the request stays open: 10 to 604800 seconds. Default 120.
 	TTLSeconds *int64 `json:"ttl_seconds,omitempty"`
 	// Who decides. Leave out for the v1 flow (the user answers on their own device with number
-	// matching). Name `user_ids` (1 to 20) or an `organization_id` with a `role`; `required` of them
-	// must approve (default 1, at most the number of user ids). Any one denial ends the request. A
-	// role with fewer holders than `required` is refused with 422 (`meta.reason` =
-	// `approvers_insufficient`). A request with approvers always needs signed approvals.
+	// matching). Name `user_ids` (1 to 20), a `group_id` (every member of the group may decide), or an
+	// `organization_id` with a `role` (or up to 10 `roles`; a holder of any of them may decide). A
+	// role or group is the way to name a big set: "any 2 of ops" is the role `ops` with `required: 2`.
+	// `required` of them must approve (default 1; at most the number of user ids, and at most 50 for a
+	// role or group). Membership is read when someone decides, so leaving the group or role ends the
+	// right to decide. Any one denial ends the request. A role or group with fewer members than
+	// `required` is refused with 422 (`meta.reason` = `approvers_insufficient`). A request with
+	// approvers always needs signed approvals.
 	Approvers *ApprovalRequestsCreateParamsApprovers `json:"approvers,omitempty"`
 	// Demand a signature over the canonical request even from the user themselves. Default false.
 	RequireSignature *bool `json:"require_signature,omitempty"`
+	// The user the request is about can never approve or reject it, even holding the approver role
+	// (403 with `meta.reason` = `requester_excluded`). Needs `approvers`; refused with 422 when too
+	// few other approvers remain to reach `required`. Default false.
+	ExcludeRequester *bool `json:"exclude_requester,omitempty"`
+	// Name of a step-up policy. An approver may then approve from a signed-in session that has just
+	// met that policy (within its max age) instead of signing with a device key or passkey; the
+	// receipt records the method as `step_up`. Device-signature approvals keep working. Refused with
+	// 400 when the policy does not exist or is disabled.
+	StepUpPolicy *string `json:"step_up_policy,omitempty"`
 	// Only an approval from a device the approver trusted (a signing key, passkey or push device
 	// marked trusted) counts; a denial never needs one. Refused with 422 (`meta.reason` =
 	// `no_trusted_device`) when too few approvers have a trusted device. The instance setting
@@ -1497,6 +1585,8 @@ type ApprovalRequestsCreateResult struct {
 	Approvers            map[string]interface{} `json:"approvers,omitempty"`
 	RequireSignature     *bool                  `json:"require_signature,omitempty"`
 	RequireTrustedDevice *bool                  `json:"require_trusted_device,omitempty"`
+	ExcludeRequester     *bool                  `json:"exclude_requester,omitempty"`
+	StepUpPolicy         *string                `json:"step_up_policy,omitempty"`
 	Digest               *string                `json:"digest,omitempty"`
 	Reference            *string                `json:"reference,omitempty"`
 	Binding              *string                `json:"binding,omitempty"`
@@ -1504,11 +1594,15 @@ type ApprovalRequestsCreateResult struct {
 
 // ApprovalRequestsGetResultApprovers is a typed object of the Backend API.
 type ApprovalRequestsGetResultApprovers struct {
-	// One of: subject, users, role.
+	// One of: subject, users, role, group.
 	Mode           *string  `json:"mode,omitempty"`
 	UserIDs        []string `json:"user_ids,omitempty"`
 	OrganizationID *string  `json:"organization_id,omitempty"`
 	Role           *string  `json:"role,omitempty"`
+	// Present when several roles of the organization were named.
+	Roles []string `json:"roles,omitempty"`
+	// Present in mode `group`.
+	GroupID *string `json:"group_id,omitempty"`
 	// How many distinct approvers must approve.
 	Required *int64 `json:"required,omitempty"`
 }
@@ -1518,9 +1612,12 @@ type ApprovalRequestsGetResultDecisionsItem struct {
 	ApproverUserID *string `json:"approver_user_id,omitempty"`
 	// One of: approve, deny.
 	Decision *string `json:"decision,omitempty"`
-	// One of: device_key, passkey, number_match.
+	// `step_up` means the approver decided with a fresh step-up for the request's step-up policy
+	// instead of a device signature. One of: device_key, passkey, step_up, number_match.
 	Method *string `json:"method,omitempty"`
-	KeyID  *string `json:"key_id,omitempty"`
+	// The free-text note the approver left with this decision.
+	Note  *string `json:"note,omitempty"`
+	KeyID *string `json:"key_id,omitempty"`
 	// The trusted device the decision came from; null when it came from a device that is not trusted.
 	TrustedDeviceID *string `json:"trusted_device_id,omitempty"`
 	DecidedAt       *int64  `json:"decided_at,omitempty"`
@@ -1549,8 +1646,12 @@ type ApprovalRequestsGetResult struct {
 	Binding          *string `json:"binding,omitempty"`
 	RequireSignature *bool   `json:"require_signature,omitempty"`
 	// The request only accepts an approval from a trusted device.
-	RequireTrustedDevice *bool                               `json:"require_trusted_device,omitempty"`
-	Approvers            *ApprovalRequestsGetResultApprovers `json:"approvers,omitempty"`
+	RequireTrustedDevice *bool `json:"require_trusted_device,omitempty"`
+	// The user the request is about cannot decide it.
+	ExcludeRequester *bool `json:"exclude_requester,omitempty"`
+	// The step-up policy an approver may satisfy instead of a device signature.
+	StepUpPolicy *string                             `json:"step_up_policy,omitempty"`
+	Approvers    *ApprovalRequestsGetResultApprovers `json:"approvers,omitempty"`
 	// SHA-256 of the canonical request (base64url): what an approver signs.
 	Digest *string `json:"digest,omitempty"`
 	// The exact text the approver is shown and signs.
@@ -1564,11 +1665,15 @@ type ApprovalRequestsGetResult struct {
 
 // ApprovalRequestsCancelResultApprovers is a typed object of the Backend API.
 type ApprovalRequestsCancelResultApprovers struct {
-	// One of: subject, users, role.
+	// One of: subject, users, role, group.
 	Mode           *string  `json:"mode,omitempty"`
 	UserIDs        []string `json:"user_ids,omitempty"`
 	OrganizationID *string  `json:"organization_id,omitempty"`
 	Role           *string  `json:"role,omitempty"`
+	// Present when several roles of the organization were named.
+	Roles []string `json:"roles,omitempty"`
+	// Present in mode `group`.
+	GroupID *string `json:"group_id,omitempty"`
 	// How many distinct approvers must approve.
 	Required *int64 `json:"required,omitempty"`
 }
@@ -1578,9 +1683,12 @@ type ApprovalRequestsCancelResultDecisionsItem struct {
 	ApproverUserID *string `json:"approver_user_id,omitempty"`
 	// One of: approve, deny.
 	Decision *string `json:"decision,omitempty"`
-	// One of: device_key, passkey, number_match.
+	// `step_up` means the approver decided with a fresh step-up for the request's step-up policy
+	// instead of a device signature. One of: device_key, passkey, step_up, number_match.
 	Method *string `json:"method,omitempty"`
-	KeyID  *string `json:"key_id,omitempty"`
+	// The free-text note the approver left with this decision.
+	Note  *string `json:"note,omitempty"`
+	KeyID *string `json:"key_id,omitempty"`
 	// The trusted device the decision came from; null when it came from a device that is not trusted.
 	TrustedDeviceID *string `json:"trusted_device_id,omitempty"`
 	DecidedAt       *int64  `json:"decided_at,omitempty"`
@@ -1609,8 +1717,12 @@ type ApprovalRequestsCancelResult struct {
 	Binding          *string `json:"binding,omitempty"`
 	RequireSignature *bool   `json:"require_signature,omitempty"`
 	// The request only accepts an approval from a trusted device.
-	RequireTrustedDevice *bool                                  `json:"require_trusted_device,omitempty"`
-	Approvers            *ApprovalRequestsCancelResultApprovers `json:"approvers,omitempty"`
+	RequireTrustedDevice *bool `json:"require_trusted_device,omitempty"`
+	// The user the request is about cannot decide it.
+	ExcludeRequester *bool `json:"exclude_requester,omitempty"`
+	// The step-up policy an approver may satisfy instead of a device signature.
+	StepUpPolicy *string                                `json:"step_up_policy,omitempty"`
+	Approvers    *ApprovalRequestsCancelResultApprovers `json:"approvers,omitempty"`
 	// SHA-256 of the canonical request (base64url): what an approver signs.
 	Digest *string `json:"digest,omitempty"`
 	// The exact text the approver is shown and signs.
@@ -1630,11 +1742,15 @@ type ApprovalRequestsConsumeParams struct {
 
 // ApprovalRequestsConsumeResultApprovers is a typed object of the Backend API.
 type ApprovalRequestsConsumeResultApprovers struct {
-	// One of: subject, users, role.
+	// One of: subject, users, role, group.
 	Mode           *string  `json:"mode,omitempty"`
 	UserIDs        []string `json:"user_ids,omitempty"`
 	OrganizationID *string  `json:"organization_id,omitempty"`
 	Role           *string  `json:"role,omitempty"`
+	// Present when several roles of the organization were named.
+	Roles []string `json:"roles,omitempty"`
+	// Present in mode `group`.
+	GroupID *string `json:"group_id,omitempty"`
 	// How many distinct approvers must approve.
 	Required *int64 `json:"required,omitempty"`
 }
@@ -1644,9 +1760,12 @@ type ApprovalRequestsConsumeResultDecisionsItem struct {
 	ApproverUserID *string `json:"approver_user_id,omitempty"`
 	// One of: approve, deny.
 	Decision *string `json:"decision,omitempty"`
-	// One of: device_key, passkey, number_match.
+	// `step_up` means the approver decided with a fresh step-up for the request's step-up policy
+	// instead of a device signature. One of: device_key, passkey, step_up, number_match.
 	Method *string `json:"method,omitempty"`
-	KeyID  *string `json:"key_id,omitempty"`
+	// The free-text note the approver left with this decision.
+	Note  *string `json:"note,omitempty"`
+	KeyID *string `json:"key_id,omitempty"`
 	// The trusted device the decision came from; null when it came from a device that is not trusted.
 	TrustedDeviceID *string `json:"trusted_device_id,omitempty"`
 	DecidedAt       *int64  `json:"decided_at,omitempty"`
@@ -1675,8 +1794,12 @@ type ApprovalRequestsConsumeResult struct {
 	Binding          *string `json:"binding,omitempty"`
 	RequireSignature *bool   `json:"require_signature,omitempty"`
 	// The request only accepts an approval from a trusted device.
-	RequireTrustedDevice *bool                                   `json:"require_trusted_device,omitempty"`
-	Approvers            *ApprovalRequestsConsumeResultApprovers `json:"approvers,omitempty"`
+	RequireTrustedDevice *bool `json:"require_trusted_device,omitempty"`
+	// The user the request is about cannot decide it.
+	ExcludeRequester *bool `json:"exclude_requester,omitempty"`
+	// The step-up policy an approver may satisfy instead of a device signature.
+	StepUpPolicy *string                                 `json:"step_up_policy,omitempty"`
+	Approvers    *ApprovalRequestsConsumeResultApprovers `json:"approvers,omitempty"`
 	// SHA-256 of the canonical request (base64url): what an approver signs.
 	Digest *string `json:"digest,omitempty"`
 	// The exact text the approver is shown and signs.
@@ -4467,6 +4590,8 @@ type ConfigGetLimitsResultLimitsAppRoles struct {
 type ConfigGetLimitsResultLimitsPermissions struct {
 	MaxImpliedPerPermission *int64 `json:"max_implied_per_permission,omitempty"`
 	KeyMaxLength            *int64 `json:"key_max_length,omitempty"`
+	MaxParts                *int64 `json:"max_parts,omitempty"`
+	PartMaxLength           *int64 `json:"part_max_length,omitempty"`
 }
 
 // ConfigGetLimitsResultLimitsScopes is a typed object of the Backend API.
@@ -4791,6 +4916,19 @@ type ConnectionProviderTopicsSetResult struct {
 	Topics map[string][]string `json:"topics"`
 }
 
+// ConnectionProvidersListPoliciesItem is a typed object of the Backend API.
+type ConnectionProvidersListPoliciesItem struct {
+	Object           string `json:"object"`
+	Provider         string `json:"provider"`
+	UniqueExternalID bool   `json:"unique_external_id"`
+	HasWebhookSecret bool   `json:"has_webhook_secret"`
+	// eBay: whether the developer id for Platform Notifications is stored.
+	HasDevID *bool `json:"has_dev_id,omitempty"`
+	// Where to point the provider's uninstall or revocation notices; null for a provider without one.
+	EventsURL *string `json:"events_url,omitempty"`
+	UpdatedAt *int64  `json:"updated_at,omitempty"`
+}
+
 // ConnectionProvidersGetPolicyResult is a typed object of the Backend API.
 type ConnectionProvidersGetPolicyResult struct {
 	Object           string `json:"object"`
@@ -4890,6 +5028,27 @@ type ConnectionReconnectSettingsSetResult struct {
 	Providers []string `json:"providers"`
 }
 
+// ConnectionTemplatesListItem is a typed object of the Backend API.
+type ConnectionTemplatesListItem struct {
+	Object   string `json:"object"`
+	Provider string `json:"provider"`
+	Name     string `json:"name"`
+	// The connection kind to create.
+	Kind string `json:"kind"`
+	// connect: the owner authorizes in a browser (POST /v1/connections/{id}/connect). credentials: you
+	// enter the secrets (PUT /v1/connections/{id}/credentials). One of: connect, credentials.
+	Flow string `json:"flow"`
+	// The write-only secret fields the credential entry takes.
+	Secrets []string `json:"secrets"`
+	// Non-secret config to send with the connection.
+	Config       map[string]interface{} `json:"config"`
+	AllowedHosts []string               `json:"allowed_hosts"`
+	// host_params names the connection needs (for example the store host).
+	HostParams []string `json:"host_params"`
+	Signature  string   `json:"signature"`
+	Note       string   `json:"note"`
+}
+
 // ConnectionsCompleteOAuthParams is a typed object of the Backend API.
 type ConnectionsCompleteOAuthParams struct {
 	// The authorization code the provider sent to your redirect_uri.
@@ -4933,6 +5092,42 @@ type ConnectionsRegisterOAuthClientParams struct {
 	Scopes             []string `json:"scopes,omitempty"`
 	// One of: client_secret_basic, client_secret_post, private_key_jwt.
 	TokenEndpointAuthMethod *string `json:"token_endpoint_auth_method,omitempty"`
+}
+
+// ConnectionsRehomeParams is a typed object of the Backend API.
+type ConnectionsRehomeParams struct {
+	// The id of the OAuth client the connections hold now.
+	FromClient string `json:"from_client"`
+	// The id of the OAuth client to move them to (enabled).
+	ToClient string `json:"to_client"`
+	// Move only these connections (up to 1000 connections move per call).
+	ConnectionIDs []string `json:"connection_ids,omitempty"`
+	DryRun        *bool    `json:"dry_run,omitempty"`
+	// false is accepted only when both clients are the same provider app.
+	Verify *bool `json:"verify,omitempty"`
+}
+
+// ConnectionsRehomeResultDataItem is a typed object of the Backend API.
+type ConnectionsRehomeResultDataItem struct {
+	ConnectionID string `json:"connection_id"`
+	// One of: moved, would_move, would_verify, failed, skipped.
+	Status string `json:"status"`
+	// Why a connection did not move (refresh_failed, needs_reauth, not_connected, revoked).
+	Reason *string `json:"reason,omitempty"`
+}
+
+// ConnectionsRehomeResult is a typed object of the Backend API.
+type ConnectionsRehomeResult struct {
+	Object     string                            `json:"object"`
+	FromClient string                            `json:"from_client"`
+	ToClient   string                            `json:"to_client"`
+	DryRun     bool                              `json:"dry_run"`
+	SameApp    bool                              `json:"same_app"`
+	Moved      int64                             `json:"moved"`
+	WouldMove  int64                             `json:"would_move"`
+	Failed     int64                             `json:"failed"`
+	Skipped    int64                             `json:"skipped"`
+	Data       []ConnectionsRehomeResultDataItem `json:"data"`
 }
 
 // ConnectionsGetRelayLimitsResult is a typed object of the Backend API.
@@ -5489,7 +5684,7 @@ type ConnectionsTransferResult struct {
 	// browser step; client_credentials and jwt_bearer mint tokens from a credential Atlas holds;
 	// api_key, bearer, basic, custom_header and hmac_secret are typed secrets the owner enters. One
 	// of: oauth, api_key, client_credentials, bearer, basic, custom_header, hmac_secret, jwt_bearer,
-	// oauth1, github_app_installation, admin_consent.
+	// oauth1, github_app_installation, admin_consent, cookie_jar.
 	Kind     string `json:"kind"`
 	Provider string `json:"provider"`
 	// Your label for this account, for example "Support inbox".
@@ -6998,6 +7193,94 @@ type DiagnosticsGetTraceResult struct {
 	CreatedAt   int64                                `json:"created_at"`
 }
 
+// CustomDomain2VerificationLastObservation is a typed object of the Backend API.
+type CustomDomain2VerificationLastObservation struct {
+	// The HTTP status.
+	Status      int64   `json:"status"`
+	ContentType *string `json:"content_type,omitempty"`
+	// Body bytes seen; headers are not counted.
+	Bytes int64 `json:"bytes"`
+	// True when reading stopped at the 64 KiB read limit, so bytes is a lower bound.
+	BytesCapped bool `json:"bytes_capped"`
+	// The first 200 bytes of the body (printable characters only).
+	BodyPrefix string `json:"body_prefix"`
+	// The URL that answered, including the per-check atlas_nonce query parameter. Redirects are not
+	// followed.
+	FinalURL string `json:"final_url"`
+	// The Location of a 3xx answer.
+	RedirectTo *string `json:"redirect_to,omitempty"`
+	// The Age response header, when present.
+	Age *int64 `json:"age,omitempty"`
+	// The cf-cache-status or x-cache response header, when present.
+	CacheStatus *string `json:"cache_status,omitempty"`
+	IsHTML      *bool   `json:"is_html,omitempty"`
+	// True when age is above 0 or a cache header says HIT: a cache answered, not your origin.
+	ServedFromCache *bool `json:"served_from_cache,omitempty"`
+	// When the fetch ran (ms since epoch).
+	CheckedAt int64 `json:"checked_at"`
+}
+
+// CustomDomain2Verification: method path: the https file that proves the host. Its whole body is the token; the token is
+// bound to this instance, host and base path.
+type CustomDomain2Verification struct {
+	Method       string `json:"method"`
+	URL          string `json:"url"`
+	Token        string `json:"token"`
+	Content      string `json:"content"`
+	Instructions string `json:"instructions"`
+	// After a rotation: the replaced token's URL, which still verifies until previous_valid_until.
+	PreviousURL *string `json:"previous_url,omitempty"`
+	// After a rotation: when the replaced token stops working (ms since epoch).
+	PreviousValidUntil *int64 `json:"previous_valid_until,omitempty"`
+	// What the most recent failed verification fetch got back, so you can see what answered (a cache,
+	// a catch-all page) without guessing. Null until a check fails, and again after one passes.
+	LastObservation *CustomDomain2VerificationLastObservation `json:"last_observation,omitempty"`
+}
+
+// CustomDomain2DNS is a typed object of the Backend API.
+type CustomDomain2DNS struct {
+	// One of: cloudflare.
+	Provider string `json:"provider"`
+	TokenSet bool   `json:"token_set"`
+}
+
+// CustomDomain2: The `CustomDomain` object.
+type CustomDomain2 struct {
+	Object               string  `json:"object"`
+	ID                   string  `json:"id"`
+	Role                 string  `json:"role"`
+	Host                 string  `json:"host"`
+	Status               string  `json:"status"`
+	Action               string  `json:"action"`
+	Live                 bool    `json:"live"`
+	CNAMETarget          *string `json:"cname_target,omitempty"`
+	LastCheckedAt        *int64  `json:"last_checked_at,omitempty"`
+	LastObservedTarget   *string `json:"last_observed_target,omitempty"`
+	FailureReason        *string `json:"failure_reason,omitempty"`
+	CertificateExpiresAt *int64  `json:"certificate_expires_at,omitempty"`
+	CookieDomain         *string `json:"cookie_domain,omitempty"`
+	// cname: proven by a CNAME to Atlas. path: a path mount on your own host, proven by an https file.
+	// One of: cname, path.
+	Method *string `json:"method,omitempty"`
+	// method path: the prefix the Frontend API is served under.
+	BasePath *string `json:"base_path,omitempty"`
+	// method path, once verified: atlas_ingress (the host is on Atlas's ingress, which routes the
+	// prefix) or customer_proxy (add the reverse-proxy rule in instructions). One of: atlas_ingress,
+	// customer_proxy, None.
+	Routing *string `json:"routing,omitempty"`
+	// method path: the Frontend API (and, once verified, the issuer) — https://<host><base_path>.
+	FrontendAPIURL *string `json:"frontend_api_url,omitempty"`
+	// method path: the https file that proves the host. Its whole body is the token; the token is
+	// bound to this instance, host and base path.
+	Verification *CustomDomain2Verification `json:"verification,omitempty"`
+	// method path, once verified: type atlas_ingress (nothing to add) or reverse_proxy (upstream, the
+	// headers to forward, and nginx / Caddy / Traefik snippets).
+	Instructions map[string]interface{} `json:"instructions,omitempty"`
+	// DNS automation: the provider Atlas writes this host's record with. The API token is write-only
+	// and never returned.
+	DNS *CustomDomain2DNS `json:"dns,omitempty"`
+}
+
 // DSRConsoleGetSummaryResult is a typed object of the Backend API.
 type DSRConsoleGetSummaryResult struct {
 	Object  *string `json:"object,omitempty"`
@@ -8107,6 +8390,36 @@ type FraudSetEmailRiskSettingsResult struct {
 	UpdatedAt          *int64  `json:"updated_at,omitempty"`
 }
 
+// GrantsListItem is a typed object of the Backend API.
+type GrantsListItem struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// `consent` is the user's recorded consent; `managed` is an OpenID Grant Management grant
+	// (`grant_id`). One of: consent, managed.
+	Type           string  `json:"type"`
+	ClientID       *string `json:"client_id,omitempty"`
+	ClientName     *string `json:"client_name,omitempty"`
+	UserID         string  `json:"user_id"`
+	OrganizationID *string `json:"organization_id,omitempty"`
+	// One of: active, revoked.
+	Status string   `json:"status"`
+	Scopes []string `json:"scopes"`
+	// Managed grants: the API the grant covers.
+	Resource             *string                  `json:"resource,omitempty"`
+	AuthorizationDetails []map[string]interface{} `json:"authorization_details,omitempty"`
+	// Managed grants: bumped by every merge, replace and narrowing.
+	Revision *int64 `json:"revision,omitempty"`
+	// The JSON you set at consent accept or with PATCH. Never shown to the user.
+	Metadata  map[string]interface{} `json:"metadata"`
+	CreatedAt int64                  `json:"created_at"`
+	UpdatedAt *int64                 `json:"updated_at,omitempty"`
+	// The last time a token was issued or refreshed under the grant (Unix ms).
+	LastUsedAt *int64 `json:"last_used_at,omitempty"`
+	RevokedAt  *int64 `json:"revoked_at,omitempty"`
+	// Managed grants: client, user, admin or system.
+	RevokedBy *string `json:"revoked_by,omitempty"`
+}
+
 // GrantsConsumeParams is a typed object of the Backend API.
 type GrantsConsumeParams struct {
 	Counter string `json:"counter"`
@@ -8216,6 +8529,84 @@ type GrantsGetUsageResult struct {
 	Live      *bool                              `json:"live,omitempty"`
 	Counters  []GrantsGetUsageResultCountersItem `json:"counters,omitempty"`
 	Leases    []GrantsGetUsageResultLeasesItem   `json:"leases,omitempty"`
+}
+
+// GrantsGetResult is a typed object of the Backend API.
+type GrantsGetResult struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// `consent` is the user's recorded consent; `managed` is an OpenID Grant Management grant
+	// (`grant_id`). One of: consent, managed.
+	Type           string  `json:"type"`
+	ClientID       *string `json:"client_id,omitempty"`
+	ClientName     *string `json:"client_name,omitempty"`
+	UserID         string  `json:"user_id"`
+	OrganizationID *string `json:"organization_id,omitempty"`
+	// One of: active, revoked.
+	Status string   `json:"status"`
+	Scopes []string `json:"scopes"`
+	// Managed grants: the API the grant covers.
+	Resource             *string                  `json:"resource,omitempty"`
+	AuthorizationDetails []map[string]interface{} `json:"authorization_details,omitempty"`
+	// Managed grants: bumped by every merge, replace and narrowing.
+	Revision *int64 `json:"revision,omitempty"`
+	// The JSON you set at consent accept or with PATCH. Never shown to the user.
+	Metadata  map[string]interface{} `json:"metadata"`
+	CreatedAt int64                  `json:"created_at"`
+	UpdatedAt *int64                 `json:"updated_at,omitempty"`
+	// The last time a token was issued or refreshed under the grant (Unix ms).
+	LastUsedAt *int64 `json:"last_used_at,omitempty"`
+	RevokedAt  *int64 `json:"revoked_at,omitempty"`
+	// Managed grants: client, user, admin or system.
+	RevokedBy *string `json:"revoked_by,omitempty"`
+}
+
+// GrantsUpdateParams is a typed object of the Backend API.
+type GrantsUpdateParams struct {
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p GrantsUpdateParams) MarshalJSON() ([]byte, error) {
+	type plain GrantsUpdateParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// GrantsUpdateResult is a typed object of the Backend API.
+type GrantsUpdateResult struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// `consent` is the user's recorded consent; `managed` is an OpenID Grant Management grant
+	// (`grant_id`). One of: consent, managed.
+	Type           string  `json:"type"`
+	ClientID       *string `json:"client_id,omitempty"`
+	ClientName     *string `json:"client_name,omitempty"`
+	UserID         string  `json:"user_id"`
+	OrganizationID *string `json:"organization_id,omitempty"`
+	// One of: active, revoked.
+	Status string   `json:"status"`
+	Scopes []string `json:"scopes"`
+	// Managed grants: the API the grant covers.
+	Resource             *string                  `json:"resource,omitempty"`
+	AuthorizationDetails []map[string]interface{} `json:"authorization_details,omitempty"`
+	// Managed grants: bumped by every merge, replace and narrowing.
+	Revision *int64 `json:"revision,omitempty"`
+	// The JSON you set at consent accept or with PATCH. Never shown to the user.
+	Metadata  map[string]interface{} `json:"metadata"`
+	CreatedAt int64                  `json:"created_at"`
+	UpdatedAt *int64                 `json:"updated_at,omitempty"`
+	// The last time a token was issued or refreshed under the grant (Unix ms).
+	LastUsedAt *int64 `json:"last_used_at,omitempty"`
+	RevokedAt  *int64 `json:"revoked_at,omitempty"`
+	// Managed grants: client, user, admin or system.
+	RevokedBy *string `json:"revoked_by,omitempty"`
 }
 
 // IGAListActivationsItem is a typed object of the Backend API.
@@ -9110,6 +9501,287 @@ type InstanceRestoreConfigSnapshotResult struct {
 	AllowedOriginsChanged *bool                                            `json:"allowed_origins_changed,omitempty"`
 }
 
+// InstanceUpdateCookieConsentParamsSite: Name the CMP site by reference instead of site_id. Atlas looks up the verified site registered
+// for the host (or a parent domain) through the linked partner platform on every save and stores
+// both the reference and the resolved id; the check re-resolves when it fails. 400 when the
+// provider is not linked or no site matches the host.
+type InstanceUpdateCookieConsentParamsSite struct {
+	// The linked partner platform id, e.g. cookiemunch.
+	Provider string `json:"provider"`
+	// The host the site is registered for.
+	Host string `json:"host"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p InstanceUpdateCookieConsentParamsSite) MarshalJSON() ([]byte, error) {
+	type plain InstanceUpdateCookieConsentParamsSite
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// InstanceUpdateCookieConsentParamsSettingsLink: A "Cookie settings" link in the footer of the hosted sign-in, sign-up and account pages and Sign
+// in with Atlas pages, for reopening the CMP preferences. Needs a preset or at least one
+// attribute. null or omitted: no link. Unknown fields inside it are reported in
+// Atlas-Unknown-Fields (e.g. settings_link.foo).
+type InstanceUpdateCookieConsentParamsSettingsLink struct {
+	// The base link text (English), e.g. "Cookie settings".
+	Label string `json:"label"`
+	// Per-language link text, keyed by page locale (any language the hosted pages speak: en, es, fr,
+	// de, pt-BR, ja, nl, ar, he, fa, hi, zh-Hans, zh-Hant, ko, it, pl, tr, ru, sv, id, vi, th; any
+	// other key is refused with a 400). Each value is 1-60 characters. The hosted page renders
+	// labels[<page locale>], else (on a non-English page) the preset's own translation of "Cookie
+	// settings", else label.
+	Labels map[string]string `json:"labels,omitempty"`
+	// Fills in the CMP's reopen trigger: cookiemunch adds data-cc="show-settings"; cookiebot calls
+	// Cookiebot.renew(); onetrust calls OneTrust.ToggleInfoDisplay(); custom adds nothing (use
+	// attributes). One of: cookiemunch, cookiebot, onetrust, custom, None.
+	Preset *string `json:"preset,omitempty"`
+	// Extra attributes for the link. Allowed names: data-*, aria-*, id, class, and href (an https URL
+	// or a #fragment). Event handlers (on*), style and every other name are refused with a 400;
+	// data-atlas-* is reserved for presets. Values are at most 200 characters and are HTML-escaped.
+	Attributes map[string]string `json:"attributes,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p InstanceUpdateCookieConsentParamsSettingsLink) MarshalJSON() ([]byte, error) {
+	type plain InstanceUpdateCookieConsentParamsSettingsLink
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// InstanceUpdateCookieConsentParams: The whole setting (script_url required), or just { "enabled": false | true } to switch a stored
+// setting off or on without deleting it, or just { "host_aliases": [...] } to declare hosts.
+type InstanceUpdateCookieConsentParams struct {
+	// false keeps the configuration but renders nothing (no CMP script, no CSP origins, no settings
+	// link). Default true. Sent alone, it toggles the stored setting.
+	Enabled *bool `json:"enabled,omitempty"`
+	// Your CMP script URL. Must be https; its origin is added to the page CSP.
+	ScriptURL *string `json:"script_url,omitempty"`
+	// The <script id> some CMPs need.
+	ScriptID *string `json:"script_id,omitempty"`
+	// Your CMP site id (sent as data-cbid). Send this or site, not both.
+	SiteID *string `json:"site_id,omitempty"`
+	// Name the CMP site by reference instead of site_id. Atlas looks up the verified site registered
+	// for the host (or a parent domain) through the linked partner platform on every save and stores
+	// both the reference and the resolved id; the check re-resolves when it fails. 400 when the
+	// provider is not linked or no site matches the host.
+	Site *InstanceUpdateCookieConsentParamsSite `json:"site,omitempty"`
+	// The CMP prior-blocking mode, e.g. "auto" (sent as data-blockingmode).
+	BlockingMode *string `json:"blocking_mode,omitempty"`
+	// Other https URLs the CMP loads from or calls; each origin is added to the page CSP.
+	ExtraOrigins []string `json:"extra_origins,omitempty"`
+	// A "Cookie settings" link in the footer of the hosted sign-in, sign-up and account pages and Sign
+	// in with Atlas pages, for reopening the CMP preferences. Needs a preset or at least one
+	// attribute. null or omitted: no link. Unknown fields inside it are reported in
+	// Atlas-Unknown-Fields (e.g. settings_link.foo).
+	SettingsLink *InstanceUpdateCookieConsentParamsSettingsLink `json:"settings_link,omitempty"`
+	// page (default): the CMP tag on the hosted pages carries data-culture=<the page language>
+	// (?locale=, else Accept-Language), so the banner matches the page. browser: no data-culture; the
+	// CMP picks its own language. One of: page, browser, None.
+	Culture *string `json:"culture,omitempty"`
+	// Hosts the hosted pages are served on that your consent manager's site is knowingly not
+	// registered for, typically the instance's default `<slug>-fapi.atlasauth.net` host when your
+	// product has no domain of its own to register. Bare hostnames. A Cookie Munch site check that
+	// finds the site registered for another domain reads as ok on these hosts (no
+	// cmp_site_domain_mismatch). Sent alone ({ "host_aliases": [...] }) it sets only the aliases and
+	// keeps the CMP setting, also when an integration supplies the CMP; [] or null clears them.
+	// Omitted on a full PUT, they stay as they are. DELETE clears them.
+	HostAliases []string `json:"host_aliases,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p InstanceUpdateCookieConsentParams) MarshalJSON() ([]byte, error) {
+	type plain InstanceUpdateCookieConsentParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// InstanceUpdateCookieConsentResultSettingsLink is a typed object of the Backend API.
+type InstanceUpdateCookieConsentResultSettingsLink struct {
+	Label string `json:"label"`
+	// The per-locale labels you set.
+	Labels map[string]string `json:"labels"`
+	// The text the link renders on a page in each supported locale.
+	RenderedLabels map[string]string `json:"rendered_labels"`
+	// One of: cookiemunch, cookiebot, onetrust, custom, None.
+	Preset *string `json:"preset,omitempty"`
+	// The attributes you set.
+	Attributes map[string]string `json:"attributes"`
+	// The attributes the rendered link carries: yours plus the preset's trigger.
+	RenderedAttributes map[string]string `json:"rendered_attributes"`
+}
+
+// InstanceUpdateCookieConsentResultDeclaredCookiesItemLifetimeRange: Present when the lifetime follows an instance setting (session.absoluteMs for __atlas_rt,
+// __atlas_uat, __atlas_sessions and __atlas_fedcm): lifetime_seconds is this instance's value,
+// which wins over the default the product-wide embed manifest shows; min/max bound what any
+// instance can set.
+type InstanceUpdateCookieConsentResultDeclaredCookiesItemLifetimeRange struct {
+	Setting        string `json:"setting"`
+	MinSeconds     int64  `json:"min_seconds"`
+	MaxSeconds     int64  `json:"max_seconds"`
+	DefaultSeconds int64  `json:"default_seconds"`
+}
+
+// InstanceUpdateCookieConsentResultDeclaredCookiesItem is a typed object of the Backend API.
+type InstanceUpdateCookieConsentResultDeclaredCookiesItem struct {
+	// The exact name, or null when pattern describes a family of keys.
+	Name *string `json:"name,omitempty"`
+	// A * wildcard for keys with an id suffix, e.g. atlasid:*.
+	Pattern *string `json:"pattern,omitempty"`
+	// One of: cookie, localStorage, sessionStorage, indexedDB.
+	Store string `json:"store"`
+	// For a cookie: its Domain (a leading dot = your registrable domain and its subdomains, when
+	// cross-subdomain cookies are on) or the exact Frontend API host for a host-only cookie. For
+	// storage: "your app's origin".
+	Domain string `json:"domain"`
+	// For a cookie: the Path it is set at. On a path mount, __session and __atlas_uat stay at / (your
+	// app reads them) and every other Atlas cookie moves under the base path (/__atlas, /__atlas/v1,
+	// ...). Null for browser storage.
+	Path *string `json:"path,omitempty"`
+	// Seconds; null = browser session (cookie) or until cleared (storage).
+	LifetimeSeconds *int64 `json:"lifetime_seconds,omitempty"`
+	// The lifetime in words, for a cookie policy table.
+	Lifetime string `json:"lifetime"`
+	// Present when the lifetime follows an instance setting (session.absoluteMs for __atlas_rt,
+	// __atlas_uat, __atlas_sessions and __atlas_fedcm): lifetime_seconds is this instance's value,
+	// which wins over the default the product-wide embed manifest shows; min/max bound what any
+	// instance can set.
+	LifetimeRange *InstanceUpdateCookieConsentResultDeclaredCookiesItemLifetimeRange `json:"lifetime_range,omitempty"`
+	HTTPOnly      bool                                                               `json:"http_only"`
+	Category      string                                                             `json:"category"`
+	// English.
+	Purpose string `json:"purpose"`
+	// The purpose in every language the hosted pages speak, keyed by locale (en, es, fr, de, pt-BR,
+	// ja, nl, ar, he, fa, hi, zh-Hans, zh-Hant, ko, it, pl, tr, ru, sv, id, vi, th).
+	Purposes    map[string]string `json:"purposes"`
+	WrittenWhen string            `json:"written_when"`
+	// One of: atlas_frontend_api, atlas_sdk.
+	SetBy string `json:"set_by"`
+}
+
+// InstanceUpdateCookieConsentResultFrontendMode: How the Frontend API is served: default (the shared Atlas host), custom_domain (a CNAME), or
+// path_mount (base_path on your own host, routed by Atlas's ingress or by your reverse proxy; the
+// cookies are the same either way).
+type InstanceUpdateCookieConsentResultFrontendMode struct {
+	// One of: default, custom_domain, path_mount.
+	Type string `json:"type"`
+	// The bare host the cookies live on.
+	Host string `json:"host"`
+	// path_mount only: the prefix, e.g. /__atlas.
+	BasePath *string `json:"base_path,omitempty"`
+}
+
+// PreflightFinding2FixCall: Only where one exact Backend API call is the whole remedy: that call, ready to send. It is one
+// of the remedies fix describes, so read fix first.
+type PreflightFinding2FixCall struct {
+	// One of: POST, PUT, PATCH.
+	Method string                 `json:"method"`
+	Path   string                 `json:"path"`
+	Body   map[string]interface{} `json:"body,omitempty"`
+}
+
+// PreflightFinding2Acknowledged: Present when the code is acknowledged (PUT /v1/instance/preflight/acks/{code}): a known,
+// accepted warning or info finding that no longer counts. Never on an error.
+type PreflightFinding2Acknowledged struct {
+	Reason string `json:"reason"`
+	// The API key or dashboard user that acknowledged it.
+	By *string `json:"by,omitempty"`
+	// Epoch ms.
+	At int64 `json:"at"`
+	// Epoch ms; null = until removed.
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+}
+
+// PreflightFinding2: The `PreflightFinding` object.
+type PreflightFinding2 struct {
+	// One of: error, warning, info.
+	Severity string `json:"severity"`
+	// Stable snake_case identifier. Every code is listed by GET /v1/instance/preflight/codes.
+	Code string `json:"code"`
+	// What is wrong, in a plain sentence.
+	Message string `json:"message"`
+	// What to do about it, in a plain sentence.
+	Fix string `json:"fix"`
+	// Only where one exact Backend API call is the whole remedy: that call, ready to send. It is one
+	// of the remedies fix describes, so read fix first.
+	FixCall *PreflightFinding2FixCall `json:"fix_call,omitempty"`
+	// With fix_call: the complete body of that call, ready to send as it is.
+	AutofixBody map[string]interface{} `json:"autofix_body,omitempty"`
+	// With fix_call: true only when the call cannot lock anyone out or change sign-in for existing
+	// users.
+	SafeToAutofix *bool `json:"safe_to_autofix,omitempty"`
+	// Ids of what the finding is about (provider, id/client_id, origin, domain_id/host, site_id, …).
+	Subject map[string]string `json:"subject,omitempty"`
+	// Set on the security posture findings (weaker than the defaults new instances get). One of:
+	// security_posture.
+	Group *string `json:"group,omitempty"`
+	// Only with include_suppressed=true: the finding does not apply to how the instance integrates.
+	Suppressed *bool `json:"suppressed,omitempty"`
+	// Only with include_suppressed=true: why it does not apply.
+	SuppressedReason *string `json:"suppressed_reason,omitempty"`
+	// Present when the code is acknowledged (PUT /v1/instance/preflight/acks/{code}): a known,
+	// accepted warning or info finding that no longer counts. Never on an error.
+	Acknowledged *PreflightFinding2Acknowledged `json:"acknowledged,omitempty"`
+}
+
+// InstanceUpdateCookieConsentResult is a typed object of the Backend API.
+type InstanceUpdateCookieConsentResult struct {
+	Object string `json:"object"`
+	// Whether the CMP (and the settings link) render on the hosted pages.
+	Enabled bool `json:"enabled"`
+	// The CMP script URL (https).
+	ScriptURL *string `json:"script_url,omitempty"`
+	ScriptID  *string `json:"script_id,omitempty"`
+	SiteID    *string `json:"site_id,omitempty"`
+	// The site reference ({ provider, host }) when the site was named by reference; site_id is what it
+	// resolved to.
+	Site         map[string]interface{}                         `json:"site,omitempty"`
+	BlockingMode *string                                        `json:"blocking_mode,omitempty"`
+	ExtraOrigins []string                                       `json:"extra_origins,omitempty"`
+	SettingsLink *InstanceUpdateCookieConsentResultSettingsLink `json:"settings_link,omitempty"`
+	// page (default): the CMP tag carries data-culture=<page language>, the same tag as <html lang>.
+	// browser: no attribute. One of: page, browser.
+	Culture *string `json:"culture,omitempty"`
+	// Every cookie and browser-storage key Atlas writes for this instance, computed from its Frontend
+	// API host and cross-subdomain cookie setting. All strictly necessary. Present on the read.
+	DeclaredCookies []InstanceUpdateCookieConsentResultDeclaredCookiesItem `json:"declared_cookies,omitempty"`
+	// How the Frontend API is served: default (the shared Atlas host), custom_domain (a CNAME), or
+	// path_mount (base_path on your own host, routed by Atlas's ingress or by your reverse proxy; the
+	// cookies are the same either way).
+	FrontendMode *InstanceUpdateCookieConsentResultFrontendMode `json:"frontend_mode,omitempty"`
+	// Where the effective setting comes from: manual (PUT, always wins), integration (an enabled
+	// integration with a cmp, else a consent manager's outbound partner link), or none. One of:
+	// manual, integration, none.
+	Source *string `json:"source,omitempty"`
+	// With source integration: the integration id, or `partner_link:<link id>` when a partner link
+	// provides it.
+	SourceIntegration *string `json:"source_integration,omitempty"`
+	// The declared host aliases (see the PUT body).
+	HostAliases []string `json:"host_aliases,omitempty"`
+	// Findings from checking a Cookie Munch site id against Cookie Munch: cmp_site_unknown,
+	// cmp_site_domain_mismatch, or cmp_site_check_unavailable when Cookie Munch could not be reached.
+	// Empty when the site checks out or there is nothing to check. Never blocks the save.
+	Warnings []PreflightFinding2 `json:"warnings"`
+}
+
 // InstanceSetDataKeyProviderParams is a typed object of the Backend API.
 type InstanceSetDataKeyProviderParams struct {
 	CacheWindowSeconds *int64 `json:"cache_window_seconds,omitempty"`
@@ -9424,6 +10096,137 @@ type InstanceCreateExportsRevokeLinkResult struct {
 	CompletedAt *int64 `json:"completed_at,omitempty"`
 }
 
+// InstanceGetHooksBeforeFirstSessionResultLastCall: The outcome of the last call. Null until the first sign-in reaches the hook.
+type InstanceGetHooksBeforeFirstSessionResultLastCall struct {
+	At *int64 `json:"at,omitempty"`
+	// One of: ok, timeout, error, invalid_response.
+	Status *string `json:"status,omitempty"`
+	Error  *string `json:"error,omitempty"`
+}
+
+// InstanceGetHooksBeforeFirstSessionResult is a typed object of the Backend API.
+type InstanceGetHooksBeforeFirstSessionResult struct {
+	Object  string `json:"object"`
+	Enabled bool   `json:"enabled"`
+	// Your endpoint. https only (http only for localhost on a development instance).
+	URL *string `json:"url,omitempty"`
+	// Whether a signing secret is stored (the value is never returned).
+	SigningSecretSet bool `json:"signing_secret_set"`
+	// How long a sign-in waits for the hook (500-5000, default 3000).
+	TimeoutMs int64 `json:"timeout_ms"`
+	// The outcome of the last call. Null until the first sign-in reaches the hook.
+	LastCall *InstanceGetHooksBeforeFirstSessionResultLastCall `json:"last_call,omitempty"`
+	// Calls that failed since the last good one. A failed call lets the sign-in continue without an
+	// external_id; each one is also in the audit log (before_first_session_hook.failed).
+	FailedCalls *int64 `json:"failed_calls,omitempty"`
+	UpdatedAt   *int64 `json:"updated_at,omitempty"`
+}
+
+// InstanceUpdateHooksBeforeFirstSessionParams is a typed object of the Backend API.
+type InstanceUpdateHooksBeforeFirstSessionParams struct {
+	// Turning on requires url and signing_secret.
+	Enabled *bool `json:"enabled,omitempty"`
+	// https only (http only for localhost on a development instance); null clears.
+	URL *string `json:"url,omitempty"`
+	// Write-only, 16-512 characters; null clears.
+	SigningSecret *string `json:"signing_secret,omitempty"`
+	TimeoutMs     *int64  `json:"timeout_ms,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p InstanceUpdateHooksBeforeFirstSessionParams) MarshalJSON() ([]byte, error) {
+	type plain InstanceUpdateHooksBeforeFirstSessionParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// InstanceUpdateHooksBeforeFirstSessionResultLastCall: The outcome of the last call. Null until the first sign-in reaches the hook.
+type InstanceUpdateHooksBeforeFirstSessionResultLastCall struct {
+	At *int64 `json:"at,omitempty"`
+	// One of: ok, timeout, error, invalid_response.
+	Status *string `json:"status,omitempty"`
+	Error  *string `json:"error,omitempty"`
+}
+
+// InstanceUpdateHooksBeforeFirstSessionResult is a typed object of the Backend API.
+type InstanceUpdateHooksBeforeFirstSessionResult struct {
+	Object  string `json:"object"`
+	Enabled bool   `json:"enabled"`
+	// Your endpoint. https only (http only for localhost on a development instance).
+	URL *string `json:"url,omitempty"`
+	// Whether a signing secret is stored (the value is never returned).
+	SigningSecretSet bool `json:"signing_secret_set"`
+	// How long a sign-in waits for the hook (500-5000, default 3000).
+	TimeoutMs int64 `json:"timeout_ms"`
+	// The outcome of the last call. Null until the first sign-in reaches the hook.
+	LastCall *InstanceUpdateHooksBeforeFirstSessionResultLastCall `json:"last_call,omitempty"`
+	// Calls that failed since the last good one. A failed call lets the sign-in continue without an
+	// external_id; each one is also in the audit log (before_first_session_hook.failed).
+	FailedCalls *int64 `json:"failed_calls,omitempty"`
+	UpdatedAt   *int64 `json:"updated_at,omitempty"`
+}
+
+// InstanceDeleteHooksBeforeFirstSessionResultLastCall: The outcome of the last call. Null until the first sign-in reaches the hook.
+type InstanceDeleteHooksBeforeFirstSessionResultLastCall struct {
+	At *int64 `json:"at,omitempty"`
+	// One of: ok, timeout, error, invalid_response.
+	Status *string `json:"status,omitempty"`
+	Error  *string `json:"error,omitempty"`
+}
+
+// InstanceDeleteHooksBeforeFirstSessionResult is a typed object of the Backend API.
+type InstanceDeleteHooksBeforeFirstSessionResult struct {
+	Object  string `json:"object"`
+	Enabled bool   `json:"enabled"`
+	// Your endpoint. https only (http only for localhost on a development instance).
+	URL *string `json:"url,omitempty"`
+	// Whether a signing secret is stored (the value is never returned).
+	SigningSecretSet bool `json:"signing_secret_set"`
+	// How long a sign-in waits for the hook (500-5000, default 3000).
+	TimeoutMs int64 `json:"timeout_ms"`
+	// The outcome of the last call. Null until the first sign-in reaches the hook.
+	LastCall *InstanceDeleteHooksBeforeFirstSessionResultLastCall `json:"last_call,omitempty"`
+	// Calls that failed since the last good one. A failed call lets the sign-in continue without an
+	// external_id; each one is also in the audit log (before_first_session_hook.failed).
+	FailedCalls *int64 `json:"failed_calls,omitempty"`
+	UpdatedAt   *int64 `json:"updated_at,omitempty"`
+}
+
+// InstanceTestHookBeforeFirstSessionResultAnswer is a typed object of the Backend API.
+type InstanceTestHookBeforeFirstSessionResultAnswer struct {
+	ExternalID *string `json:"external_id,omitempty"`
+}
+
+// InstanceTestHookBeforeFirstSessionResultError is a typed object of the Backend API.
+type InstanceTestHookBeforeFirstSessionResultError struct {
+	// timeout, error, invalid_response or not_configured.
+	Code    *string `json:"code,omitempty"`
+	Message *string `json:"message,omitempty"`
+}
+
+// InstanceTestHookBeforeFirstSessionResult is a typed object of the Backend API.
+type InstanceTestHookBeforeFirstSessionResult struct {
+	// True when the receiver answered as a working one should (2xx for a webhook; a valid answer or a
+	// deny for a hook). Null while a webhook test is only queued (no ?wait).
+	Ok *bool `json:"ok,omitempty"`
+	// success or failed once attempted; pending while a webhook test is queued. One of: success,
+	// failed, pending.
+	Status string `json:"status"`
+	// The HTTP status the receiver answered with; null when no answer came (timeout, network error) or
+	// nothing was sent yet.
+	HTTPStatus *int64 `json:"http_status,omitempty"`
+	// How long the attempt took; null when nothing was sent yet.
+	LatencyMs *int64                                          `json:"latency_ms,omitempty"`
+	Answer    *InstanceTestHookBeforeFirstSessionResultAnswer `json:"answer,omitempty"`
+	Error     *InstanceTestHookBeforeFirstSessionResultError  `json:"error,omitempty"`
+}
+
 // InstanceGetImpersonationPolicyResult is a typed object of the Backend API.
 type InstanceGetImpersonationPolicyResult struct {
 	Object             string   `json:"object"`
@@ -9568,6 +10371,100 @@ type InstanceGetImportResult struct {
 	CompletedAt *int64 `json:"completed_at,omitempty"`
 }
 
+// InstanceGetIntegrationsForwardingResult is a typed object of the Backend API.
+type InstanceGetIntegrationsForwardingResult struct {
+	Object *string `json:"object,omitempty"`
+	// One of: lucida, hermetica, seolyticize, webhook.
+	Forwarding *string `json:"forwarding,omitempty"`
+	Event      *string `json:"event,omitempty"`
+	// The managed webhook endpoint.
+	ID     *string `json:"id,omitempty"`
+	Active *bool   `json:"active,omitempty"`
+}
+
+// InstanceSetIntegrationsForwardingParams is a typed object of the Backend API.
+type InstanceSetIntegrationsForwardingParams struct {
+	// lucida, hermetica, seolyticize: the destination's server-side key (write-only).
+	ServerKey *string `json:"server_key,omitempty"`
+	// seolyticize: the site key.
+	SiteKey *string `json:"site_key,omitempty"`
+	// seolyticize: an https page of the site, used when a sign-up's visit is unknown to Seolyticize.
+	// Defaults to the first https allowed origin.
+	SiteURL *string `json:"site_url,omitempty"`
+	// lucida, hermetica: an https host other than the default.
+	Host *string `json:"host,omitempty"`
+	// seolyticize: which event records the conversion. One of: user.created, user.attributed.
+	ConversionEvent *string `json:"conversion_event,omitempty"`
+	// lucida, seolyticize: send email, name, ip and user agent. Default false.
+	IncludePII *bool `json:"include_pii,omitempty"`
+	// webhook: the https receiver.
+	URL    *string `json:"url,omitempty"`
+	Active *bool   `json:"active,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p InstanceSetIntegrationsForwardingParams) MarshalJSON() ([]byte, error) {
+	type plain InstanceSetIntegrationsForwardingParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// InstanceSetIntegrationsForwardingResult is a typed object of the Backend API.
+type InstanceSetIntegrationsForwardingResult struct {
+	Object *string `json:"object,omitempty"`
+	// One of: lucida, hermetica, seolyticize, webhook.
+	Forwarding *string `json:"forwarding,omitempty"`
+	Event      *string `json:"event,omitempty"`
+	Created    *bool   `json:"created,omitempty"`
+	// The managed webhook endpoint.
+	ID *string `json:"id,omitempty"`
+	// webhook only, on create: the signing secret, shown once.
+	Secret *string `json:"secret,omitempty"`
+}
+
+// InstanceListIntegrationsHealthResultDataItemLastFailure is a typed object of the Backend API.
+type InstanceListIntegrationsHealthResultDataItemLastFailure struct {
+	At     *int64  `json:"at,omitempty"`
+	Status *int64  `json:"status,omitempty"`
+	Error  *string `json:"error,omitempty"`
+}
+
+// InstanceListIntegrationsHealthResultDataItem is a typed object of the Backend API.
+type InstanceListIntegrationsHealthResultDataItem struct {
+	// One of: webhook_endpoint, integration, privacy_orchestrator.
+	Kind string  `json:"kind"`
+	ID   *string `json:"id,omitempty"`
+	Name *string `json:"name,omitempty"`
+	URL  *string `json:"url,omitempty"`
+	// The connected platform that owns it, if any.
+	ManagedBy *string `json:"managed_by,omitempty"`
+	// The receiver type: https, a destination such as lucida, events_receiver, tokens_only or
+	// case_api.
+	Destination *string `json:"destination,omitempty"`
+	// One of: healthy, failing, disabled, inactive, no_deliveries, unknown.
+	State               string                                                   `json:"state"`
+	LastSuccessAt       *int64                                                   `json:"last_success_at,omitempty"`
+	LastFailure         *InstanceListIntegrationsHealthResultDataItemLastFailure `json:"last_failure,omitempty"`
+	ConsecutiveFailures *int64                                                   `json:"consecutive_failures,omitempty"`
+	// integration only: the last token minted for it.
+	LastMintedAt *int64 `json:"last_minted_at,omitempty"`
+}
+
+// InstanceListIntegrationsHealthResult is a typed object of the Backend API.
+type InstanceListIntegrationsHealthResult struct {
+	Object         string                                         `json:"object"`
+	Data           []InstanceListIntegrationsHealthResultDataItem `json:"data"`
+	HasMore        *bool                                          `json:"has_more,omitempty"`
+	UnhealthyCount int64                                          `json:"unhealthy_count"`
+	GeneratedAt    *int64                                         `json:"generated_at,omitempty"`
+}
+
 // InstanceListIntegrationsMintsItem is a typed object of the Backend API.
 type InstanceListIntegrationsMintsItem struct {
 	Object      string `json:"object"`
@@ -9621,6 +10518,18 @@ type InstanceTestIntegrationResult struct {
 	WillRetry *bool   `json:"will_retry,omitempty"`
 	ID        *string `json:"id,omitempty"`
 	Note      *string `json:"note,omitempty"`
+}
+
+// InstanceGetIssuersResult is a typed object of the Backend API.
+type InstanceGetIssuersResult struct {
+	// The `iss` new tokens carry now.
+	Active string `json:"active"`
+	// The `iss` after a pending domain claim goes active, else null.
+	Planned *string `json:"planned,omitempty"`
+	// Earlier issuers still accepted.
+	Previous []string `json:"previous"`
+	// The key set that verifies tokens of every issuer listed.
+	JWKSURI string `json:"jwks_uri"`
 }
 
 // InstanceListOpKeysItem is a typed object of the Backend API.
@@ -9829,20 +10738,29 @@ type InstanceListScopesItem struct {
 	Description            map[string]string `json:"description,omitempty"`
 	Sensitive              *bool             `json:"sensitive,omitempty"`
 	RequiresVerifiedClient *bool             `json:"requires_verified_client,omitempty"`
+	// One of: any, verified, certified.
+	RequiresClientLevel *string `json:"requires_client_level,omitempty"`
+	OwnerExempt         *bool   `json:"owner_exempt,omitempty"`
+	Wildcard            *bool   `json:"wildcard,omitempty"`
 }
 
 // InstanceSetScopesParamsScopesItem is a typed object of the Backend API.
 type InstanceSetScopesParamsScopesItem struct {
 	// 1-64 characters of letters, digits and : . _ -
 	Name string `json:"name"`
-	// Title per locale, e.g. { "en": "Read listings", "es": "Leer anuncios" }. Up to 200 characters
-	// each; longer is refused with 422, never cut.
+	// Title per locale, e.g. { "en": "Read listings", "es": "Leer anuncios" }. Up to 500 characters
+	// each; longer is refused with 422 unless ?too_long=truncate.
 	Label map[string]string `json:"label,omitempty"`
-	// Explanation per locale. Up to 500 characters each; longer is refused with 422 (param
-	// scopes.<n>.description), never cut.
+	// Explanation per locale. Up to 2000 characters each; longer is refused with 422 (param
+	// scopes.<n>.description) unless ?too_long=truncate.
 	Description            map[string]string `json:"description,omitempty"`
 	Sensitive              *bool             `json:"sensitive,omitempty"`
 	RequiresVerifiedClient *bool             `json:"requires_verified_client,omitempty"`
+	// The client level that may request the scope. One of: any, verified, certified.
+	RequiresClientLevel *string `json:"requires_client_level,omitempty"`
+	// The developer who owns a client may request the scope with it on their own account whatever its
+	// level.
+	OwnerExempt *bool `json:"owner_exempt,omitempty"`
 	// ClearFields lists JSON field names to send as null, which clears them on the server.
 	// Fields left unset are omitted.
 	ClearFields []string `json:"-"`
@@ -9942,7 +10860,12 @@ type InstanceCreateSecretKeyParams struct {
 	// A named scope set instead of `scopes[]`. `app-runtime`: what an app server needs to run: read
 	// users, read and write sessions, organizations (memberships and policy) and SSO connections, read
 	// preflight. No webhook secret reveal or rotation, no instance settings writes, no key management.
-	// Send either preset or scopes. One of: app-runtime.
+	// `web-app`: a web app's server: read and delete users, read and revoke sessions, privacy
+	// requests. `provisioning`: a deploy script's key (instance settings, domains, messaging,
+	// webhooks, OAuth, branding, keys). `integrations`: the key a connected platform's connect flow
+	// needs: instance settings, webhook endpoints, OAuth clients, keys, and the executor scopes
+	// `privacy:execute` and `privacy:grants:revoke` it mints its narrower key from. Send either preset
+	// or scopes. One of: app-runtime, web-app, provisioning, integrations.
 	Preset *string `json:"preset,omitempty"`
 	// Unix ms or ISO 8601; at most one year away. Default one year from now.
 	ExpiresAt  interface{} `json:"expires_at,omitempty"`
@@ -10110,6 +11033,245 @@ type InstanceDeleteSigningKeyScheduleResult struct {
 	Object  string `json:"object"`
 	Deleted bool   `json:"deleted"`
 	Enabled *bool  `json:"enabled,omitempty"`
+}
+
+// InstanceListStagingCopiesItem is a typed object of the Backend API.
+type InstanceListStagingCopiesItem struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// One of: clone, preview.
+	Kind string `json:"kind"`
+	// The new environment name (a preview is `preview-` and a slug of its ref).
+	Name string  `json:"name"`
+	Ref  *string `json:"ref,omitempty"`
+	// `copying` while a large clone is filled by a background job; poll GET until `completed` or
+	// `failed`. One of: pending, copying, completed, failed, deleted.
+	Status string `json:"status"`
+	// While copying: `sections.<name>` = { total, copied } rows.
+	Progress         map[string]interface{} `json:"progress,omitempty"`
+	SourceInstanceID string                 `json:"source_instance_id"`
+	// The new instance.
+	InstanceID      *string  `json:"instance_id,omitempty"`
+	Environment     string   `json:"environment"`
+	PublishableKey  *string  `json:"publishable_key,omitempty"`
+	FrontendAPIHost *string  `json:"frontend_api_host,omitempty"`
+	AllowedOrigins  []string `json:"allowed_origins,omitempty"`
+	Include         []string `json:"include"`
+	MaskEmails      bool     `json:"mask_emails"`
+	// What was copied, per section.
+	Counts map[string]interface{} `json:"counts,omitempty"`
+	// What could not be placed (at most 100).
+	Errors []map[string]interface{} `json:"errors,omitempty"`
+	// Epoch ms.
+	ExpiresAt *int64  `json:"expires_at,omitempty"`
+	CreatedBy *string `json:"created_by,omitempty"`
+	// Epoch ms.
+	CreatedAt int64 `json:"created_at"`
+	// Epoch ms.
+	CompletedAt *int64 `json:"completed_at,omitempty"`
+	// Epoch ms.
+	DeletedAt *int64 `json:"deleted_at,omitempty"`
+}
+
+// InstanceCreateStagingCopyParams is a typed object of the Backend API.
+type InstanceCreateStagingCopyParams struct {
+	// clone: a named environment that stays. preview: a short-lived one for a pull request, keyed on
+	// ref. One of: clone, preview.
+	Mode string `json:"mode"`
+	// mode clone only: the environment name (lowercase letters, digits, hyphens; not development,
+	// production or starting with preview-).
+	Name *string `json:"name,omitempty"`
+	// A stable handle, e.g. a pull request number. Required for a preview. One live clone per ref: a
+	// repeat returns it (200) instead of creating another.
+	Ref *string `json:"ref,omitempty"`
+	// What to copy. Default: config and roles. memberships needs users and organizations. A section
+	// over 2000 rows is refused: move it with a tenant export and import.
+	Include []string `json:"include,omitempty"`
+	// Default true: user email addresses are replaced with unreachable ones and phone numbers,
+	// usernames and linked identities are left out. false keeps them.
+	MaskEmails *bool `json:"mask_emails,omitempty"`
+	// mode preview only: hours until the preview is deleted (default 72).
+	TTLHours *int64 `json:"ttl_hours,omitempty"`
+	// The origins the new instance accepts (e.g. the preview URL). Not copied from the source.
+	AllowedOrigins []string `json:"allowed_origins,omitempty"`
+	// With an existing ref: re-apply the source's configuration to the clone and restart a preview's
+	// clock.
+	Refresh *bool `json:"refresh,omitempty"`
+	// Platform API only. Scopes of the secret key minted for the new instance (default app-runtime).
+	// One of: app-runtime, full.
+	SecretKeyPreset *string `json:"secret_key_preset,omitempty"`
+}
+
+// InstanceCreateStagingCopyResult is a typed object of the Backend API.
+type InstanceCreateStagingCopyResult struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// One of: clone, preview.
+	Kind string `json:"kind"`
+	// The new environment name (a preview is `preview-` and a slug of its ref).
+	Name string  `json:"name"`
+	Ref  *string `json:"ref,omitempty"`
+	// `copying` while a large clone is filled by a background job; poll GET until `completed` or
+	// `failed`. One of: pending, copying, completed, failed, deleted.
+	Status string `json:"status"`
+	// While copying: `sections.<name>` = { total, copied } rows.
+	Progress         map[string]interface{} `json:"progress,omitempty"`
+	SourceInstanceID string                 `json:"source_instance_id"`
+	// The new instance.
+	InstanceID      *string  `json:"instance_id,omitempty"`
+	Environment     string   `json:"environment"`
+	PublishableKey  *string  `json:"publishable_key,omitempty"`
+	FrontendAPIHost *string  `json:"frontend_api_host,omitempty"`
+	AllowedOrigins  []string `json:"allowed_origins,omitempty"`
+	Include         []string `json:"include"`
+	MaskEmails      bool     `json:"mask_emails"`
+	// What was copied, per section.
+	Counts map[string]interface{} `json:"counts,omitempty"`
+	// What could not be placed (at most 100).
+	Errors []map[string]interface{} `json:"errors,omitempty"`
+	// Epoch ms.
+	ExpiresAt *int64  `json:"expires_at,omitempty"`
+	CreatedBy *string `json:"created_by,omitempty"`
+	// Epoch ms.
+	CreatedAt int64 `json:"created_at"`
+	// Epoch ms.
+	CompletedAt *int64 `json:"completed_at,omitempty"`
+	// Epoch ms.
+	DeletedAt *int64 `json:"deleted_at,omitempty"`
+	// The new instance's first secret key, shown once (null on a repeat for the same ref).
+	Secret          *string  `json:"secret,omitempty"`
+	SecretKeyScopes []string `json:"secret_key_scopes,omitempty"`
+	Replayed        *bool    `json:"replayed,omitempty"`
+	Note            *string  `json:"note,omitempty"`
+}
+
+// InstanceGetStagingCopyResult is a typed object of the Backend API.
+type InstanceGetStagingCopyResult struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// One of: clone, preview.
+	Kind string `json:"kind"`
+	// The new environment name (a preview is `preview-` and a slug of its ref).
+	Name string  `json:"name"`
+	Ref  *string `json:"ref,omitempty"`
+	// `copying` while a large clone is filled by a background job; poll GET until `completed` or
+	// `failed`. One of: pending, copying, completed, failed, deleted.
+	Status string `json:"status"`
+	// While copying: `sections.<name>` = { total, copied } rows.
+	Progress         map[string]interface{} `json:"progress,omitempty"`
+	SourceInstanceID string                 `json:"source_instance_id"`
+	// The new instance.
+	InstanceID      *string  `json:"instance_id,omitempty"`
+	Environment     string   `json:"environment"`
+	PublishableKey  *string  `json:"publishable_key,omitempty"`
+	FrontendAPIHost *string  `json:"frontend_api_host,omitempty"`
+	AllowedOrigins  []string `json:"allowed_origins,omitempty"`
+	Include         []string `json:"include"`
+	MaskEmails      bool     `json:"mask_emails"`
+	// What was copied, per section.
+	Counts map[string]interface{} `json:"counts,omitempty"`
+	// What could not be placed (at most 100).
+	Errors []map[string]interface{} `json:"errors,omitempty"`
+	// Epoch ms.
+	ExpiresAt *int64  `json:"expires_at,omitempty"`
+	CreatedBy *string `json:"created_by,omitempty"`
+	// Epoch ms.
+	CreatedAt int64 `json:"created_at"`
+	// Epoch ms.
+	CompletedAt *int64 `json:"completed_at,omitempty"`
+	// Epoch ms.
+	DeletedAt *int64 `json:"deleted_at,omitempty"`
+}
+
+// InstanceDeleteStagingCopyResult is a typed object of the Backend API.
+type InstanceDeleteStagingCopyResult struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// One of: clone, preview.
+	Kind string `json:"kind"`
+	// The new environment name (a preview is `preview-` and a slug of its ref).
+	Name string  `json:"name"`
+	Ref  *string `json:"ref,omitempty"`
+	// `copying` while a large clone is filled by a background job; poll GET until `completed` or
+	// `failed`. One of: pending, copying, completed, failed, deleted.
+	Status string `json:"status"`
+	// While copying: `sections.<name>` = { total, copied } rows.
+	Progress         map[string]interface{} `json:"progress,omitempty"`
+	SourceInstanceID string                 `json:"source_instance_id"`
+	// The new instance.
+	InstanceID      *string  `json:"instance_id,omitempty"`
+	Environment     string   `json:"environment"`
+	PublishableKey  *string  `json:"publishable_key,omitempty"`
+	FrontendAPIHost *string  `json:"frontend_api_host,omitempty"`
+	AllowedOrigins  []string `json:"allowed_origins,omitempty"`
+	Include         []string `json:"include"`
+	MaskEmails      bool     `json:"mask_emails"`
+	// What was copied, per section.
+	Counts map[string]interface{} `json:"counts,omitempty"`
+	// What could not be placed (at most 100).
+	Errors []map[string]interface{} `json:"errors,omitempty"`
+	// Epoch ms.
+	ExpiresAt *int64  `json:"expires_at,omitempty"`
+	CreatedBy *string `json:"created_by,omitempty"`
+	// Epoch ms.
+	CreatedAt int64 `json:"created_at"`
+	// Epoch ms.
+	CompletedAt *int64 `json:"completed_at,omitempty"`
+	// Epoch ms.
+	DeletedAt *int64 `json:"deleted_at,omitempty"`
+}
+
+// InstanceRefreshStagingCopyParamsSyntheticUsers is a typed object of the Backend API.
+type InstanceRefreshStagingCopyParamsSyntheticUsers struct {
+	Count int64  `json:"count"`
+	Seed  string `json:"seed"`
+}
+
+// InstanceRefreshStagingCopyParams is a typed object of the Backend API.
+type InstanceRefreshStagingCopyParams struct {
+	// Default: config only.
+	Include        []string                                        `json:"include,omitempty"`
+	SyntheticUsers *InstanceRefreshStagingCopyParamsSyntheticUsers `json:"synthetic_users,omitempty"`
+	// A preview only: a new deadline from now.
+	TTLHours *int64 `json:"ttl_hours,omitempty"`
+}
+
+// InstanceRefreshStagingCopyResult is a typed object of the Backend API.
+type InstanceRefreshStagingCopyResult struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// One of: clone, preview.
+	Kind string `json:"kind"`
+	// The new environment name (a preview is `preview-` and a slug of its ref).
+	Name string  `json:"name"`
+	Ref  *string `json:"ref,omitempty"`
+	// `copying` while a large clone is filled by a background job; poll GET until `completed` or
+	// `failed`. One of: pending, copying, completed, failed, deleted.
+	Status string `json:"status"`
+	// While copying: `sections.<name>` = { total, copied } rows.
+	Progress         map[string]interface{} `json:"progress,omitempty"`
+	SourceInstanceID string                 `json:"source_instance_id"`
+	// The new instance.
+	InstanceID      *string  `json:"instance_id,omitempty"`
+	Environment     string   `json:"environment"`
+	PublishableKey  *string  `json:"publishable_key,omitempty"`
+	FrontendAPIHost *string  `json:"frontend_api_host,omitempty"`
+	AllowedOrigins  []string `json:"allowed_origins,omitempty"`
+	Include         []string `json:"include"`
+	MaskEmails      bool     `json:"mask_emails"`
+	// What was copied, per section.
+	Counts map[string]interface{} `json:"counts,omitempty"`
+	// What could not be placed (at most 100).
+	Errors []map[string]interface{} `json:"errors,omitempty"`
+	// Epoch ms.
+	ExpiresAt *int64  `json:"expires_at,omitempty"`
+	CreatedBy *string `json:"created_by,omitempty"`
+	// Epoch ms.
+	CreatedAt int64 `json:"created_at"`
+	// Epoch ms.
+	CompletedAt *int64 `json:"completed_at,omitempty"`
+	// Epoch ms.
+	DeletedAt *int64 `json:"deleted_at,omitempty"`
 }
 
 // UserTraitsSchema: The `UserTraitsSchema` object.
@@ -10930,6 +12092,30 @@ type MachineTrustPoliciesTestResult struct {
 	Reasons []string `json:"reasons"`
 }
 
+// MachinesListRevokedItemRevokedBy is a typed object of the Backend API.
+type MachinesListRevokedItemRevokedBy struct {
+	Type *string `json:"type,omitempty"`
+	ID   *string `json:"id,omitempty"`
+}
+
+// MachinesListRevokedItem is a typed object of the Backend API.
+type MachinesListRevokedItem struct {
+	// One of: machine, machine_grant.
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// `machine_grant` entries: the machine the grant belonged to.
+	MachineID *string `json:"machine_id,omitempty"`
+	// `machine_grant` entries: the resource server identifier, the `aud` of the tokens it covered.
+	Audience  *string `json:"audience,omitempty"`
+	RevokedAt int64   `json:"revoked_at"`
+	// Secret-key callers only.
+	RevokedReason *string `json:"revoked_reason,omitempty"`
+	// Secret-key callers only.
+	RevokedBy      *MachinesListRevokedItemRevokedBy `json:"revoked_by,omitempty"`
+	OwnerUserID    *string                           `json:"owner_user_id,omitempty"`
+	OrganizationID *string                           `json:"organization_id,omitempty"`
+}
+
 // MachinesUpdateGrantParams is a typed object of the Backend API.
 type MachinesUpdateGrantParams struct {
 	Scopes           []string               `json:"scopes,omitempty"`
@@ -11366,6 +12552,24 @@ type MCPRegistryDecideResult struct {
 	CreatedAt   *int64  `json:"created_at,omitempty"`
 }
 
+// MessageLinksCreateParams is a typed object of the Backend API.
+type MessageLinksCreateParams struct {
+	Email string `json:"email"`
+	// One of: unsubscribe, preferences.
+	Type string `json:"type"`
+	// One of your optional notification categories. Required for `unsubscribe`, not allowed for
+	// `preferences`.
+	Category *string `json:"category,omitempty"`
+}
+
+// MessageLinksCreateResult is a typed object of the Backend API.
+type MessageLinksCreateResult struct {
+	Object string `json:"object"`
+	// One of: unsubscribe, preferences.
+	Type string `json:"type"`
+	URL  string `json:"url"`
+}
+
 // MessageReceiversListItem is a typed object of the Backend API.
 type MessageReceiversListItem struct {
 	Object string `json:"object"`
@@ -11477,6 +12681,13 @@ type MessagesListItem struct {
 	// Enough to recognise the recipient (`jo***@ex***.com`, `+1•••••0123`), not enough to use. The
 	// address itself is never stored in the ledger.
 	RecipientMasked string `json:"recipient_masked"`
+	// `auth` for Atlas's own sign-in mail, `transactional` for mail you sent with POST /v1/messages.
+	// One of: auth, transactional.
+	Category *string `json:"category,omitempty"`
+	// The `category` you sent with POST /v1/messages (one of your notification categories), or null.
+	MessageCategory *string `json:"message_category,omitempty"`
+	// The tags you sent with a transactional message.
+	Tags map[string]string `json:"tags,omitempty"`
 	// A keyed hash of the recipient, stable within the instance. Search with ?recipient=.
 	RecipientHash string `json:"recipient_hash"`
 	// ISO country of a phone number.
@@ -11496,6 +12707,160 @@ type MessagesListItem struct {
 	CreatedAt int64 `json:"created_at"`
 	// Epoch ms.
 	UpdatedAt int64 `json:"updated_at"`
+}
+
+// MessagesCreateParams is a typed object of the Backend API.
+type MessagesCreateParams struct {
+	To interface{} `json:"to"`
+	// A template name or id. Not together with subject/html/text.
+	Template *string `json:"template,omitempty"`
+	// Variables for the template's {{placeholders}}.
+	Data map[string]interface{} `json:"data,omitempty"`
+	// Required without a template; one line.
+	Subject *string `json:"subject,omitempty"`
+	// Up to 512 KB, sent as given.
+	HTML *string `json:"html,omitempty"`
+	// Up to 256 KB. Send html, text or both.
+	Text *string `json:"text,omitempty"`
+	// Labels returned on the message. Keys are 1-40 letters, digits, _ . : or -.
+	Tags map[string]string `json:"tags,omitempty"`
+	// Where replies go: an address, or { email, name }. Passed to your provider as Reply-To.
+	ReplyTo interface{} `json:"reply_to,omitempty"`
+	// Send as this address instead of the configured sender. Its domain must be your verified sending
+	// domain, exactly (422 FROM_DOMAIN_NOT_VERIFIED otherwise).
+	From interface{} `json:"from,omitempty"`
+	// Extra headers. Only List-Unsubscribe, List-Unsubscribe-Post (List-Unsubscribe=One-Click) and
+	// X-Entity-Ref-ID are accepted; values are one line. Any other header is a 400.
+	Headers map[string]string `json:"headers,omitempty"`
+	// An https URL: sets List-Unsubscribe and List-Unsubscribe-Post (one-click, RFC 8058). Not
+	// together with unsubscribe or a List-Unsubscribe header.
+	UnsubscribeURL *string `json:"unsubscribe_url,omitempty"`
+	// Atlas generates a one-click unsubscribe link for each recipient, scoped to `category`, sets the
+	// headers and fills {{unsubscribe_url}} in the body. Needs `category`.
+	Unsubscribe *bool `json:"unsubscribe,omitempty"`
+	// One of your notification categories (POST /v1/notification_categories). A recipient who opted
+	// out of it (an unsubscribe, the preference page, or the user's own preference) is not mailed: the
+	// message is recorded as suppressed. Built-in non-optional categories cannot be opted out of.
+	Category *string `json:"category,omitempty"`
+	// With a template: the language copy to send (a tag such as fr or pt-BR). Default: the user's own
+	// locale when the address belongs to a user, then the template's base copy.
+	Locale *string `json:"locale,omitempty"`
+}
+
+// MessagesCreateResultAttemptsItem is a typed object of the Backend API.
+type MessagesCreateResultAttemptsItem struct {
+	Provider string  `json:"provider"`
+	Ok       bool    `json:"ok"`
+	Error    *string `json:"error,omitempty"`
+}
+
+// MessagesCreateResultTimelineItem is a typed object of the Backend API.
+type MessagesCreateResultTimelineItem struct {
+	// One of: queued, sent, delivered, bounced, complained, failed, suppressed, blocked.
+	Status string `json:"status"`
+	// Epoch ms.
+	At     int64   `json:"at"`
+	Detail *string `json:"detail,omitempty"`
+}
+
+// MessagesCreateResultDataItemAttemptsItem is a typed object of the Backend API.
+type MessagesCreateResultDataItemAttemptsItem struct {
+	Provider string  `json:"provider"`
+	Ok       bool    `json:"ok"`
+	Error    *string `json:"error,omitempty"`
+}
+
+// MessagesCreateResultDataItemTimelineItem is a typed object of the Backend API.
+type MessagesCreateResultDataItemTimelineItem struct {
+	// One of: queued, sent, delivered, bounced, complained, failed, suppressed, blocked.
+	Status string `json:"status"`
+	// Epoch ms.
+	At     int64   `json:"at"`
+	Detail *string `json:"detail,omitempty"`
+}
+
+// MessagesCreateResultDataItem is a typed object of the Backend API.
+type MessagesCreateResultDataItem struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// One of: email, sms, whatsapp, voice, push.
+	Channel string `json:"channel"`
+	// The template that produced it (`verification_code`, `custom:<name>`, `push_mfa_challenge`,
+	// `provider_test`, ...). Null for a phone message.
+	Template *string `json:"template,omitempty"`
+	// Enough to recognise the recipient (`jo***@ex***.com`, `+1•••••0123`), not enough to use. The
+	// address itself is never stored in the ledger.
+	RecipientMasked string `json:"recipient_masked"`
+	// `auth` for Atlas's own sign-in mail, `transactional` for mail you sent with POST /v1/messages.
+	// One of: auth, transactional.
+	Category *string `json:"category,omitempty"`
+	// The `category` you sent with POST /v1/messages (one of your notification categories), or null.
+	MessageCategory *string `json:"message_category,omitempty"`
+	// The tags you sent with a transactional message.
+	Tags map[string]string `json:"tags,omitempty"`
+	// A keyed hash of the recipient, stable within the instance. Search with ?recipient=.
+	RecipientHash string `json:"recipient_hash"`
+	// ISO country of a phone number.
+	Country *string `json:"country,omitempty"`
+	// One of: queued, sent, delivered, bounced, complained, failed, suppressed, blocked.
+	Status       string  `json:"status"`
+	StatusDetail *string `json:"status_detail,omitempty"`
+	// The transport that took the message (`resend`, `ses`, `twilio`, ...).
+	Provider *string `json:"provider,omitempty"`
+	// The id your provider gave it; what its callbacks refer to.
+	ProviderMessageID *string `json:"provider_message_id,omitempty"`
+	// The providers tried, in order. More than one means a fallback provider took over.
+	Attempts []MessagesCreateResultDataItemAttemptsItem `json:"attempts"`
+	// Every status the message passed through, oldest first.
+	Timeline []MessagesCreateResultDataItemTimelineItem `json:"timeline"`
+	// Epoch ms.
+	CreatedAt int64 `json:"created_at"`
+	// Epoch ms.
+	UpdatedAt int64 `json:"updated_at"`
+}
+
+// MessagesCreateResult is a typed object of the Backend API.
+type MessagesCreateResult struct {
+	Object *string `json:"object,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	// One of: email, sms, whatsapp, voice, push.
+	Channel *string `json:"channel,omitempty"`
+	// The template that produced it (`verification_code`, `custom:<name>`, `push_mfa_challenge`,
+	// `provider_test`, ...). Null for a phone message.
+	Template *string `json:"template,omitempty"`
+	// Enough to recognise the recipient (`jo***@ex***.com`, `+1•••••0123`), not enough to use. The
+	// address itself is never stored in the ledger.
+	RecipientMasked *string `json:"recipient_masked,omitempty"`
+	// `auth` for Atlas's own sign-in mail, `transactional` for mail you sent with POST /v1/messages.
+	// One of: auth, transactional.
+	Category *string `json:"category,omitempty"`
+	// The `category` you sent with POST /v1/messages (one of your notification categories), or null.
+	MessageCategory *string `json:"message_category,omitempty"`
+	// The tags you sent with a transactional message.
+	Tags map[string]string `json:"tags,omitempty"`
+	// A keyed hash of the recipient, stable within the instance. Search with ?recipient=.
+	RecipientHash *string `json:"recipient_hash,omitempty"`
+	// ISO country of a phone number.
+	Country *string `json:"country,omitempty"`
+	// One of: queued, sent, delivered, bounced, complained, failed, suppressed, blocked.
+	Status       *string `json:"status,omitempty"`
+	StatusDetail *string `json:"status_detail,omitempty"`
+	// The transport that took the message (`resend`, `ses`, `twilio`, ...).
+	Provider *string `json:"provider,omitempty"`
+	// The id your provider gave it; what its callbacks refer to.
+	ProviderMessageID *string `json:"provider_message_id,omitempty"`
+	// The providers tried, in order. More than one means a fallback provider took over.
+	Attempts []MessagesCreateResultAttemptsItem `json:"attempts,omitempty"`
+	// Every status the message passed through, oldest first.
+	Timeline []MessagesCreateResultTimelineItem `json:"timeline,omitempty"`
+	// Epoch ms.
+	CreatedAt *int64 `json:"created_at,omitempty"`
+	// Epoch ms.
+	UpdatedAt *int64                         `json:"updated_at,omitempty"`
+	Data      []MessagesCreateResultDataItem `json:"data,omitempty"`
+	HasMore   *bool                          `json:"has_more,omitempty"`
+	// Pass as starting_after for the next page.
+	NextCursor *string `json:"next_cursor,omitempty"`
 }
 
 // MessagesGetSummaryResult is a typed object of the Backend API.
@@ -11534,6 +12899,13 @@ type MessagesGetResult struct {
 	// Enough to recognise the recipient (`jo***@ex***.com`, `+1•••••0123`), not enough to use. The
 	// address itself is never stored in the ledger.
 	RecipientMasked string `json:"recipient_masked"`
+	// `auth` for Atlas's own sign-in mail, `transactional` for mail you sent with POST /v1/messages.
+	// One of: auth, transactional.
+	Category *string `json:"category,omitempty"`
+	// The `category` you sent with POST /v1/messages (one of your notification categories), or null.
+	MessageCategory *string `json:"message_category,omitempty"`
+	// The tags you sent with a transactional message.
+	Tags map[string]string `json:"tags,omitempty"`
 	// A keyed hash of the recipient, stable within the instance. Search with ?recipient=.
 	RecipientHash string `json:"recipient_hash"`
 	// ISO country of a phone number.
@@ -12318,6 +13690,50 @@ type MigrationsGetStatusResult struct {
 	Object *string `json:"object,omitempty"`
 }
 
+// MigrationsCreateSessionParamsSessionsItem is a typed object of the Backend API.
+type MigrationsCreateSessionParamsSessionsItem struct {
+	// The legacy session token. Exactly one of token or token_hash.
+	Token *string `json:"token,omitempty"`
+	// SHA-256 hex of the token (UTF-8). Exactly one of token or token_hash.
+	TokenHash *string `json:"token_hash,omitempty"`
+	// The Atlas user. Exactly one of user_id or external_id.
+	UserID *string `json:"user_id,omitempty"`
+	// Your id for the user. Exactly one of user_id or external_id.
+	ExternalID *string `json:"external_id,omitempty"`
+	// When the legacy session ends (ISO 8601, or Unix ms). Must be in the future.
+	ExpiresAt string `json:"expires_at"`
+	// The person had completed a second factor in this session.
+	MFAVerified *bool `json:"mfa_verified,omitempty"`
+}
+
+// MigrationsCreateSessionParams is a typed object of the Backend API.
+type MigrationsCreateSessionParams struct {
+	Sessions []MigrationsCreateSessionParamsSessionsItem `json:"sessions"`
+	// Validate and count only.
+	DryRun *bool `json:"dry_run,omitempty"`
+}
+
+// MigrationsCreateSessionResultErrorsItem is a typed object of the Backend API.
+type MigrationsCreateSessionResultErrorsItem struct {
+	Index int64 `json:"index"`
+	// One of: invalid_row, unknown_field, user_not_found, session_expired, already_exchanged.
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// MigrationsCreateSessionResult is a typed object of the Backend API.
+type MigrationsCreateSessionResult struct {
+	Object   string                                    `json:"object"`
+	Source   string                                    `json:"source"`
+	DryRun   bool                                      `json:"dry_run"`
+	Received int64                                     `json:"received"`
+	Imported int64                                     `json:"imported"`
+	Failed   int64                                     `json:"failed"`
+	Errors   []MigrationsCreateSessionResultErrorsItem `json:"errors"`
+	// The bridge mode for this source. Imported sessions exchange only in `session_table` mode.
+	BridgeMode *string `json:"bridge_mode,omitempty"`
+}
+
 // MigrationsVerifyParams is a typed object of the Backend API.
 type MigrationsVerifyParams struct {
 	// The old session token.
@@ -12335,6 +13751,204 @@ type MigrationsVerifyResult struct {
 	DualRunUntil *int64  `json:"dual_run_until,omitempty"`
 }
 
+// NativeAppsListItem is a typed object of the Backend API.
+type NativeAppsListItem struct {
+	Object string `json:"object"`
+	// napp_...: send it as `native_app_id` when starting a sign-in and as the `X-Atlas-App-Id` header.
+	ID string `json:"id"`
+	// One of: ios, android, development.
+	Platform string `json:"platform"`
+	// development apps only.
+	AllowedUsers []string `json:"allowed_users,omitempty"`
+	// development apps only: epoch milliseconds.
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// development apps only: expires_at has passed, so the app signs nobody in until it is extended.
+	Expired                *bool    `json:"expired,omitempty"`
+	BundleID               *string  `json:"bundle_id,omitempty"`
+	TeamID                 *string  `json:"team_id,omitempty"`
+	PackageName            *string  `json:"package_name,omitempty"`
+	Sha256CertFingerprints []string `json:"sha256_cert_fingerprints,omitempty"`
+	CallbackURLs           []string `json:"callback_urls"`
+	// Epoch milliseconds.
+	CreatedAt int64 `json:"created_at"`
+}
+
+// NativeAppsCreateParams is a typed object of the Backend API.
+type NativeAppsCreateParams struct {
+	// Required on create; cannot be changed. development: a test app with no store identity (Expo Go,
+	// a dev build), for the users in allowed_users until expires_at; its sessions are always
+	// device-bound. One of: ios, android, development.
+	Platform *string `json:"platform,omitempty"`
+	// ios: the bundle identifier (with team_id).
+	BundleID *string `json:"bundle_id,omitempty"`
+	// ios: the Apple team id (with bundle_id).
+	TeamID *string `json:"team_id,omitempty"`
+	// android: the application id (with sha256_cert_fingerprints).
+	PackageName *string `json:"package_name,omitempty"`
+	// android: signing-certificate SHA-256 fingerprints, 64 hex characters, colons optional; stored in
+	// uppercase colon form.
+	Sha256CertFingerprints []string `json:"sha256_cert_fingerprints,omitempty"`
+	// URLs a sign-in may return to: https (Universal Links / App Links) or an app-specific private-use
+	// scheme such as exampleapp://oauth-callback (RFC 8252 section 7.1; http, javascript, data, file
+	// and similar schemes are refused). No fragment. exp:// and exp+<slug>:// (Expo Go, dev clients)
+	// are accepted on development instances, and on any instance for a development app (400
+	// DEV_SCHEME_ON_PRODUCTION otherwise).
+	CallbackURLs []string `json:"callback_urls,omitempty"`
+	// development: the user ids (user_...) or email addresses that may sign in through this app. PATCH
+	// replaces the list.
+	AllowedUsers []string `json:"allowed_users,omitempty"`
+	// development: epoch milliseconds when the app stops working, in the future and at most 90 days
+	// ahead. PATCH extends it (403 NATIVE_APP_EXPIRED at sign-in after it passes).
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+}
+
+// NativeAppsCreateResult is a typed object of the Backend API.
+type NativeAppsCreateResult struct {
+	Object string `json:"object"`
+	// napp_...: send it as `native_app_id` when starting a sign-in and as the `X-Atlas-App-Id` header.
+	ID string `json:"id"`
+	// One of: ios, android, development.
+	Platform string `json:"platform"`
+	// development apps only.
+	AllowedUsers []string `json:"allowed_users,omitempty"`
+	// development apps only: epoch milliseconds.
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// development apps only: expires_at has passed, so the app signs nobody in until it is extended.
+	Expired                *bool    `json:"expired,omitempty"`
+	BundleID               *string  `json:"bundle_id,omitempty"`
+	TeamID                 *string  `json:"team_id,omitempty"`
+	PackageName            *string  `json:"package_name,omitempty"`
+	Sha256CertFingerprints []string `json:"sha256_cert_fingerprints,omitempty"`
+	CallbackURLs           []string `json:"callback_urls"`
+	// Epoch milliseconds.
+	CreatedAt int64 `json:"created_at"`
+}
+
+// NativeAppsGetPublishableKeyResult is a typed object of the Backend API.
+type NativeAppsGetPublishableKeyResult struct {
+	Object string `json:"object"`
+	// Empty = the publishable key works from any app (the default).
+	AppIDs []string `json:"app_ids"`
+}
+
+// NativeAppsSetPublishableKeyParams is a typed object of the Backend API.
+type NativeAppsSetPublishableKeyParams struct {
+	AppIDs []string `json:"app_ids"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p NativeAppsSetPublishableKeyParams) MarshalJSON() ([]byte, error) {
+	type plain NativeAppsSetPublishableKeyParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// NativeAppsSetPublishableKeyResult is a typed object of the Backend API.
+type NativeAppsSetPublishableKeyResult struct {
+	Object string `json:"object"`
+	// Empty = the publishable key works from any app (the default).
+	AppIDs []string `json:"app_ids"`
+}
+
+// NativeAppsGetResult is a typed object of the Backend API.
+type NativeAppsGetResult struct {
+	Object string `json:"object"`
+	// napp_...: send it as `native_app_id` when starting a sign-in and as the `X-Atlas-App-Id` header.
+	ID string `json:"id"`
+	// One of: ios, android, development.
+	Platform string `json:"platform"`
+	// development apps only.
+	AllowedUsers []string `json:"allowed_users,omitempty"`
+	// development apps only: epoch milliseconds.
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// development apps only: expires_at has passed, so the app signs nobody in until it is extended.
+	Expired                *bool    `json:"expired,omitempty"`
+	BundleID               *string  `json:"bundle_id,omitempty"`
+	TeamID                 *string  `json:"team_id,omitempty"`
+	PackageName            *string  `json:"package_name,omitempty"`
+	Sha256CertFingerprints []string `json:"sha256_cert_fingerprints,omitempty"`
+	CallbackURLs           []string `json:"callback_urls"`
+	// Epoch milliseconds.
+	CreatedAt int64 `json:"created_at"`
+}
+
+// NativeAppsUpdateParams is a typed object of the Backend API.
+type NativeAppsUpdateParams struct {
+	// Required on create; cannot be changed. development: a test app with no store identity (Expo Go,
+	// a dev build), for the users in allowed_users until expires_at; its sessions are always
+	// device-bound. One of: ios, android, development.
+	Platform *string `json:"platform,omitempty"`
+	// ios: the bundle identifier (with team_id).
+	BundleID *string `json:"bundle_id,omitempty"`
+	// ios: the Apple team id (with bundle_id).
+	TeamID *string `json:"team_id,omitempty"`
+	// android: the application id (with sha256_cert_fingerprints).
+	PackageName *string `json:"package_name,omitempty"`
+	// android: signing-certificate SHA-256 fingerprints, 64 hex characters, colons optional; stored in
+	// uppercase colon form.
+	Sha256CertFingerprints []string `json:"sha256_cert_fingerprints,omitempty"`
+	// URLs a sign-in may return to: https (Universal Links / App Links) or an app-specific private-use
+	// scheme such as exampleapp://oauth-callback (RFC 8252 section 7.1; http, javascript, data, file
+	// and similar schemes are refused). No fragment. exp:// and exp+<slug>:// (Expo Go, dev clients)
+	// are accepted on development instances, and on any instance for a development app (400
+	// DEV_SCHEME_ON_PRODUCTION otherwise).
+	CallbackURLs []string `json:"callback_urls,omitempty"`
+	// development: the user ids (user_...) or email addresses that may sign in through this app. PATCH
+	// replaces the list.
+	AllowedUsers []string `json:"allowed_users,omitempty"`
+	// development: epoch milliseconds when the app stops working, in the future and at most 90 days
+	// ahead. PATCH extends it (403 NATIVE_APP_EXPIRED at sign-in after it passes).
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p NativeAppsUpdateParams) MarshalJSON() ([]byte, error) {
+	type plain NativeAppsUpdateParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// NativeAppsUpdateResult is a typed object of the Backend API.
+type NativeAppsUpdateResult struct {
+	Object string `json:"object"`
+	// napp_...: send it as `native_app_id` when starting a sign-in and as the `X-Atlas-App-Id` header.
+	ID string `json:"id"`
+	// One of: ios, android, development.
+	Platform string `json:"platform"`
+	// development apps only.
+	AllowedUsers []string `json:"allowed_users,omitempty"`
+	// development apps only: epoch milliseconds.
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// development apps only: expires_at has passed, so the app signs nobody in until it is extended.
+	Expired                *bool    `json:"expired,omitempty"`
+	BundleID               *string  `json:"bundle_id,omitempty"`
+	TeamID                 *string  `json:"team_id,omitempty"`
+	PackageName            *string  `json:"package_name,omitempty"`
+	Sha256CertFingerprints []string `json:"sha256_cert_fingerprints,omitempty"`
+	CallbackURLs           []string `json:"callback_urls"`
+	// Epoch milliseconds.
+	CreatedAt int64 `json:"created_at"`
+}
+
+// NativeAppsDeleteResult is a typed object of the Backend API.
+type NativeAppsDeleteResult struct {
+	Object  *string `json:"object,omitempty"`
+	ID      *string `json:"id,omitempty"`
+	Deleted *bool   `json:"deleted,omitempty"`
+}
+
 // OAuthApplicationTypesListItem is a typed object of the Backend API.
 type OAuthApplicationTypesListItem struct {
 	Object      string                 `json:"object"`
@@ -12342,6 +13956,50 @@ type OAuthApplicationTypesListItem struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	Defaults    map[string]interface{} `json:"defaults"`
+}
+
+// OAuthClientsListConsentsResultDataItem is a typed object of the Backend API.
+type OAuthClientsListConsentsResultDataItem struct {
+	Object *string  `json:"object,omitempty"`
+	UserID *string  `json:"user_id,omitempty"`
+	Scopes []string `json:"scopes,omitempty"`
+	// The consent grant id, usable with GET/PATCH/DELETE /v1/grants/{id}. Backend API only.
+	GrantID *string `json:"grant_id,omitempty"`
+	// The metadata set on the grant. Backend API only.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	// One of: active, revoked.
+	Status *string `json:"status,omitempty"`
+	// When the user first authorized the client (Unix ms).
+	CreatedAt *int64 `json:"created_at,omitempty"`
+	// The last time a token was issued or refreshed for the user and client (Unix ms).
+	LastUsedAt *int64 `json:"last_used_at,omitempty"`
+	// When the consent was revoked, for status revoked.
+	RevokedAt *int64 `json:"revoked_at,omitempty"`
+}
+
+// OAuthClientsListConsentsResult is a typed object of the Backend API.
+type OAuthClientsListConsentsResult struct {
+	Object   *string                                  `json:"object,omitempty"`
+	ClientID *string                                  `json:"client_id,omitempty"`
+	Data     []OAuthClientsListConsentsResultDataItem `json:"data,omitempty"`
+	HasMore  *bool                                    `json:"has_more,omitempty"`
+	// Pass as starting_after for the next page.
+	NextCursor *string `json:"next_cursor,omitempty"`
+}
+
+// OAuthClientsRevokeConsentParams is a typed object of the Backend API.
+type OAuthClientsRevokeConsentParams struct {
+	// Only revoke these users. Omit to revoke every active consent.
+	UserIDs []string `json:"user_ids,omitempty"`
+}
+
+// OAuthClientsRevokeConsentResult is a typed object of the Backend API.
+type OAuthClientsRevokeConsentResult struct {
+	Object          *string `json:"object,omitempty"`
+	ClientID        *string `json:"client_id,omitempty"`
+	ConsentsRevoked *int64  `json:"consents_revoked,omitempty"`
+	// Active refresh grants that were revoked with the consents.
+	TokensRevoked *int64 `json:"tokens_revoked,omitempty"`
 }
 
 // OAuthClientsSetOrganizationAccessParams is a typed object of the Backend API.
@@ -12443,6 +14101,15 @@ type OAuthClientsListUsageResultTotals struct {
 	RateLimited    *int64 `json:"rate_limited,omitempty"`
 }
 
+// OAuthClientsListUsageResultLatestError: The most recent failed token endpoint request in the window; null when there was none.
+type OAuthClientsListUsageResultLatestError struct {
+	// The OAuth error code, for example invalid_grant.
+	Code     *string `json:"code,omitempty"`
+	Endpoint *string `json:"endpoint,omitempty"`
+	// Unix ms.
+	At *int64 `json:"at,omitempty"`
+}
+
 // OAuthClientsListUsageResultDataItem is a typed object of the Backend API.
 type OAuthClientsListUsageResultDataItem struct {
 	Day *string `json:"day,omitempty"`
@@ -12454,6 +14121,9 @@ type OAuthClientsListUsageResultDataItem struct {
 	ActiveUsers *int64 `json:"active_users,omitempty"`
 	// Token endpoint requests answered with an error.
 	Errors *int64 `json:"errors,omitempty"`
+	// The day's errors by OAuth error code, for example {"invalid_grant": 1}. Errors recorded without
+	// a code count under "unknown".
+	ErrorsByCode map[string]int64 `json:"errors_by_code,omitempty"`
 	// Requests refused by the per-client rate limit.
 	RateLimited *int64 `json:"rate_limited,omitempty"`
 }
@@ -12466,9 +14136,11 @@ type OAuthClientsListUsageResult struct {
 	// First day (UTC date).
 	Since *string `json:"since,omitempty"`
 	// Last day (UTC date).
-	Until  *string                               `json:"until,omitempty"`
-	Totals *OAuthClientsListUsageResultTotals    `json:"totals,omitempty"`
-	Data   []OAuthClientsListUsageResultDataItem `json:"data,omitempty"`
+	Until  *string                            `json:"until,omitempty"`
+	Totals *OAuthClientsListUsageResultTotals `json:"totals,omitempty"`
+	// The most recent failed token endpoint request in the window; null when there was none.
+	LatestError *OAuthClientsListUsageResultLatestError `json:"latest_error,omitempty"`
+	Data        []OAuthClientsListUsageResultDataItem   `json:"data,omitempty"`
 }
 
 // OAuthClientsGetWebhookResult is a typed object of the Backend API.
@@ -12518,6 +14190,49 @@ type OAuthClientsSetWebhookResult struct {
 	Note          *string `json:"note,omitempty"`
 }
 
+// OAuthConsentRequestsSetSwitchAccountResult is a typed object of the Backend API.
+type OAuthConsentRequestsSetSwitchAccountResult struct {
+	Object *string `json:"object,omitempty"`
+	// Send the end user’s browser here next.
+	RedirectTo *string `json:"redirect_to,omitempty"`
+}
+
+// OAuthDeviceRequestsGetResultClient is a typed object of the Backend API.
+type OAuthDeviceRequestsGetResultClient struct {
+	ID         *string `json:"id,omitempty"`
+	ClientID   *string `json:"client_id,omitempty"`
+	Name       *string `json:"name,omitempty"`
+	FirstParty *bool   `json:"first_party,omitempty"`
+}
+
+// OAuthDeviceRequestsGetResult is a typed object of the Backend API.
+type OAuthDeviceRequestsGetResult struct {
+	Object *string `json:"object,omitempty"`
+	// The signed-in Atlas user id.
+	Subject *string `json:"subject,omitempty"`
+	// The code the person entered.
+	UserCode       *string                             `json:"user_code,omitempty"`
+	Client         *OAuthDeviceRequestsGetResultClient `json:"client,omitempty"`
+	RequestedScope []string                            `json:"requested_scope,omitempty"`
+	Audience       *string                             `json:"audience,omitempty"`
+	// The challenge expires (epoch ms).
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+}
+
+// OAuthDeviceRequestsSetAcceptResult is a typed object of the Backend API.
+type OAuthDeviceRequestsSetAcceptResult struct {
+	Object *string `json:"object,omitempty"`
+	// Send the end user’s browser here next.
+	RedirectTo *string `json:"redirect_to,omitempty"`
+}
+
+// OAuthDeviceRequestsSetRejectResult is a typed object of the Backend API.
+type OAuthDeviceRequestsSetRejectResult struct {
+	Object *string `json:"object,omitempty"`
+	// Send the end user’s browser here next.
+	RedirectTo *string `json:"redirect_to,omitempty"`
+}
+
 // OAuthGrantsImportParamsGrantsItemRefreshTokensItem is a typed object of the Backend API.
 type OAuthGrantsImportParamsGrantsItemRefreshTokensItem struct {
 	// The bcrypt hash, or the base64url SHA-256, of the token.
@@ -12562,6 +14277,13 @@ type OAuthGrantsImportResultResultsItem struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// OAuthGrantsImportResultDataItem is a typed object of the Backend API.
+type OAuthGrantsImportResultDataItem struct {
+	Index *int64 `json:"index,omitempty"`
+	// One of: imported, failed.
+	Status *string `json:"status,omitempty"`
+}
+
 // OAuthGrantsImportResultErrorsItem is a typed object of the Backend API.
 type OAuthGrantsImportResultErrorsItem struct {
 	Index   *int64  `json:"index,omitempty"`
@@ -12578,8 +14300,10 @@ type OAuthGrantsImportResult struct {
 	RefreshTokens *int64 `json:"refresh_tokens,omitempty"`
 	// One entry per submitted grant, in order.
 	Results []OAuthGrantsImportResultResultsItem `json:"results,omitempty"`
-	Errors  []OAuthGrantsImportResultErrorsItem  `json:"errors,omitempty"`
-	Note    *string                              `json:"note,omitempty"`
+	// The same entries as `results`, under the name every import report shares.
+	Data   []OAuthGrantsImportResultDataItem   `json:"data,omitempty"`
+	Errors []OAuthGrantsImportResultErrorsItem `json:"errors,omitempty"`
+	Note   *string                             `json:"note,omitempty"`
 }
 
 // OAuthPublishersListItem is a typed object of the Backend API.
@@ -13467,6 +15191,8 @@ type WebhookEndpointCreate struct {
 	OAuth map[string]interface{} `json:"oauth,omitempty"`
 	// Deliveries per second this endpoint may receive; null = unlimited.
 	MaxRps *int64 `json:"max_rps,omitempty"`
+	// Membership events to this endpoint carry the seat private_metadata.
+	IncludePrivateMembership *bool `json:"include_private_membership,omitempty"`
 	// Where deliveries go: { type: "https" } or an event destination with its non-secret settings.
 	// Credentials are never returned (credentials_set says whether they are stored).
 	Destination *WebhookEndpointCreateDestination `json:"destination,omitempty"`
@@ -14638,6 +16364,2110 @@ type PasskeyCampaignsDeleteResult struct {
 	Metrics   *PasskeyCampaignsDeleteResultMetrics `json:"metrics,omitempty"`
 }
 
+// PCAGetActionRegistryResultNamespacesItemCounts is a typed object of the Backend API.
+type PCAGetActionRegistryResultNamespacesItemCounts struct {
+	Actions     *int64 `json:"actions,omitempty"`
+	Confirmed   *int64 `json:"confirmed,omitempty"`
+	Unconfirmed *int64 `json:"unconfirmed,omitempty"`
+	Deprecated  *int64 `json:"deprecated,omitempty"`
+}
+
+// PCAGetActionRegistryResultNamespacesItem is a typed object of the Backend API.
+type PCAGetActionRegistryResultNamespacesItem struct {
+	Ns            *string                                         `json:"ns,omitempty"`
+	ActiveVersion *string                                         `json:"active_version,omitempty"`
+	Digest        *string                                         `json:"digest,omitempty"`
+	Pinned        *bool                                           `json:"pinned,omitempty"`
+	UpdatedAt     *string                                         `json:"updated_at,omitempty"`
+	Counts        *PCAGetActionRegistryResultNamespacesItemCounts `json:"counts,omitempty"`
+}
+
+// PCAGetActionRegistryResultPublisherKeysItem is a typed object of the Backend API.
+type PCAGetActionRegistryResultPublisherKeysItem struct {
+	Kid *string `json:"kid,omitempty"`
+	// The Ed25519 public key.
+	Pk          *string `json:"pk,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	CreatedAt   *string `json:"created_at,omitempty"`
+}
+
+// PCAGetActionRegistryResultReviewerKeysItem is a typed object of the Backend API.
+type PCAGetActionRegistryResultReviewerKeysItem struct {
+	Kid *string `json:"kid,omitempty"`
+	// The Ed25519 public key.
+	Pk          *string `json:"pk,omitempty"`
+	ReviewerID  *string `json:"reviewer_id,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+}
+
+// PCAGetActionRegistryResult is a typed object of the Backend API.
+type PCAGetActionRegistryResult struct {
+	Object *string `json:"object,omitempty"`
+	// true once any namespace has a published version.
+	RegistryMode  *bool                                         `json:"registry_mode,omitempty"`
+	Namespaces    []PCAGetActionRegistryResultNamespacesItem    `json:"namespaces,omitempty"`
+	PublisherKeys []PCAGetActionRegistryResultPublisherKeysItem `json:"publisher_keys,omitempty"`
+	ReviewerKeys  []PCAGetActionRegistryResultReviewerKeysItem  `json:"reviewer_keys,omitempty"`
+}
+
+// PCAListActionRegistryActionsItem is a typed object of the Backend API.
+type PCAListActionRegistryActionsItem struct {
+	Verb    *string `json:"verb,omitempty"`
+	Ns      *string `json:"ns,omitempty"`
+	Version *string `json:"version,omitempty"`
+	Title   *string `json:"title,omitempty"`
+	// One of: confirmed, unconfirmed, stale, deprecated.
+	State     *string  `json:"state,omitempty"`
+	Traits    []string `json:"traits,omitempty"`
+	Risk      *int64   `json:"risk,omitempty"`
+	RulesText []string `json:"rules_text,omitempty"`
+}
+
+// PCAGetActionRegistryActionResultCard is a typed object of the Backend API.
+type PCAGetActionRegistryActionResultCard struct {
+	Text  *string                  `json:"text,omitempty"`
+	Lines []map[string]interface{} `json:"lines,omitempty"`
+}
+
+// PCAGetActionRegistryActionResultHistoryItemRules is a typed object of the Backend API.
+type PCAGetActionRegistryActionResultHistoryItemRules struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAGetActionRegistryActionResultHistoryItem is a typed object of the Backend API.
+type PCAGetActionRegistryActionResultHistoryItem struct {
+	Version *string                                           `json:"version,omitempty"`
+	Class   *string                                           `json:"class,omitempty"`
+	Reasons []string                                          `json:"reasons,omitempty"`
+	Rules   *PCAGetActionRegistryActionResultHistoryItemRules `json:"rules,omitempty"`
+}
+
+// PCAGetActionRegistryActionResult is a typed object of the Backend API.
+type PCAGetActionRegistryActionResult struct {
+	Object  *string `json:"object,omitempty"`
+	Verb    *string `json:"verb,omitempty"`
+	Ns      *string `json:"ns,omitempty"`
+	Version *string `json:"version,omitempty"`
+	// One of: confirmed, unconfirmed, stale, deprecated.
+	State *string `json:"state,omitempty"`
+	// The ActionDef.
+	Def       map[string]interface{}                `json:"def,omitempty"`
+	DefDigest *string                               `json:"def_digest,omitempty"`
+	Card      *PCAGetActionRegistryActionResultCard `json:"card,omitempty"`
+	// The effective profile and trait closure, and the hint (what the action would be if confirmed as
+	// suggested).
+	Effective     map[string]interface{}                        `json:"effective,omitempty"`
+	Rules         map[string]interface{}                        `json:"rules,omitempty"`
+	RulesText     []string                                      `json:"rules_text,omitempty"`
+	CompiledRules map[string]interface{}                        `json:"compiled_rules,omitempty"`
+	History       []PCAGetActionRegistryActionResultHistoryItem `json:"history,omitempty"`
+}
+
+// PCAReviewActionRegistryActionResultLintItem is a typed object of the Backend API.
+type PCAReviewActionRegistryActionResultLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAReviewActionRegistryActionResultRulesLintItem is a typed object of the Backend API.
+type PCAReviewActionRegistryActionResultRulesLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAReviewActionRegistryActionResultDiffVsActive is a typed object of the Backend API.
+type PCAReviewActionRegistryActionResultDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAReviewActionRegistryActionResultRulesDiffVsActive is a typed object of the Backend API.
+type PCAReviewActionRegistryActionResultRulesDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAReviewActionRegistryActionResult: A definition in the review queue. Imported, synced, templated and edited definitions are never
+// confirmed: until a reviewer confirms one it is treated as the most dangerous kind of action.
+type PCAReviewActionRegistryActionResult struct {
+	Verb *string `json:"verb,omitempty"`
+	Ns   *string `json:"ns,omitempty"`
+	// One of: import, template, sync, edit.
+	Origin *string `json:"origin,omitempty"`
+	// `removed`: the source no longer has the operation; publishing deprecates it. One of: added,
+	// changed, removed, None.
+	Change   *string `json:"change,omitempty"`
+	SourceID *string `json:"source_id,omitempty"`
+	// The ActionDef.
+	Def       map[string]interface{} `json:"def,omitempty"`
+	DefDigest *string                `json:"def_digest,omitempty"`
+	// One of: authored, unreviewed, suggested, confirmed, stale.
+	State *string `json:"state,omitempty"`
+	// What the reviewer is shown: declared, implied and suggested traits, the effective profile, the
+	// policy card, the changes against the active definition.
+	Review   map[string]interface{}                        `json:"review,omitempty"`
+	CardText *string                                       `json:"card_text,omitempty"`
+	Lint     []PCAReviewActionRegistryActionResultLintItem `json:"lint,omitempty"`
+	// The business rules of the action.
+	Rules map[string]interface{} `json:"rules,omitempty"`
+	// The rules in plain sentences.
+	RulesText   []string                                           `json:"rules_text,omitempty"`
+	RulesLint   []PCAReviewActionRegistryActionResultRulesLintItem `json:"rules_lint,omitempty"`
+	RulesReview map[string]interface{}                             `json:"rules_review,omitempty"`
+	// The rules widen against the active version and carry no valid rules review: publishing is
+	// refused until a reviewer signs them.
+	RulesReviewNeeded *bool `json:"rules_review_needed,omitempty"`
+	// The custom traits of the namespace ([] = the core set): the trait registry the attestation is
+	// made against.
+	RegistryTraits    []map[string]interface{}                              `json:"registry_traits,omitempty"`
+	DiffVsActive      *PCAReviewActionRegistryActionResultDiffVsActive      `json:"diff_vs_active,omitempty"`
+	RulesDiffVsActive *PCAReviewActionRegistryActionResultRulesDiffVsActive `json:"rules_diff_vs_active,omitempty"`
+	UpdatedBy         *string                                               `json:"updated_by,omitempty"`
+	UpdatedAt         *string                                               `json:"updated_at,omitempty"`
+}
+
+// PCAListActionRegistryDraftsItemLintItem is a typed object of the Backend API.
+type PCAListActionRegistryDraftsItemLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAListActionRegistryDraftsItemRulesLintItem is a typed object of the Backend API.
+type PCAListActionRegistryDraftsItemRulesLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAListActionRegistryDraftsItemDiffVsActive is a typed object of the Backend API.
+type PCAListActionRegistryDraftsItemDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAListActionRegistryDraftsItemRulesDiffVsActive is a typed object of the Backend API.
+type PCAListActionRegistryDraftsItemRulesDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAListActionRegistryDraftsItem: A definition in the review queue. Imported, synced, templated and edited definitions are never
+// confirmed: until a reviewer confirms one it is treated as the most dangerous kind of action.
+type PCAListActionRegistryDraftsItem struct {
+	Verb *string `json:"verb,omitempty"`
+	Ns   *string `json:"ns,omitempty"`
+	// One of: import, template, sync, edit.
+	Origin *string `json:"origin,omitempty"`
+	// `removed`: the source no longer has the operation; publishing deprecates it. One of: added,
+	// changed, removed, None.
+	Change   *string `json:"change,omitempty"`
+	SourceID *string `json:"source_id,omitempty"`
+	// The ActionDef.
+	Def       map[string]interface{} `json:"def,omitempty"`
+	DefDigest *string                `json:"def_digest,omitempty"`
+	// One of: authored, unreviewed, suggested, confirmed, stale.
+	State *string `json:"state,omitempty"`
+	// What the reviewer is shown: declared, implied and suggested traits, the effective profile, the
+	// policy card, the changes against the active definition.
+	Review   map[string]interface{}                    `json:"review,omitempty"`
+	CardText *string                                   `json:"card_text,omitempty"`
+	Lint     []PCAListActionRegistryDraftsItemLintItem `json:"lint,omitempty"`
+	// The business rules of the action.
+	Rules map[string]interface{} `json:"rules,omitempty"`
+	// The rules in plain sentences.
+	RulesText   []string                                       `json:"rules_text,omitempty"`
+	RulesLint   []PCAListActionRegistryDraftsItemRulesLintItem `json:"rules_lint,omitempty"`
+	RulesReview map[string]interface{}                         `json:"rules_review,omitempty"`
+	// The rules widen against the active version and carry no valid rules review: publishing is
+	// refused until a reviewer signs them.
+	RulesReviewNeeded *bool `json:"rules_review_needed,omitempty"`
+	// The custom traits of the namespace ([] = the core set): the trait registry the attestation is
+	// made against.
+	RegistryTraits    []map[string]interface{}                          `json:"registry_traits,omitempty"`
+	DiffVsActive      *PCAListActionRegistryDraftsItemDiffVsActive      `json:"diff_vs_active,omitempty"`
+	RulesDiffVsActive *PCAListActionRegistryDraftsItemRulesDiffVsActive `json:"rules_diff_vs_active,omitempty"`
+	UpdatedBy         *string                                           `json:"updated_by,omitempty"`
+	UpdatedAt         *string                                           `json:"updated_at,omitempty"`
+}
+
+// PCAGetActionRegistryDraftResultLintItem is a typed object of the Backend API.
+type PCAGetActionRegistryDraftResultLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAGetActionRegistryDraftResultRulesLintItem is a typed object of the Backend API.
+type PCAGetActionRegistryDraftResultRulesLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAGetActionRegistryDraftResultDiffVsActive is a typed object of the Backend API.
+type PCAGetActionRegistryDraftResultDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAGetActionRegistryDraftResultRulesDiffVsActive is a typed object of the Backend API.
+type PCAGetActionRegistryDraftResultRulesDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAGetActionRegistryDraftResult: A definition in the review queue. Imported, synced, templated and edited definitions are never
+// confirmed: until a reviewer confirms one it is treated as the most dangerous kind of action.
+type PCAGetActionRegistryDraftResult struct {
+	Verb *string `json:"verb,omitempty"`
+	Ns   *string `json:"ns,omitempty"`
+	// One of: import, template, sync, edit.
+	Origin *string `json:"origin,omitempty"`
+	// `removed`: the source no longer has the operation; publishing deprecates it. One of: added,
+	// changed, removed, None.
+	Change   *string `json:"change,omitempty"`
+	SourceID *string `json:"source_id,omitempty"`
+	// The ActionDef.
+	Def       map[string]interface{} `json:"def,omitempty"`
+	DefDigest *string                `json:"def_digest,omitempty"`
+	// One of: authored, unreviewed, suggested, confirmed, stale.
+	State *string `json:"state,omitempty"`
+	// What the reviewer is shown: declared, implied and suggested traits, the effective profile, the
+	// policy card, the changes against the active definition.
+	Review   map[string]interface{}                    `json:"review,omitempty"`
+	CardText *string                                   `json:"card_text,omitempty"`
+	Lint     []PCAGetActionRegistryDraftResultLintItem `json:"lint,omitempty"`
+	// The business rules of the action.
+	Rules map[string]interface{} `json:"rules,omitempty"`
+	// The rules in plain sentences.
+	RulesText   []string                                       `json:"rules_text,omitempty"`
+	RulesLint   []PCAGetActionRegistryDraftResultRulesLintItem `json:"rules_lint,omitempty"`
+	RulesReview map[string]interface{}                         `json:"rules_review,omitempty"`
+	// The rules widen against the active version and carry no valid rules review: publishing is
+	// refused until a reviewer signs them.
+	RulesReviewNeeded *bool `json:"rules_review_needed,omitempty"`
+	// The custom traits of the namespace ([] = the core set): the trait registry the attestation is
+	// made against.
+	RegistryTraits    []map[string]interface{}                          `json:"registry_traits,omitempty"`
+	DiffVsActive      *PCAGetActionRegistryDraftResultDiffVsActive      `json:"diff_vs_active,omitempty"`
+	RulesDiffVsActive *PCAGetActionRegistryDraftResultRulesDiffVsActive `json:"rules_diff_vs_active,omitempty"`
+	UpdatedBy         *string                                           `json:"updated_by,omitempty"`
+	UpdatedAt         *string                                           `json:"updated_at,omitempty"`
+}
+
+// PCAUpdateActionRegistryDraftParams: Any edit drops a confirmation and a rules review: the definition is unreviewed again.
+type PCAUpdateActionRegistryDraftParams struct {
+	Title       *string                `json:"title,omitempty"`
+	Description *string                `json:"description,omitempty"`
+	Effects     []string               `json:"effects,omitempty"`
+	Params      map[string]interface{} `json:"params,omitempty"`
+	// The reversibility declaration of the action (class and, where reversible, its compensating
+	// action).
+	Reversibility map[string]interface{} `json:"reversibility,omitempty"`
+	Compensates   *string                `json:"compensates,omitempty"`
+	Traits        []string               `json:"traits,omitempty"`
+	// The business rules (null removes them).
+	Rules map[string]interface{} `json:"rules,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCAUpdateActionRegistryDraftParams) MarshalJSON() ([]byte, error) {
+	type plain PCAUpdateActionRegistryDraftParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCAUpdateActionRegistryDraftResultLintItem is a typed object of the Backend API.
+type PCAUpdateActionRegistryDraftResultLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAUpdateActionRegistryDraftResultRulesLintItem is a typed object of the Backend API.
+type PCAUpdateActionRegistryDraftResultRulesLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAUpdateActionRegistryDraftResultDiffVsActive is a typed object of the Backend API.
+type PCAUpdateActionRegistryDraftResultDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAUpdateActionRegistryDraftResultRulesDiffVsActive is a typed object of the Backend API.
+type PCAUpdateActionRegistryDraftResultRulesDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAUpdateActionRegistryDraftResult: A definition in the review queue. Imported, synced, templated and edited definitions are never
+// confirmed: until a reviewer confirms one it is treated as the most dangerous kind of action.
+type PCAUpdateActionRegistryDraftResult struct {
+	Verb *string `json:"verb,omitempty"`
+	Ns   *string `json:"ns,omitempty"`
+	// One of: import, template, sync, edit.
+	Origin *string `json:"origin,omitempty"`
+	// `removed`: the source no longer has the operation; publishing deprecates it. One of: added,
+	// changed, removed, None.
+	Change   *string `json:"change,omitempty"`
+	SourceID *string `json:"source_id,omitempty"`
+	// The ActionDef.
+	Def       map[string]interface{} `json:"def,omitempty"`
+	DefDigest *string                `json:"def_digest,omitempty"`
+	// One of: authored, unreviewed, suggested, confirmed, stale.
+	State *string `json:"state,omitempty"`
+	// What the reviewer is shown: declared, implied and suggested traits, the effective profile, the
+	// policy card, the changes against the active definition.
+	Review   map[string]interface{}                       `json:"review,omitempty"`
+	CardText *string                                      `json:"card_text,omitempty"`
+	Lint     []PCAUpdateActionRegistryDraftResultLintItem `json:"lint,omitempty"`
+	// The business rules of the action.
+	Rules map[string]interface{} `json:"rules,omitempty"`
+	// The rules in plain sentences.
+	RulesText   []string                                          `json:"rules_text,omitempty"`
+	RulesLint   []PCAUpdateActionRegistryDraftResultRulesLintItem `json:"rules_lint,omitempty"`
+	RulesReview map[string]interface{}                            `json:"rules_review,omitempty"`
+	// The rules widen against the active version and carry no valid rules review: publishing is
+	// refused until a reviewer signs them.
+	RulesReviewNeeded *bool `json:"rules_review_needed,omitempty"`
+	// The custom traits of the namespace ([] = the core set): the trait registry the attestation is
+	// made against.
+	RegistryTraits    []map[string]interface{}                             `json:"registry_traits,omitempty"`
+	DiffVsActive      *PCAUpdateActionRegistryDraftResultDiffVsActive      `json:"diff_vs_active,omitempty"`
+	RulesDiffVsActive *PCAUpdateActionRegistryDraftResultRulesDiffVsActive `json:"rules_diff_vs_active,omitempty"`
+	UpdatedBy         *string                                              `json:"updated_by,omitempty"`
+	UpdatedAt         *string                                              `json:"updated_at,omitempty"`
+}
+
+// PCADeleteActionRegistryDraftResult is a typed object of the Backend API.
+type PCADeleteActionRegistryDraftResult struct {
+	Object  *string `json:"object,omitempty"`
+	Verb    *string `json:"verb,omitempty"`
+	Deleted *bool   `json:"deleted,omitempty"`
+}
+
+// PCAConfirmActionRegistryDraftParamsAttestationDismissedItem is a typed object of the Backend API.
+type PCAConfirmActionRegistryDraftParamsAttestationDismissedItem struct {
+	Trait  *string `json:"trait,omitempty"`
+	Reason *string `json:"reason,omitempty"`
+}
+
+// PCAConfirmActionRegistryDraftParamsAttestation: The reviewer's signed decision over the definition with `traits` = final_traits (signed in the
+// browser with the reviewer key the passkey unwraps).
+type PCAConfirmActionRegistryDraftParamsAttestation struct {
+	DefDigest    string                                                        `json:"def_digest"`
+	TraitsDigest string                                                        `json:"traits_digest"`
+	FactsDigest  string                                                        `json:"facts_digest"`
+	FinalTraits  []string                                                      `json:"final_traits"`
+	Dismissed    []PCAConfirmActionRegistryDraftParamsAttestationDismissedItem `json:"dismissed"`
+	ReviewerKid  string                                                        `json:"reviewer_kid"`
+	// Seconds; at most 10 minutes old and 2 minutes ahead.
+	Ts  int64  `json:"ts"`
+	Sig string `json:"sig"`
+}
+
+// PCAConfirmActionRegistryDraftParamsRulesReview: A signed rules review (needed to publish widened rules).
+type PCAConfirmActionRegistryDraftParamsRulesReview struct {
+	Verb        *string `json:"verb,omitempty"`
+	DefDigest   *string `json:"def_digest,omitempty"`
+	RulesDigest *string `json:"rules_digest,omitempty"`
+	ReviewerKid *string `json:"reviewer_kid,omitempty"`
+	Ts          *int64  `json:"ts,omitempty"`
+	Sig         *string `json:"sig,omitempty"`
+}
+
+// PCAConfirmActionRegistryDraftParamsAssertion: WebAuthn assertion by the reviewer's passkey over
+// sha256('atlas-pca/action-review-challenge/v1\0' || review message || rules review message).
+type PCAConfirmActionRegistryDraftParamsAssertion struct {
+	// The passkey credential id.
+	CredentialID string `json:"credential_id"`
+	// response.authenticatorData.
+	AuthenticatorData string `json:"authenticatorData"`
+	// response.clientDataJSON.
+	ClientDataJSON string `json:"clientDataJSON"`
+	// response.signature.
+	Signature string `json:"signature"`
+}
+
+// PCAConfirmActionRegistryDraftParams is a typed object of the Backend API.
+type PCAConfirmActionRegistryDraftParams struct {
+	// The reviewer's signed decision over the definition with `traits` = final_traits (signed in the
+	// browser with the reviewer key the passkey unwraps).
+	Attestation PCAConfirmActionRegistryDraftParamsAttestation `json:"attestation"`
+	// A signed rules review (needed to publish widened rules).
+	RulesReview *PCAConfirmActionRegistryDraftParamsRulesReview `json:"rules_review,omitempty"`
+	// WebAuthn assertion by the reviewer's passkey over
+	// sha256('atlas-pca/action-review-challenge/v1\0' || review message || rules review message).
+	Assertion PCAConfirmActionRegistryDraftParamsAssertion `json:"assertion"`
+}
+
+// PCAConfirmActionRegistryDraftResultLintItem is a typed object of the Backend API.
+type PCAConfirmActionRegistryDraftResultLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAConfirmActionRegistryDraftResultRulesLintItem is a typed object of the Backend API.
+type PCAConfirmActionRegistryDraftResultRulesLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAConfirmActionRegistryDraftResultDiffVsActive is a typed object of the Backend API.
+type PCAConfirmActionRegistryDraftResultDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAConfirmActionRegistryDraftResultRulesDiffVsActive is a typed object of the Backend API.
+type PCAConfirmActionRegistryDraftResultRulesDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAConfirmActionRegistryDraftResult: A definition in the review queue. Imported, synced, templated and edited definitions are never
+// confirmed: until a reviewer confirms one it is treated as the most dangerous kind of action.
+type PCAConfirmActionRegistryDraftResult struct {
+	Verb *string `json:"verb,omitempty"`
+	Ns   *string `json:"ns,omitempty"`
+	// One of: import, template, sync, edit.
+	Origin *string `json:"origin,omitempty"`
+	// `removed`: the source no longer has the operation; publishing deprecates it. One of: added,
+	// changed, removed, None.
+	Change   *string `json:"change,omitempty"`
+	SourceID *string `json:"source_id,omitempty"`
+	// The ActionDef.
+	Def       map[string]interface{} `json:"def,omitempty"`
+	DefDigest *string                `json:"def_digest,omitempty"`
+	// One of: authored, unreviewed, suggested, confirmed, stale.
+	State *string `json:"state,omitempty"`
+	// What the reviewer is shown: declared, implied and suggested traits, the effective profile, the
+	// policy card, the changes against the active definition.
+	Review   map[string]interface{}                        `json:"review,omitempty"`
+	CardText *string                                       `json:"card_text,omitempty"`
+	Lint     []PCAConfirmActionRegistryDraftResultLintItem `json:"lint,omitempty"`
+	// The business rules of the action.
+	Rules map[string]interface{} `json:"rules,omitempty"`
+	// The rules in plain sentences.
+	RulesText   []string                                           `json:"rules_text,omitempty"`
+	RulesLint   []PCAConfirmActionRegistryDraftResultRulesLintItem `json:"rules_lint,omitempty"`
+	RulesReview map[string]interface{}                             `json:"rules_review,omitempty"`
+	// The rules widen against the active version and carry no valid rules review: publishing is
+	// refused until a reviewer signs them.
+	RulesReviewNeeded *bool `json:"rules_review_needed,omitempty"`
+	// The custom traits of the namespace ([] = the core set): the trait registry the attestation is
+	// made against.
+	RegistryTraits    []map[string]interface{}                              `json:"registry_traits,omitempty"`
+	DiffVsActive      *PCAConfirmActionRegistryDraftResultDiffVsActive      `json:"diff_vs_active,omitempty"`
+	RulesDiffVsActive *PCAConfirmActionRegistryDraftResultRulesDiffVsActive `json:"rules_diff_vs_active,omitempty"`
+	UpdatedBy         *string                                               `json:"updated_by,omitempty"`
+	UpdatedAt         *string                                               `json:"updated_at,omitempty"`
+}
+
+// PCACreateActionRegistryImportParams is a typed object of the Backend API.
+type PCACreateActionRegistryImportParams struct {
+	// The action namespace.
+	Ns string `json:"ns"`
+	// One of: openapi, mcp, graphql, grpc, asyncapi, jsonschema.
+	From string `json:"from"`
+	// An https URL the server fetches (public addresses only, at most 8 MiB, redirects re-checked).
+	// For `mcp`, the server URL: initialize, then tools/list.
+	URL *string `json:"url,omitempty"`
+	// The document text instead of a URL (at most 8 MiB).
+	Source *string `json:"source,omitempty"`
+	// jsonschema only: the verb to give the action.
+	Verb *string `json:"verb,omitempty"`
+	// Keep the URL as a source for manual or scheduled sync.
+	Track *bool `json:"track,omitempty"`
+	// One of: off, hourly, daily.
+	Schedule *string `json:"schedule,omitempty"`
+}
+
+// PCACreateActionRegistryImportResultTodoItem is a typed object of the Backend API.
+type PCACreateActionRegistryImportResultTodoItem struct {
+	Where   *string `json:"where,omitempty"`
+	Code    *string `json:"code,omitempty"`
+	Message *string `json:"message,omitempty"`
+}
+
+// PCACreateActionRegistryImportResult is a typed object of the Backend API.
+type PCACreateActionRegistryImportResult struct {
+	Object *string `json:"object,omitempty"`
+	// Drafts written (operations equal to the current definition are skipped).
+	Imported *int64                                        `json:"imported,omitempty"`
+	Verbs    []string                                      `json:"verbs,omitempty"`
+	Todo     []PCACreateActionRegistryImportResultTodoItem `json:"todo,omitempty"`
+	SourceID *string                                       `json:"source_id,omitempty"`
+}
+
+// PCAGetActionRegistryNamespacesDiffResultChangesItemRules is a typed object of the Backend API.
+type PCAGetActionRegistryNamespacesDiffResultChangesItemRules struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAGetActionRegistryNamespacesDiffResultChangesItem is a typed object of the Backend API.
+type PCAGetActionRegistryNamespacesDiffResultChangesItem struct {
+	Verb *string `json:"verb,omitempty"`
+	// One of: equal, narrow, widen, incomparable, added, removed, deprecated.
+	Class    *string                                                   `json:"class,omitempty"`
+	Reasons  []string                                                  `json:"reasons,omitempty"`
+	Rules    *PCAGetActionRegistryNamespacesDiffResultChangesItemRules `json:"rules,omitempty"`
+	Reviewed *bool                                                     `json:"reviewed,omitempty"`
+}
+
+// PCAGetActionRegistryNamespacesDiffResult is a typed object of the Backend API.
+type PCAGetActionRegistryNamespacesDiffResult struct {
+	// false when moving to `to` would need a reviewer signature that is missing.
+	Ok   bool   `json:"ok"`
+	From string `json:"from"`
+	To   string `json:"to"`
+	// When not ok: the refusal code.
+	Code *string `json:"code,omitempty"`
+	// When not ok: why.
+	Message *string `json:"message,omitempty"`
+	// When not ok: the actions that need a reviewer.
+	Verbs   []string                                              `json:"verbs,omitempty"`
+	Changes []PCAGetActionRegistryNamespacesDiffResultChangesItem `json:"changes"`
+}
+
+// PCASetActionRegistryNamespacesPinParams is a typed object of the Backend API.
+type PCASetActionRegistryNamespacesPinParams struct {
+	// The stored version to activate and pin (MAJOR.MINOR.PATCH).
+	Version string `json:"version"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCASetActionRegistryNamespacesPinParams) MarshalJSON() ([]byte, error) {
+	type plain PCASetActionRegistryNamespacesPinParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCASetActionRegistryNamespacesPinResultChangesItemRules is a typed object of the Backend API.
+type PCASetActionRegistryNamespacesPinResultChangesItemRules struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCASetActionRegistryNamespacesPinResultChangesItem is a typed object of the Backend API.
+type PCASetActionRegistryNamespacesPinResultChangesItem struct {
+	Verb *string `json:"verb,omitempty"`
+	// One of: equal, narrow, widen, incomparable, added, removed, deprecated.
+	Class    *string                                                  `json:"class,omitempty"`
+	Reasons  []string                                                 `json:"reasons,omitempty"`
+	Rules    *PCASetActionRegistryNamespacesPinResultChangesItemRules `json:"rules,omitempty"`
+	Reviewed *bool                                                    `json:"reviewed,omitempty"`
+}
+
+// PCASetActionRegistryNamespacesPinResult is a typed object of the Backend API.
+type PCASetActionRegistryNamespacesPinResult struct {
+	Object        *string                                              `json:"object,omitempty"`
+	Ns            *string                                              `json:"ns,omitempty"`
+	ActiveVersion *string                                              `json:"active_version,omitempty"`
+	Pinned        *bool                                                `json:"pinned,omitempty"`
+	Changes       []PCASetActionRegistryNamespacesPinResultChangesItem `json:"changes,omitempty"`
+}
+
+// PCADeleteActionRegistryNamespacesPinResultChangesItemRules is a typed object of the Backend API.
+type PCADeleteActionRegistryNamespacesPinResultChangesItemRules struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCADeleteActionRegistryNamespacesPinResultChangesItem is a typed object of the Backend API.
+type PCADeleteActionRegistryNamespacesPinResultChangesItem struct {
+	Verb *string `json:"verb,omitempty"`
+	// One of: equal, narrow, widen, incomparable, added, removed, deprecated.
+	Class    *string                                                     `json:"class,omitempty"`
+	Reasons  []string                                                    `json:"reasons,omitempty"`
+	Rules    *PCADeleteActionRegistryNamespacesPinResultChangesItemRules `json:"rules,omitempty"`
+	Reviewed *bool                                                       `json:"reviewed,omitempty"`
+}
+
+// PCADeleteActionRegistryNamespacesPinResult is a typed object of the Backend API.
+type PCADeleteActionRegistryNamespacesPinResult struct {
+	Object        *string                                                 `json:"object,omitempty"`
+	Ns            *string                                                 `json:"ns,omitempty"`
+	ActiveVersion *string                                                 `json:"active_version,omitempty"`
+	Pinned        *bool                                                   `json:"pinned,omitempty"`
+	Changes       []PCADeleteActionRegistryNamespacesPinResultChangesItem `json:"changes,omitempty"`
+}
+
+// PCAListActionRegistryNamespacesVersionsItemChangesItemRules is a typed object of the Backend API.
+type PCAListActionRegistryNamespacesVersionsItemChangesItemRules struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAListActionRegistryNamespacesVersionsItemChangesItem is a typed object of the Backend API.
+type PCAListActionRegistryNamespacesVersionsItemChangesItem struct {
+	Verb *string `json:"verb,omitempty"`
+	// One of: equal, narrow, widen, incomparable, added, removed, deprecated.
+	Class    *string                                                      `json:"class,omitempty"`
+	Reasons  []string                                                     `json:"reasons,omitempty"`
+	Rules    *PCAListActionRegistryNamespacesVersionsItemChangesItemRules `json:"rules,omitempty"`
+	Reviewed *bool                                                        `json:"reviewed,omitempty"`
+}
+
+// PCAListActionRegistryNamespacesVersionsItem is a typed object of the Backend API.
+type PCAListActionRegistryNamespacesVersionsItem struct {
+	Version *string `json:"version,omitempty"`
+	Digest  *string `json:"digest,omitempty"`
+	Prev    *string `json:"prev,omitempty"`
+	// One of: active, staged.
+	Status *string `json:"status,omitempty"`
+	// How it was published: `secret_key`, a console user, or a publisher key.
+	PublishedBy *string                                                  `json:"published_by,omitempty"`
+	CreatedAt   *string                                                  `json:"created_at,omitempty"`
+	Changes     []PCAListActionRegistryNamespacesVersionsItemChangesItem `json:"changes,omitempty"`
+}
+
+// PCAGetActionRegistryNamespacesVersionResultChangesItemRules is a typed object of the Backend API.
+type PCAGetActionRegistryNamespacesVersionResultChangesItemRules struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAGetActionRegistryNamespacesVersionResultChangesItem is a typed object of the Backend API.
+type PCAGetActionRegistryNamespacesVersionResultChangesItem struct {
+	Verb *string `json:"verb,omitempty"`
+	// One of: equal, narrow, widen, incomparable, added, removed, deprecated.
+	Class    *string                                                      `json:"class,omitempty"`
+	Reasons  []string                                                     `json:"reasons,omitempty"`
+	Rules    *PCAGetActionRegistryNamespacesVersionResultChangesItemRules `json:"rules,omitempty"`
+	Reviewed *bool                                                        `json:"reviewed,omitempty"`
+}
+
+// PCAGetActionRegistryNamespacesVersionResult is a typed object of the Backend API.
+type PCAGetActionRegistryNamespacesVersionResult struct {
+	Object  *string `json:"object,omitempty"`
+	Version *string `json:"version,omitempty"`
+	Digest  *string `json:"digest,omitempty"`
+	Prev    *string `json:"prev,omitempty"`
+	// One of: active, staged.
+	Status *string `json:"status,omitempty"`
+	// How it was published: `secret_key`, a console user, or a publisher key.
+	PublishedBy *string                                                  `json:"published_by,omitempty"`
+	CreatedAt   *string                                                  `json:"created_at,omitempty"`
+	Changes     []PCAGetActionRegistryNamespacesVersionResultChangesItem `json:"changes,omitempty"`
+	Ns          *string                                                  `json:"ns,omitempty"`
+	Pack        map[string]interface{}                                   `json:"pack,omitempty"`
+	Rules       map[string]interface{}                                   `json:"rules,omitempty"`
+	Traits      map[string]interface{}                                   `json:"traits,omitempty"`
+	Deprecated  []string                                                 `json:"deprecated,omitempty"`
+}
+
+// PCACreateActionRegistryPackParams is a typed object of the Backend API.
+type PCACreateActionRegistryPackParams struct {
+	// The signed action pack (its namespace, version, definitions and publisher signature).
+	Pack map[string]interface{} `json:"pack"`
+	// The business rules of the pack, keyed by verb.
+	Rules map[string]interface{} `json:"rules,omitempty"`
+	// The custom traits of the namespace (omit for the core set).
+	Traits map[string]interface{} `json:"traits,omitempty"`
+}
+
+// PCACreateActionRegistryPackResultChangesItemRules is a typed object of the Backend API.
+type PCACreateActionRegistryPackResultChangesItemRules struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCACreateActionRegistryPackResultChangesItem is a typed object of the Backend API.
+type PCACreateActionRegistryPackResultChangesItem struct {
+	Verb *string `json:"verb,omitempty"`
+	// One of: equal, narrow, widen, incomparable, added, removed, deprecated.
+	Class    *string                                            `json:"class,omitempty"`
+	Reasons  []string                                           `json:"reasons,omitempty"`
+	Rules    *PCACreateActionRegistryPackResultChangesItemRules `json:"rules,omitempty"`
+	Reviewed *bool                                              `json:"reviewed,omitempty"`
+}
+
+// PCACreateActionRegistryPackResult is a typed object of the Backend API.
+type PCACreateActionRegistryPackResult struct {
+	Object  *string `json:"object,omitempty"`
+	Ns      *string `json:"ns,omitempty"`
+	Version *string `json:"version,omitempty"`
+	Digest  *string `json:"digest,omitempty"`
+	Prev    *string `json:"prev,omitempty"`
+	// One of: active, staged.
+	Status          *string                                        `json:"status,omitempty"`
+	Changes         []PCACreateActionRegistryPackResultChangesItem `json:"changes,omitempty"`
+	PublishedDrafts *int64                                         `json:"published_drafts,omitempty"`
+}
+
+// PCAPublishActionRegistryParams is a typed object of the Backend API.
+type PCAPublishActionRegistryParams struct {
+	// The action namespace.
+	Ns string `json:"ns"`
+	// MAJOR.MINOR.PATCH; default: the next patch version.
+	Version *string `json:"version,omitempty"`
+}
+
+// PCAPublishActionRegistryResultChangesItemRules is a typed object of the Backend API.
+type PCAPublishActionRegistryResultChangesItemRules struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAPublishActionRegistryResultChangesItem is a typed object of the Backend API.
+type PCAPublishActionRegistryResultChangesItem struct {
+	Verb *string `json:"verb,omitempty"`
+	// One of: equal, narrow, widen, incomparable, added, removed, deprecated.
+	Class    *string                                         `json:"class,omitempty"`
+	Reasons  []string                                        `json:"reasons,omitempty"`
+	Rules    *PCAPublishActionRegistryResultChangesItemRules `json:"rules,omitempty"`
+	Reviewed *bool                                           `json:"reviewed,omitempty"`
+}
+
+// PCAPublishActionRegistryResult is a typed object of the Backend API.
+type PCAPublishActionRegistryResult struct {
+	Object  *string `json:"object,omitempty"`
+	Ns      *string `json:"ns,omitempty"`
+	Version *string `json:"version,omitempty"`
+	Digest  *string `json:"digest,omitempty"`
+	Prev    *string `json:"prev,omitempty"`
+	// One of: active, staged.
+	Status          *string                                     `json:"status,omitempty"`
+	Changes         []PCAPublishActionRegistryResultChangesItem `json:"changes,omitempty"`
+	PublishedDrafts *int64                                      `json:"published_drafts,omitempty"`
+}
+
+// PCACreateActionRegistryPublisherKeyParams is a typed object of the Backend API.
+type PCACreateActionRegistryPublisherKeyParams struct {
+	// The key id (not a reserved id, and never one starting with `rv_`).
+	Kid string `json:"kid"`
+	// The Ed25519 public key (32 bytes). A key already pinned under another role or id is refused with
+	// 409.
+	Pk          string  `json:"pk"`
+	DisplayName *string `json:"display_name,omitempty"`
+}
+
+// PCACreateActionRegistryPublisherKeyResult is a typed object of the Backend API.
+type PCACreateActionRegistryPublisherKeyResult struct {
+	Object      *string `json:"object,omitempty"`
+	Kid         *string `json:"kid,omitempty"`
+	Pk          *string `json:"pk,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+}
+
+// PCAListActionRegistryReviewersItemCredentialsItem is a typed object of the Backend API.
+type PCAListActionRegistryReviewersItemCredentialsItem struct {
+	ID         *string  `json:"id,omitempty"`
+	Name       *string  `json:"name,omitempty"`
+	Transports []string `json:"transports,omitempty"`
+	Status     *string  `json:"status,omitempty"`
+	CreatedAt  *string  `json:"created_at,omitempty"`
+	LastUsedAt *string  `json:"last_used_at,omitempty"`
+	RevokedAt  *string  `json:"revoked_at,omitempty"`
+}
+
+// PCAListActionRegistryReviewersItem is a typed object of the Backend API.
+type PCAListActionRegistryReviewersItem struct {
+	Object *string `json:"object,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	// `rv_<id>` once enrolled.
+	Kid         *string `json:"kid,omitempty"`
+	Pk          *string `json:"pk,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	UserID      *string `json:"user_id,omitempty"`
+	// One of: pending, active, disabled.
+	Status      *string                                             `json:"status,omitempty"`
+	CreatedAt   *string                                             `json:"created_at,omitempty"`
+	Credentials []PCAListActionRegistryReviewersItemCredentialsItem `json:"credentials,omitempty"`
+}
+
+// PCACreateActionRegistryReviewersEnrolmentParams is a typed object of the Backend API.
+type PCACreateActionRegistryReviewersEnrolmentParams struct {
+	DisplayName *string `json:"display_name,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	// The dashboard user who reviews from the console (default from the console: the signed-in user).
+	UserID *string `json:"user_id,omitempty"`
+}
+
+// PCACreateActionRegistryReviewersEnrolmentResult is a typed object of the Backend API.
+type PCACreateActionRegistryReviewersEnrolmentResult struct {
+	Object *string `json:"object,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	// Single-use link (24 hours).
+	EnrolmentURL *string `json:"enrolment_url,omitempty"`
+	ExpiresAt    *string `json:"expires_at,omitempty"`
+	ReviewerID   *string `json:"reviewer_id,omitempty"`
+}
+
+// PCADeleteActionRegistryReviewerResultCredentialsItem is a typed object of the Backend API.
+type PCADeleteActionRegistryReviewerResultCredentialsItem struct {
+	ID         *string  `json:"id,omitempty"`
+	Name       *string  `json:"name,omitempty"`
+	Transports []string `json:"transports,omitempty"`
+	Status     *string  `json:"status,omitempty"`
+	CreatedAt  *string  `json:"created_at,omitempty"`
+	LastUsedAt *string  `json:"last_used_at,omitempty"`
+	RevokedAt  *string  `json:"revoked_at,omitempty"`
+}
+
+// PCADeleteActionRegistryReviewerResult is a typed object of the Backend API.
+type PCADeleteActionRegistryReviewerResult struct {
+	Object *string `json:"object,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	// `rv_<id>` once enrolled.
+	Kid         *string `json:"kid,omitempty"`
+	Pk          *string `json:"pk,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	UserID      *string `json:"user_id,omitempty"`
+	// One of: pending, active, disabled.
+	Status      *string                                                `json:"status,omitempty"`
+	CreatedAt   *string                                                `json:"created_at,omitempty"`
+	Credentials []PCADeleteActionRegistryReviewerResultCredentialsItem `json:"credentials,omitempty"`
+}
+
+// PCAListActionRegistrySourcesItem is a typed object of the Backend API.
+type PCAListActionRegistrySourcesItem struct {
+	Object *string `json:"object,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	Ns     *string `json:"ns,omitempty"`
+	// One of: openapi, mcp, graphql, grpc, asyncapi, jsonschema.
+	Kind *string `json:"kind,omitempty"`
+	URI  *string `json:"uri,omitempty"`
+	Verb *string `json:"verb,omitempty"`
+	// One of: off, hourly, daily.
+	Schedule     *string `json:"schedule,omitempty"`
+	LastSyncedAt *string `json:"last_synced_at,omitempty"`
+	NextRunAt    *string `json:"next_run_at,omitempty"`
+	// One of: ok, changes, error, None.
+	LastStatus *string `json:"last_status,omitempty"`
+	LastError  *string `json:"last_error,omitempty"`
+	Failures   *int64  `json:"failures,omitempty"`
+	Operations *int64  `json:"operations,omitempty"`
+	CreatedAt  *string `json:"created_at,omitempty"`
+}
+
+// PCACreateActionRegistrySourceParams is a typed object of the Backend API.
+type PCACreateActionRegistrySourceParams struct {
+	// The action namespace.
+	Ns string `json:"ns"`
+	// One of: openapi, mcp, graphql, grpc, asyncapi, jsonschema.
+	From string  `json:"from"`
+	URL  string  `json:"url"`
+	Verb *string `json:"verb,omitempty"`
+	// One of: off, hourly, daily.
+	Schedule *string `json:"schedule,omitempty"`
+}
+
+// PCACreateActionRegistrySourceResult is a typed object of the Backend API.
+type PCACreateActionRegistrySourceResult struct {
+	Object *string `json:"object,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	Ns     *string `json:"ns,omitempty"`
+	// One of: openapi, mcp, graphql, grpc, asyncapi, jsonschema.
+	Kind *string `json:"kind,omitempty"`
+	URI  *string `json:"uri,omitempty"`
+	Verb *string `json:"verb,omitempty"`
+	// One of: off, hourly, daily.
+	Schedule     *string `json:"schedule,omitempty"`
+	LastSyncedAt *string `json:"last_synced_at,omitempty"`
+	NextRunAt    *string `json:"next_run_at,omitempty"`
+	// One of: ok, changes, error, None.
+	LastStatus *string `json:"last_status,omitempty"`
+	LastError  *string `json:"last_error,omitempty"`
+	Failures   *int64  `json:"failures,omitempty"`
+	Operations *int64  `json:"operations,omitempty"`
+	CreatedAt  *string `json:"created_at,omitempty"`
+}
+
+// PCAUpdateActionRegistrySourceParams is a typed object of the Backend API.
+type PCAUpdateActionRegistrySourceParams struct {
+	URL  *string `json:"url,omitempty"`
+	Verb *string `json:"verb,omitempty"`
+	// One of: off, hourly, daily.
+	Schedule *string `json:"schedule,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCAUpdateActionRegistrySourceParams) MarshalJSON() ([]byte, error) {
+	type plain PCAUpdateActionRegistrySourceParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCAUpdateActionRegistrySourceResult is a typed object of the Backend API.
+type PCAUpdateActionRegistrySourceResult struct {
+	Object *string `json:"object,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	Ns     *string `json:"ns,omitempty"`
+	// One of: openapi, mcp, graphql, grpc, asyncapi, jsonschema.
+	Kind *string `json:"kind,omitempty"`
+	URI  *string `json:"uri,omitempty"`
+	Verb *string `json:"verb,omitempty"`
+	// One of: off, hourly, daily.
+	Schedule     *string `json:"schedule,omitempty"`
+	LastSyncedAt *string `json:"last_synced_at,omitempty"`
+	NextRunAt    *string `json:"next_run_at,omitempty"`
+	// One of: ok, changes, error, None.
+	LastStatus *string `json:"last_status,omitempty"`
+	LastError  *string `json:"last_error,omitempty"`
+	Failures   *int64  `json:"failures,omitempty"`
+	Operations *int64  `json:"operations,omitempty"`
+	CreatedAt  *string `json:"created_at,omitempty"`
+}
+
+// PCADeleteActionRegistrySourceResult is a typed object of the Backend API.
+type PCADeleteActionRegistrySourceResult struct {
+	Object  *string `json:"object,omitempty"`
+	ID      *string `json:"id,omitempty"`
+	Deleted *bool   `json:"deleted,omitempty"`
+}
+
+// PCASyncActionRegistrySourceResultEntriesItemDiff is a typed object of the Backend API.
+type PCASyncActionRegistrySourceResultEntriesItemDiff struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCASyncActionRegistrySourceResultEntriesItem is a typed object of the Backend API.
+type PCASyncActionRegistrySourceResultEntriesItem struct {
+	Verb *string `json:"verb,omitempty"`
+	// One of: added, changed, unchanged, removed.
+	Change *string                                           `json:"change,omitempty"`
+	Diff   *PCASyncActionRegistrySourceResultEntriesItemDiff `json:"diff,omitempty"`
+}
+
+// PCASyncActionRegistrySourceResult is a typed object of the Backend API.
+type PCASyncActionRegistrySourceResult struct {
+	Object      *string                                        `json:"object,omitempty"`
+	SourceID    *string                                        `json:"source_id,omitempty"`
+	Ns          *string                                        `json:"ns,omitempty"`
+	Entries     []PCASyncActionRegistrySourceResultEntriesItem `json:"entries,omitempty"`
+	NeedsReview *bool                                          `json:"needs_review,omitempty"`
+	Drafted     []string                                       `json:"drafted,omitempty"`
+}
+
+// PCAListActionRegistryTemplatesItem is a typed object of the Backend API.
+type PCAListActionRegistryTemplatesItem struct {
+	ID          *string  `json:"id,omitempty"`
+	Title       *string  `json:"title,omitempty"`
+	Description *string  `json:"description,omitempty"`
+	Ns          *string  `json:"ns,omitempty"`
+	Actions     *int64   `json:"actions,omitempty"`
+	Traits      []string `json:"traits,omitempty"`
+}
+
+// PCAApplyActionRegistryTemplateParams is a typed object of the Backend API.
+type PCAApplyActionRegistryTemplateParams struct {
+	// The action namespace.
+	Ns *string `json:"ns,omitempty"`
+}
+
+// PCAApplyActionRegistryTemplateItemLintItem is a typed object of the Backend API.
+type PCAApplyActionRegistryTemplateItemLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAApplyActionRegistryTemplateItemRulesLintItem is a typed object of the Backend API.
+type PCAApplyActionRegistryTemplateItemRulesLintItem struct {
+	Rule *string `json:"rule,omitempty"`
+	// One of: error, warning, note.
+	Severity *string `json:"severity,omitempty"`
+	Verb     *string `json:"verb,omitempty"`
+	Param    *string `json:"param,omitempty"`
+	Message  *string `json:"message,omitempty"`
+}
+
+// PCAApplyActionRegistryTemplateItemDiffVsActive is a typed object of the Backend API.
+type PCAApplyActionRegistryTemplateItemDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAApplyActionRegistryTemplateItemRulesDiffVsActive is a typed object of the Backend API.
+type PCAApplyActionRegistryTemplateItemRulesDiffVsActive struct {
+	// One of: equal, narrow, widen, incomparable.
+	Class   *string  `json:"class,omitempty"`
+	Reasons []string `json:"reasons,omitempty"`
+}
+
+// PCAApplyActionRegistryTemplateItem: A definition in the review queue. Imported, synced, templated and edited definitions are never
+// confirmed: until a reviewer confirms one it is treated as the most dangerous kind of action.
+type PCAApplyActionRegistryTemplateItem struct {
+	Verb *string `json:"verb,omitempty"`
+	Ns   *string `json:"ns,omitempty"`
+	// One of: import, template, sync, edit.
+	Origin *string `json:"origin,omitempty"`
+	// `removed`: the source no longer has the operation; publishing deprecates it. One of: added,
+	// changed, removed, None.
+	Change   *string `json:"change,omitempty"`
+	SourceID *string `json:"source_id,omitempty"`
+	// The ActionDef.
+	Def       map[string]interface{} `json:"def,omitempty"`
+	DefDigest *string                `json:"def_digest,omitempty"`
+	// One of: authored, unreviewed, suggested, confirmed, stale.
+	State *string `json:"state,omitempty"`
+	// What the reviewer is shown: declared, implied and suggested traits, the effective profile, the
+	// policy card, the changes against the active definition.
+	Review   map[string]interface{}                       `json:"review,omitempty"`
+	CardText *string                                      `json:"card_text,omitempty"`
+	Lint     []PCAApplyActionRegistryTemplateItemLintItem `json:"lint,omitempty"`
+	// The business rules of the action.
+	Rules map[string]interface{} `json:"rules,omitempty"`
+	// The rules in plain sentences.
+	RulesText   []string                                          `json:"rules_text,omitempty"`
+	RulesLint   []PCAApplyActionRegistryTemplateItemRulesLintItem `json:"rules_lint,omitempty"`
+	RulesReview map[string]interface{}                            `json:"rules_review,omitempty"`
+	// The rules widen against the active version and carry no valid rules review: publishing is
+	// refused until a reviewer signs them.
+	RulesReviewNeeded *bool `json:"rules_review_needed,omitempty"`
+	// The custom traits of the namespace ([] = the core set): the trait registry the attestation is
+	// made against.
+	RegistryTraits    []map[string]interface{}                             `json:"registry_traits,omitempty"`
+	DiffVsActive      *PCAApplyActionRegistryTemplateItemDiffVsActive      `json:"diff_vs_active,omitempty"`
+	RulesDiffVsActive *PCAApplyActionRegistryTemplateItemRulesDiffVsActive `json:"rules_diff_vs_active,omitempty"`
+	UpdatedBy         *string                                              `json:"updated_by,omitempty"`
+	UpdatedAt         *string                                              `json:"updated_at,omitempty"`
+}
+
+// PCAGetApprovalsSettingsResultChannels is a typed object of the Backend API.
+type PCAGetApprovalsSettingsResultChannels struct {
+	Push    *bool `json:"push,omitempty"`
+	Email   *bool `json:"email,omitempty"`
+	SMS     *bool `json:"sms,omitempty"`
+	Slack   *bool `json:"slack,omitempty"`
+	Webhook *bool `json:"webhook,omitempty"`
+}
+
+// PCAGetApprovalsSettingsResultCIBA is a typed object of the Backend API.
+type PCAGetApprovalsSettingsResultCIBA struct {
+	Enabled *bool `json:"enabled,omitempty"`
+	// notify: a CIBA deny denies; require: a member must also approve in their identity provider. One
+	// of: notify, require.
+	Mode                              *string `json:"mode,omitempty"`
+	BackchannelAuthenticationEndpoint *string `json:"backchannel_authentication_endpoint,omitempty"`
+	TokenEndpoint                     *string `json:"token_endpoint,omitempty"`
+	ClientID                          *string `json:"client_id,omitempty"`
+	// One of: email, subject_id.
+	LoginHint       *string `json:"login_hint,omitempty"`
+	ClientSecretSet *bool   `json:"client_secret_set,omitempty"`
+}
+
+// PCAGetApprovalsSettingsResult is a typed object of the Backend API.
+type PCAGetApprovalsSettingsResult struct {
+	Object                *string                                `json:"object,omitempty"`
+	Channels              *PCAGetApprovalsSettingsResultChannels `json:"channels,omitempty"`
+	DefaultMemberChannels []string                               `json:"default_member_channels,omitempty"`
+	CIBA                  *PCAGetApprovalsSettingsResultCIBA     `json:"ciba,omitempty"`
+	SlackWebhookSet       *bool                                  `json:"slack_webhook_set,omitempty"`
+}
+
+// PCASetApprovalsSettingsParamsChannels is a typed object of the Backend API.
+type PCASetApprovalsSettingsParamsChannels struct {
+	Push    *bool `json:"push,omitempty"`
+	Email   *bool `json:"email,omitempty"`
+	SMS     *bool `json:"sms,omitempty"`
+	Slack   *bool `json:"slack,omitempty"`
+	Webhook *bool `json:"webhook,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCASetApprovalsSettingsParamsChannels) MarshalJSON() ([]byte, error) {
+	type plain PCASetApprovalsSettingsParamsChannels
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCASetApprovalsSettingsParamsCIBA is a typed object of the Backend API.
+type PCASetApprovalsSettingsParamsCIBA struct {
+	Enabled *bool `json:"enabled,omitempty"`
+	// notify: a CIBA deny denies; require: a member must also approve in their identity provider. One
+	// of: notify, require.
+	Mode                              *string `json:"mode,omitempty"`
+	BackchannelAuthenticationEndpoint *string `json:"backchannel_authentication_endpoint,omitempty"`
+	TokenEndpoint                     *string `json:"token_endpoint,omitempty"`
+	ClientID                          *string `json:"client_id,omitempty"`
+	// One of: email, subject_id.
+	LoginHint *string `json:"login_hint,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCASetApprovalsSettingsParamsCIBA) MarshalJSON() ([]byte, error) {
+	type plain PCASetApprovalsSettingsParamsCIBA
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCASetApprovalsSettingsParams is a typed object of the Backend API.
+type PCASetApprovalsSettingsParams struct {
+	Channels              *PCASetApprovalsSettingsParamsChannels `json:"channels,omitempty"`
+	DefaultMemberChannels []string                               `json:"default_member_channels,omitempty"`
+	CIBA                  *PCASetApprovalsSettingsParamsCIBA     `json:"ciba,omitempty"`
+	// A hooks.slack.com incoming-webhook URL; stored encrypted, never returned. null clears.
+	SlackWebhookURL *string `json:"slack_webhook_url,omitempty"`
+	// Stored encrypted, never returned. null clears.
+	CIBAClientSecret *string `json:"ciba_client_secret,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCASetApprovalsSettingsParams) MarshalJSON() ([]byte, error) {
+	type plain PCASetApprovalsSettingsParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCASetApprovalsSettingsResultChannels is a typed object of the Backend API.
+type PCASetApprovalsSettingsResultChannels struct {
+	Push    *bool `json:"push,omitempty"`
+	Email   *bool `json:"email,omitempty"`
+	SMS     *bool `json:"sms,omitempty"`
+	Slack   *bool `json:"slack,omitempty"`
+	Webhook *bool `json:"webhook,omitempty"`
+}
+
+// PCASetApprovalsSettingsResultCIBA is a typed object of the Backend API.
+type PCASetApprovalsSettingsResultCIBA struct {
+	Enabled *bool `json:"enabled,omitempty"`
+	// notify: a CIBA deny denies; require: a member must also approve in their identity provider. One
+	// of: notify, require.
+	Mode                              *string `json:"mode,omitempty"`
+	BackchannelAuthenticationEndpoint *string `json:"backchannel_authentication_endpoint,omitempty"`
+	TokenEndpoint                     *string `json:"token_endpoint,omitempty"`
+	ClientID                          *string `json:"client_id,omitempty"`
+	// One of: email, subject_id.
+	LoginHint       *string `json:"login_hint,omitempty"`
+	ClientSecretSet *bool   `json:"client_secret_set,omitempty"`
+}
+
+// PCASetApprovalsSettingsResult is a typed object of the Backend API.
+type PCASetApprovalsSettingsResult struct {
+	Object                *string                                `json:"object,omitempty"`
+	Channels              *PCASetApprovalsSettingsResultChannels `json:"channels,omitempty"`
+	DefaultMemberChannels []string                               `json:"default_member_channels,omitempty"`
+	CIBA                  *PCASetApprovalsSettingsResultCIBA     `json:"ciba,omitempty"`
+	SlackWebhookSet       *bool                                  `json:"slack_webhook_set,omitempty"`
+}
+
+// PCAListApproversItemMembersItem is a typed object of the Backend API.
+type PCAListApproversItemMembersItem struct {
+	ID          *string  `json:"id,omitempty"`
+	DisplayName *string  `json:"display_name,omitempty"`
+	UserID      *string  `json:"user_id,omitempty"`
+	Email       *string  `json:"email,omitempty"`
+	Phone       *string  `json:"phone,omitempty"`
+	Channels    []string `json:"channels,omitempty"`
+	Status      *string  `json:"status,omitempty"`
+	CreatedAt   *string  `json:"created_at,omitempty"`
+}
+
+// PCAListApproversItemCredentialsItem is a typed object of the Backend API.
+type PCAListApproversItemCredentialsItem struct {
+	ID         *string  `json:"id,omitempty"`
+	MemberID   *string  `json:"member_id,omitempty"`
+	Name       *string  `json:"name,omitempty"`
+	Transports []string `json:"transports,omitempty"`
+	Aaguid     *string  `json:"aaguid,omitempty"`
+	// One of: active, revoked.
+	Status     *string `json:"status,omitempty"`
+	CreatedAt  *string `json:"created_at,omitempty"`
+	LastUsedAt *string `json:"last_used_at,omitempty"`
+	RevokedAt  *string `json:"revoked_at,omitempty"`
+}
+
+// PCAListApproversItem is a typed object of the Backend API.
+type PCAListApproversItem struct {
+	Object       *string `json:"object,omitempty"`
+	ID           *string `json:"id,omitempty"`
+	PrincipalPub *string `json:"principal_pub,omitempty"`
+	// One of: user, org, machine.
+	SubjectType *string `json:"subject_type,omitempty"`
+	SubjectID   *string `json:"subject_id,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	Quorum      *int64  `json:"quorum,omitempty"`
+	// One of: active, disabled.
+	Status      *string                               `json:"status,omitempty"`
+	CreatedAt   *string                               `json:"created_at,omitempty"`
+	Members     []PCAListApproversItemMembersItem     `json:"members,omitempty"`
+	Credentials []PCAListApproversItemCredentialsItem `json:"credentials,omitempty"`
+}
+
+// PCACreateApproversEnrolmentParams is a typed object of the Backend API.
+type PCACreateApproversEnrolmentParams struct {
+	// New approver: the subject the principal key is bound to. One of: user, org, machine.
+	SubjectType *string `json:"subject_type,omitempty"`
+	SubjectID   *string `json:"subject_id,omitempty"`
+	// Add a delegate (or, with member_id, another passkey) to an existing approver.
+	ApproverID  *string `json:"approver_id,omitempty"`
+	MemberID    *string `json:"member_id,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	// E.164.
+	Phone *string `json:"phone,omitempty"`
+	// Instance user of the member (push notifications go to their devices).
+	UserID   *string  `json:"user_id,omitempty"`
+	Channels []string `json:"channels,omitempty"`
+}
+
+// PCACreateApproversEnrolmentResult is a typed object of the Backend API.
+type PCACreateApproversEnrolmentResult struct {
+	Object *string `json:"object,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	// Single-use link to the hosted enrolment page (valid 24 hours).
+	EnrolmentURL *string `json:"enrolment_url,omitempty"`
+	ExpiresAt    *string `json:"expires_at,omitempty"`
+	ApproverID   *string `json:"approver_id,omitempty"`
+	MemberID     *string `json:"member_id,omitempty"`
+}
+
+// PCAGetApproverResultMembersItem is a typed object of the Backend API.
+type PCAGetApproverResultMembersItem struct {
+	ID          *string  `json:"id,omitempty"`
+	DisplayName *string  `json:"display_name,omitempty"`
+	UserID      *string  `json:"user_id,omitempty"`
+	Email       *string  `json:"email,omitempty"`
+	Phone       *string  `json:"phone,omitempty"`
+	Channels    []string `json:"channels,omitempty"`
+	Status      *string  `json:"status,omitempty"`
+	CreatedAt   *string  `json:"created_at,omitempty"`
+}
+
+// PCAGetApproverResultCredentialsItem is a typed object of the Backend API.
+type PCAGetApproverResultCredentialsItem struct {
+	ID         *string  `json:"id,omitempty"`
+	MemberID   *string  `json:"member_id,omitempty"`
+	Name       *string  `json:"name,omitempty"`
+	Transports []string `json:"transports,omitempty"`
+	Aaguid     *string  `json:"aaguid,omitempty"`
+	// One of: active, revoked.
+	Status     *string `json:"status,omitempty"`
+	CreatedAt  *string `json:"created_at,omitempty"`
+	LastUsedAt *string `json:"last_used_at,omitempty"`
+	RevokedAt  *string `json:"revoked_at,omitempty"`
+}
+
+// PCAGetApproverResult is a typed object of the Backend API.
+type PCAGetApproverResult struct {
+	Object       *string `json:"object,omitempty"`
+	ID           *string `json:"id,omitempty"`
+	PrincipalPub *string `json:"principal_pub,omitempty"`
+	// One of: user, org, machine.
+	SubjectType *string `json:"subject_type,omitempty"`
+	SubjectID   *string `json:"subject_id,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	Quorum      *int64  `json:"quorum,omitempty"`
+	// One of: active, disabled.
+	Status      *string                               `json:"status,omitempty"`
+	CreatedAt   *string                               `json:"created_at,omitempty"`
+	Members     []PCAGetApproverResultMembersItem     `json:"members,omitempty"`
+	Credentials []PCAGetApproverResultCredentialsItem `json:"credentials,omitempty"`
+}
+
+// PCAUpdateApproverParams is a typed object of the Backend API.
+type PCAUpdateApproverParams struct {
+	// Distinct members whose passkey approval is required (at most the active members).
+	Quorum      *int64  `json:"quorum,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	// One of: active, disabled.
+	Status *string `json:"status,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCAUpdateApproverParams) MarshalJSON() ([]byte, error) {
+	type plain PCAUpdateApproverParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCAUpdateApproverResultMembersItem is a typed object of the Backend API.
+type PCAUpdateApproverResultMembersItem struct {
+	ID          *string  `json:"id,omitempty"`
+	DisplayName *string  `json:"display_name,omitempty"`
+	UserID      *string  `json:"user_id,omitempty"`
+	Email       *string  `json:"email,omitempty"`
+	Phone       *string  `json:"phone,omitempty"`
+	Channels    []string `json:"channels,omitempty"`
+	Status      *string  `json:"status,omitempty"`
+	CreatedAt   *string  `json:"created_at,omitempty"`
+}
+
+// PCAUpdateApproverResultCredentialsItem is a typed object of the Backend API.
+type PCAUpdateApproverResultCredentialsItem struct {
+	ID         *string  `json:"id,omitempty"`
+	MemberID   *string  `json:"member_id,omitempty"`
+	Name       *string  `json:"name,omitempty"`
+	Transports []string `json:"transports,omitempty"`
+	Aaguid     *string  `json:"aaguid,omitempty"`
+	// One of: active, revoked.
+	Status     *string `json:"status,omitempty"`
+	CreatedAt  *string `json:"created_at,omitempty"`
+	LastUsedAt *string `json:"last_used_at,omitempty"`
+	RevokedAt  *string `json:"revoked_at,omitempty"`
+}
+
+// PCAUpdateApproverResult is a typed object of the Backend API.
+type PCAUpdateApproverResult struct {
+	Object       *string `json:"object,omitempty"`
+	ID           *string `json:"id,omitempty"`
+	PrincipalPub *string `json:"principal_pub,omitempty"`
+	// One of: user, org, machine.
+	SubjectType *string `json:"subject_type,omitempty"`
+	SubjectID   *string `json:"subject_id,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	Quorum      *int64  `json:"quorum,omitempty"`
+	// One of: active, disabled.
+	Status      *string                                  `json:"status,omitempty"`
+	CreatedAt   *string                                  `json:"created_at,omitempty"`
+	Members     []PCAUpdateApproverResultMembersItem     `json:"members,omitempty"`
+	Credentials []PCAUpdateApproverResultCredentialsItem `json:"credentials,omitempty"`
+}
+
+// PCADeleteApproversCredentialResultMembersItem is a typed object of the Backend API.
+type PCADeleteApproversCredentialResultMembersItem struct {
+	ID          *string  `json:"id,omitempty"`
+	DisplayName *string  `json:"display_name,omitempty"`
+	UserID      *string  `json:"user_id,omitempty"`
+	Email       *string  `json:"email,omitempty"`
+	Phone       *string  `json:"phone,omitempty"`
+	Channels    []string `json:"channels,omitempty"`
+	Status      *string  `json:"status,omitempty"`
+	CreatedAt   *string  `json:"created_at,omitempty"`
+}
+
+// PCADeleteApproversCredentialResultCredentialsItem is a typed object of the Backend API.
+type PCADeleteApproversCredentialResultCredentialsItem struct {
+	ID         *string  `json:"id,omitempty"`
+	MemberID   *string  `json:"member_id,omitempty"`
+	Name       *string  `json:"name,omitempty"`
+	Transports []string `json:"transports,omitempty"`
+	Aaguid     *string  `json:"aaguid,omitempty"`
+	// One of: active, revoked.
+	Status     *string `json:"status,omitempty"`
+	CreatedAt  *string `json:"created_at,omitempty"`
+	LastUsedAt *string `json:"last_used_at,omitempty"`
+	RevokedAt  *string `json:"revoked_at,omitempty"`
+}
+
+// PCADeleteApproversCredentialResult is a typed object of the Backend API.
+type PCADeleteApproversCredentialResult struct {
+	Object       *string `json:"object,omitempty"`
+	ID           *string `json:"id,omitempty"`
+	PrincipalPub *string `json:"principal_pub,omitempty"`
+	// One of: user, org, machine.
+	SubjectType *string `json:"subject_type,omitempty"`
+	SubjectID   *string `json:"subject_id,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	Quorum      *int64  `json:"quorum,omitempty"`
+	// One of: active, disabled.
+	Status      *string                                             `json:"status,omitempty"`
+	CreatedAt   *string                                             `json:"created_at,omitempty"`
+	Members     []PCADeleteApproversCredentialResultMembersItem     `json:"members,omitempty"`
+	Credentials []PCADeleteApproversCredentialResultCredentialsItem `json:"credentials,omitempty"`
+}
+
+// PCAUpdateApproversMemberParams is a typed object of the Backend API.
+type PCAUpdateApproversMemberParams struct {
+	Channels    []string `json:"channels,omitempty"`
+	Email       *string  `json:"email,omitempty"`
+	Phone       *string  `json:"phone,omitempty"`
+	DisplayName *string  `json:"display_name,omitempty"`
+	// One of: active, disabled.
+	Status *string `json:"status,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCAUpdateApproversMemberParams) MarshalJSON() ([]byte, error) {
+	type plain PCAUpdateApproversMemberParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCAUpdateApproversMemberResultMembersItem is a typed object of the Backend API.
+type PCAUpdateApproversMemberResultMembersItem struct {
+	ID          *string  `json:"id,omitempty"`
+	DisplayName *string  `json:"display_name,omitempty"`
+	UserID      *string  `json:"user_id,omitempty"`
+	Email       *string  `json:"email,omitempty"`
+	Phone       *string  `json:"phone,omitempty"`
+	Channels    []string `json:"channels,omitempty"`
+	Status      *string  `json:"status,omitempty"`
+	CreatedAt   *string  `json:"created_at,omitempty"`
+}
+
+// PCAUpdateApproversMemberResultCredentialsItem is a typed object of the Backend API.
+type PCAUpdateApproversMemberResultCredentialsItem struct {
+	ID         *string  `json:"id,omitempty"`
+	MemberID   *string  `json:"member_id,omitempty"`
+	Name       *string  `json:"name,omitempty"`
+	Transports []string `json:"transports,omitempty"`
+	Aaguid     *string  `json:"aaguid,omitempty"`
+	// One of: active, revoked.
+	Status     *string `json:"status,omitempty"`
+	CreatedAt  *string `json:"created_at,omitempty"`
+	LastUsedAt *string `json:"last_used_at,omitempty"`
+	RevokedAt  *string `json:"revoked_at,omitempty"`
+}
+
+// PCAUpdateApproversMemberResult is a typed object of the Backend API.
+type PCAUpdateApproversMemberResult struct {
+	Object       *string `json:"object,omitempty"`
+	ID           *string `json:"id,omitempty"`
+	PrincipalPub *string `json:"principal_pub,omitempty"`
+	// One of: user, org, machine.
+	SubjectType *string `json:"subject_type,omitempty"`
+	SubjectID   *string `json:"subject_id,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	Quorum      *int64  `json:"quorum,omitempty"`
+	// One of: active, disabled.
+	Status      *string                                         `json:"status,omitempty"`
+	CreatedAt   *string                                         `json:"created_at,omitempty"`
+	Members     []PCAUpdateApproversMemberResultMembersItem     `json:"members,omitempty"`
+	Credentials []PCAUpdateApproversMemberResultCredentialsItem `json:"credentials,omitempty"`
+}
+
+// PCACreateBeaconParams is a typed object of the Backend API.
+type PCACreateBeaconParams struct {
+	// A signed v2 liveness beacon {v:2, instance, scope, epoch, seq, issued_at, not_after, issuer,
+	// sig} (principal path).
+	Beacon map[string]interface{} `json:"beacon,omitempty"`
+	// Operator path: '*' (default) or a grant_ref.
+	Scope *string `json:"scope,omitempty"`
+	// Operator path: validity in ms (default 300000, max 3600000).
+	ValidityMs *int64 `json:"validity_ms,omitempty"`
+}
+
+// PCACreateBeaconResult is a typed object of the Backend API.
+type PCACreateBeaconResult struct {
+	Object *string                `json:"object,omitempty"`
+	Beacon map[string]interface{} `json:"beacon,omitempty"`
+	// Bind this into the PCActn as freshness.beacon_ref.
+	BeaconRef *string `json:"beacon_ref,omitempty"`
+	// One of: principal, operator.
+	IssuerKind *string `json:"issuer_kind,omitempty"`
+}
+
+// PCAGetBondAccountsResult is a typed object of the Backend API.
+type PCAGetBondAccountsResult struct {
+	Object  *string  `json:"object,omitempty"`
+	Account *string  `json:"account,omitempty"`
+	Balance *float64 `json:"balance,omitempty"`
+}
+
+// PCACreateBondAccountParams is a typed object of the Backend API.
+type PCACreateBondAccountParams struct {
+	// The depositor: a principal base64url Ed25519 public key.
+	Account string `json:"account"`
+	// Positive amount to credit.
+	Amount float64 `json:"amount"`
+}
+
+// PCACreateBondAccountResult is a typed object of the Backend API.
+type PCACreateBondAccountResult struct {
+	Object  *string  `json:"object,omitempty"`
+	Account *string  `json:"account,omitempty"`
+	Balance *float64 `json:"balance,omitempty"`
+}
+
+// PCACreateConstitutionParams is a typed object of the Backend API.
+type PCACreateConstitutionParams struct {
+	GrantRef string `json:"grant_ref"`
+	// A `SignedConstitution`: { version, principal, invariants[], issued_at?, id, sig } (Ed25519 by
+	// the grant principal over the domain-separated content id).
+	Constitution map[string]interface{} `json:"constitution"`
+}
+
+// PCACreateConstitutionResult is a typed object of the Backend API.
+type PCACreateConstitutionResult struct {
+	Object         *string                `json:"object,omitempty"`
+	GrantRef       *string                `json:"grant_ref,omitempty"`
+	Constitution   map[string]interface{} `json:"constitution,omitempty"`
+	ConstitutionID *string                `json:"constitution_id,omitempty"`
+	RegisteredAt   *string                `json:"registered_at,omitempty"`
+	// Live monitor head: { seq, state_digest, updated_at } (null until the first admitted action).
+	Monitor map[string]interface{} `json:"monitor,omitempty"`
+	// Proof-of-progress counters when the grant commits a goal: { goal_commitment, seq, spent,
+	// remaining, exploration_budget, state_digest, head }.
+	Progress map[string]interface{} `json:"progress,omitempty"`
+}
+
+// PCAListGrantsItem is a typed object of the Backend API.
+type PCAListGrantsItem struct {
+	Object      *string `json:"object,omitempty"`
+	GrantRef    *string `json:"grant_ref,omitempty"`
+	Status      *string `json:"status,omitempty"`
+	Principal   *string `json:"principal,omitempty"`
+	Agent       *string `json:"agent,omitempty"`
+	ChainDigest *string `json:"chain_digest,omitempty"`
+}
+
+// PCAGetGrantResult is a typed object of the Backend API.
+type PCAGetGrantResult struct {
+	Object              *string                `json:"object,omitempty"`
+	GrantRef            *string                `json:"grant_ref,omitempty"`
+	Status              *string                `json:"status,omitempty"`
+	Grant               map[string]interface{} `json:"grant,omitempty"`
+	RemainingBudget     map[string]interface{} `json:"remaining_budget,omitempty"`
+	RevokedCapabilities *int64                 `json:"revoked_capabilities,omitempty"`
+	RevocationEpoch     map[string]interface{} `json:"revocation_epoch,omitempty"`
+}
+
+// PCADeleteGrantParams is a typed object of the Backend API.
+type PCADeleteGrantParams struct {
+	// Ed25519 by the grant principal over the domain-separated {grant_ref, grant_ref} revocation
+	// message.
+	PrincipalSig *string `json:"principal_sig,omitempty"`
+}
+
+// PCADeleteGrantResult is a typed object of the Backend API.
+type PCADeleteGrantResult struct {
+	Object          *string                `json:"object,omitempty"`
+	Revoked         []string               `json:"revoked,omitempty"`
+	RevocationEpoch map[string]interface{} `json:"revocation_epoch,omitempty"`
+}
+
+// PCAAmendGrantParamsAuthority: The comparable shape of a grant's authority: explicit verbs, resource patterns (exact, or a
+// trailing * prefix), named numeric ceilings and an expiry. Admission enforces verbs, resources
+// and expires_at; limits are recorded and compared.
+type PCAAmendGrantParamsAuthority struct {
+	Verbs     []string `json:"verbs"`
+	Resources []string `json:"resources"`
+	// Named non-negative ceilings, e.g. money.usd.
+	Limits map[string]interface{} `json:"limits,omitempty"`
+	// Epoch milliseconds.
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+}
+
+// PCAAmendGrantParams is a typed object of the Backend API.
+type PCAAmendGrantParams struct {
+	// One of: narrow, merge, replace.
+	Action string `json:"action"`
+	// The comparable shape of a grant's authority: explicit verbs, resource patterns (exact, or a
+	// trailing * prefix), named numeric ceilings and an expiry. Admission enforces verbs, resources
+	// and expires_at; limits are recorded and compared.
+	Authority PCAAmendGrantParamsAuthority `json:"authority"`
+	// Ed25519 over the grant-amend domain and {grant, rev, action, authority digest}.
+	Sig *string `json:"sig,omitempty"`
+	// One of: holder, principal.
+	SignedBy    *string `json:"signed_by,omitempty"`
+	StepUpRef   *string `json:"step_up_ref,omitempty"`
+	NewGrantRef *string `json:"new_grant_ref,omitempty"`
+}
+
+// PCAAmendGrantResult is a typed object of the Backend API.
+type PCAAmendGrantResult struct {
+	Object     *string                `json:"object,omitempty"`
+	GrantRef   *string                `json:"grant_ref,omitempty"`
+	Rev        *int64                 `json:"rev,omitempty"`
+	Created    *bool                  `json:"created,omitempty"`
+	Supersedes *string                `json:"supersedes,omitempty"`
+	Authority  map[string]interface{} `json:"authority,omitempty"`
+}
+
+// PCASetGrantsAuthorityParamsAuthority: The comparable shape of a grant's authority: explicit verbs, resource patterns (exact, or a
+// trailing * prefix), named numeric ceilings and an expiry. Admission enforces verbs, resources
+// and expires_at; limits are recorded and compared.
+type PCASetGrantsAuthorityParamsAuthority struct {
+	Verbs     []string `json:"verbs"`
+	Resources []string `json:"resources"`
+	// Named non-negative ceilings, e.g. money.usd.
+	Limits map[string]interface{} `json:"limits,omitempty"`
+	// Epoch milliseconds.
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCASetGrantsAuthorityParamsAuthority) MarshalJSON() ([]byte, error) {
+	type plain PCASetGrantsAuthorityParamsAuthority
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCASetGrantsAuthorityParams is a typed object of the Backend API.
+type PCASetGrantsAuthorityParams struct {
+	// The comparable shape of a grant's authority: explicit verbs, resource patterns (exact, or a
+	// trailing * prefix), named numeric ceilings and an expiry. Admission enforces verbs, resources
+	// and expires_at; limits are recorded and compared.
+	Authority PCASetGrantsAuthorityParamsAuthority `json:"authority"`
+	Sig       string                               `json:"sig"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCASetGrantsAuthorityParams) MarshalJSON() ([]byte, error) {
+	type plain PCASetGrantsAuthorityParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCASetGrantsAuthorityResult is a typed object of the Backend API.
+type PCASetGrantsAuthorityResult struct {
+	Object          *string                `json:"object,omitempty"`
+	GrantRef        *string                `json:"grant_ref,omitempty"`
+	Rev             *int64                 `json:"rev,omitempty"`
+	Status          *string                `json:"status,omitempty"`
+	Authority       map[string]interface{} `json:"authority,omitempty"`
+	AuthorityDigest *string                `json:"authority_digest,omitempty"`
+}
+
+// PCACreateGrantsNeedParamsNeedsItem is a typed object of the Backend API.
+type PCACreateGrantsNeedParamsNeedsItem struct {
+	Verb       string                 `json:"verb"`
+	Resource   string                 `json:"resource"`
+	Limits     map[string]interface{} `json:"limits,omitempty"`
+	Adjustable *bool                  `json:"adjustable,omitempty"`
+}
+
+// PCACreateGrantsNeedParams is a typed object of the Backend API.
+type PCACreateGrantsNeedParams struct {
+	Needs []PCACreateGrantsNeedParamsNeedsItem `json:"needs"`
+	Sig   *string                              `json:"sig,omitempty"`
+}
+
+// PCACreateGrantsNeedResult is a typed object of the Backend API.
+type PCACreateGrantsNeedResult struct {
+	Object   *string `json:"object,omitempty"`
+	ID       *string `json:"id,omitempty"`
+	GrantRef *string `json:"grant_ref,omitempty"`
+	Status   *string `json:"status,omitempty"`
+}
+
+// PCAStepUpGrantResult is a typed object of the Backend API.
+type PCAStepUpGrantResult struct {
+	Object    *string `json:"object,omitempty"`
+	StepUpRef *string `json:"step_up_ref,omitempty"`
+	Nonce     *string `json:"nonce,omitempty"`
+	ExpiresAt *string `json:"expires_at,omitempty"`
+}
+
+// PCAApproveGrantStepUpParams is a typed object of the Backend API.
+type PCAApproveGrantStepUpParams struct {
+	Sig string `json:"sig"`
+}
+
+// PCAApproveGrantStepUpResult is a typed object of the Backend API.
+type PCAApproveGrantStepUpResult struct {
+	Object    *string `json:"object,omitempty"`
+	StepUpRef *string `json:"step_up_ref,omitempty"`
+	Approved  *bool   `json:"approved,omitempty"`
+}
+
+// PCARotateGuardianResultPrevious is a typed object of the Backend API.
+type PCARotateGuardianResultPrevious struct {
+	Epoch     *int64  `json:"epoch,omitempty"`
+	PublicKey *string `json:"public_key,omitempty"`
+}
+
+// PCARotateGuardianResult is a typed object of the Backend API.
+type PCARotateGuardianResult struct {
+	Object    *string                          `json:"object,omitempty"`
+	Epoch     *int64                           `json:"epoch,omitempty"`
+	PublicKey *string                          `json:"public_key,omitempty"`
+	Previous  *PCARotateGuardianResultPrevious `json:"previous,omitempty"`
+	Keys      []map[string]interface{}         `json:"keys,omitempty"`
+}
+
+// PCACreateIntentSchemaParams is a typed object of the Backend API.
+type PCACreateIntentSchemaParams struct {
+	// The signed schema { v: 1, kind: "pca-action-schema", site, aud, version, units?, state?, verbs,
+	// sig: { alg, kid, value, pq_value? } }.
+	Schema map[string]interface{} `json:"schema"`
+	// The site schema keys [{ kid, alg, pk, pq_pk? }] from its discovery document.
+	Keys []map[string]interface{} `json:"keys"`
+}
+
+// PCACreateIntentSchemaResult is a typed object of the Backend API.
+type PCACreateIntentSchemaResult struct {
+	Object  *string                `json:"object,omitempty"`
+	Digest  *string                `json:"digest,omitempty"`
+	Aud     *string                `json:"aud,omitempty"`
+	Version *string                `json:"version,omitempty"`
+	Schema  map[string]interface{} `json:"schema,omitempty"`
+	Anchor  map[string]interface{} `json:"anchor,omitempty"`
+}
+
+// PCAApproveNeedParams is a typed object of the Backend API.
+type PCAApproveNeedParams struct {
+	Approved    []map[string]interface{} `json:"approved"`
+	Sig         string                   `json:"sig"`
+	StepUpRef   *string                  `json:"step_up_ref,omitempty"`
+	NewGrantRef *string                  `json:"new_grant_ref,omitempty"`
+}
+
+// PCAApproveNeedResult is a typed object of the Backend API.
+type PCAApproveNeedResult struct {
+	Object     *string                `json:"object,omitempty"`
+	GrantRef   *string                `json:"grant_ref,omitempty"`
+	Supersedes *string                `json:"supersedes,omitempty"`
+	Authority  map[string]interface{} `json:"authority,omitempty"`
+}
+
+// PCADenyNeedParams is a typed object of the Backend API.
+type PCADenyNeedParams struct {
+	Sig *string `json:"sig,omitempty"`
+}
+
+// PCADenyNeedResult is a typed object of the Backend API.
+type PCADenyNeedResult struct {
+	Object *string `json:"object,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	Status *string `json:"status,omitempty"`
+}
+
+// PCADeletePqPinResult is a typed object of the Backend API.
+type PCADeletePqPinResult struct {
+	Object   *string `json:"object,omitempty"`
+	Identity *string `json:"identity,omitempty"`
+	Deleted  *bool   `json:"deleted,omitempty"`
+}
+
+// PCAListPrincipalsItem is a typed object of the Backend API.
+type PCAListPrincipalsItem struct {
+	Object *string `json:"object,omitempty"`
+}
+
+// PCACreatePrincipalParams is a typed object of the Backend API.
+type PCACreatePrincipalParams struct {
+	// The principal base64url Ed25519 public key to enrol.
+	PrincipalPub string `json:"principal_pub"`
+	// One of: user, org, machine.
+	SubjectType string `json:"subject_type"`
+	// The id of the user/org/machine, which must exist in this instance.
+	SubjectID string `json:"subject_id"`
+}
+
+// PCACreatePrincipalResult is a typed object of the Backend API.
+type PCACreatePrincipalResult struct {
+	Object       *string `json:"object,omitempty"`
+	PrincipalPub *string `json:"principal_pub,omitempty"`
+	SubjectType  *string `json:"subject_type,omitempty"`
+	SubjectID    *string `json:"subject_id,omitempty"`
+	Status       *string `json:"status,omitempty"`
+}
+
+// PCADeletePrincipalResult is a typed object of the Backend API.
+type PCADeletePrincipalResult struct {
+	Object       *string `json:"object,omitempty"`
+	PrincipalPub *string `json:"principal_pub,omitempty"`
+	Status       *string `json:"status,omitempty"`
+}
+
+// PCACreateUndoRecordParams is a typed object of the Backend API.
+type PCACreateUndoRecordParams struct {
+	// The full undo record as the resource server holds it, receipts included.
+	Record map[string]interface{} `json:"record"`
+}
+
+// PCACreateUndoRecordResultPendingVeto: A veto received by the instance and not yet applied by the resource server, or null.
+type PCACreateUndoRecordResultPendingVeto struct {
+	At       *int64  `json:"at,omitempty"`
+	Via      *string `json:"via,omitempty"`
+	By       *string `json:"by,omitempty"`
+	Evidence *string `json:"evidence,omitempty"`
+}
+
+// PCACreateUndoRecordResult is a typed object of the Backend API.
+type PCACreateUndoRecordResult struct {
+	Object *string `json:"object,omitempty"`
+	// The stored undo record without its encoded PCActn.
+	Record map[string]interface{} `json:"record,omitempty"`
+	// A veto received by the instance and not yet applied by the resource server, or null.
+	PendingVeto *PCACreateUndoRecordResultPendingVeto `json:"pending_veto,omitempty"`
+}
+
+// PCAGetUndoRecordResultPendingVeto: A veto received by the instance and not yet applied by the resource server, or null.
+type PCAGetUndoRecordResultPendingVeto struct {
+	At       *int64  `json:"at,omitempty"`
+	Via      *string `json:"via,omitempty"`
+	By       *string `json:"by,omitempty"`
+	Evidence *string `json:"evidence,omitempty"`
+}
+
+// PCAGetUndoRecordResult is a typed object of the Backend API.
+type PCAGetUndoRecordResult struct {
+	Object *string `json:"object,omitempty"`
+	// The stored undo record without its encoded PCActn.
+	Record map[string]interface{} `json:"record,omitempty"`
+	// A veto received by the instance and not yet applied by the resource server, or null.
+	PendingVeto *PCAGetUndoRecordResultPendingVeto `json:"pending_veto,omitempty"`
+}
+
+// PCASetUndoRecordParams is a typed object of the Backend API.
+type PCASetUndoRecordParams struct {
+	// The full undo record as the resource server holds it, receipts included.
+	Record map[string]interface{} `json:"record"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PCASetUndoRecordParams) MarshalJSON() ([]byte, error) {
+	type plain PCASetUndoRecordParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PCASetUndoRecordResultPendingVeto: A veto received by the instance and not yet applied by the resource server, or null.
+type PCASetUndoRecordResultPendingVeto struct {
+	At       *int64  `json:"at,omitempty"`
+	Via      *string `json:"via,omitempty"`
+	By       *string `json:"by,omitempty"`
+	Evidence *string `json:"evidence,omitempty"`
+}
+
+// PCASetUndoRecordResult is a typed object of the Backend API.
+type PCASetUndoRecordResult struct {
+	Object *string `json:"object,omitempty"`
+	// The stored undo record without its encoded PCActn.
+	Record map[string]interface{} `json:"record,omitempty"`
+	// A veto received by the instance and not yet applied by the resource server, or null.
+	PendingVeto *PCASetUndoRecordResultPendingVeto `json:"pending_veto,omitempty"`
+}
+
+// PCAListUndoVetoesItemVeto: A veto: when (ms), how (`token` for a hosted veto), by whom (the principal) and the evidence
+// digest (the token digest).
+type PCAListUndoVetoesItemVeto struct {
+	At       *int64  `json:"at,omitempty"`
+	Via      *string `json:"via,omitempty"`
+	By       *string `json:"by,omitempty"`
+	Evidence *string `json:"evidence,omitempty"`
+	// The principal's encoded undo token: re-verify it as of `at` before applying the veto.
+	Token *string `json:"token,omitempty"`
+}
+
+// PCAListUndoVetoesItem is a typed object of the Backend API.
+type PCAListUndoVetoesItem struct {
+	Object    *string `json:"object,omitempty"`
+	RecordID  *string `json:"record_id,omitempty"`
+	GrantRef  *string `json:"grant_ref,omitempty"`
+	State     *string `json:"state,omitempty"`
+	Ver       *int64  `json:"ver,omitempty"`
+	WindowEnd *int64  `json:"window_end,omitempty"`
+	// A veto: when (ms), how (`token` for a hosted veto), by whom (the principal) and the evidence
+	// digest (the token digest).
+	Veto *PCAListUndoVetoesItemVeto `json:"veto,omitempty"`
+}
+
+// PCACreateWorkflowReceiptParams is a typed object of the Backend API.
+type PCACreateWorkflowReceiptParams struct {
+	GrantRef string `json:"grant_ref"`
+	// The signed workflow commitment {body, sig}; must verify against the grant principal key.
+	Workflow map[string]interface{} `json:"workflow"`
+	// The step id; must be a step of the workflow.
+	Step string `json:"step"`
+	// One of: ok, failed.
+	Outcome string `json:"outcome"`
+	// Digest of the params the step ran with.
+	ParamsDigest string `json:"params_digest"`
+	// field -> {digest, num, unit, labels} as produced by wfOutput.
+	Outputs map[string]interface{} `json:"outputs"`
+	// The receipts issued so far for this workflow (the caller keeps the chain).
+	Receipts []map[string]interface{} `json:"receipts,omitempty"`
+}
+
+// PCACreateWorkflowReceiptResult is a typed object of the Backend API.
+type PCACreateWorkflowReceiptResult struct {
+	Object   *string                  `json:"object,omitempty"`
+	GrantRef *string                  `json:"grant_ref,omitempty"`
+	Receipt  map[string]interface{}   `json:"receipt,omitempty"`
+	Receipts []map[string]interface{} `json:"receipts,omitempty"`
+}
+
+// PermissionAliasesListItem is a typed object of the Backend API.
+type PermissionAliasesListItem struct {
+	Object        string `json:"object"`
+	Alias         string `json:"alias"`
+	PermissionKey string `json:"permission_key"`
+	CreatedAt     int64  `json:"created_at"`
+}
+
+// PermissionAliasesCreateParams is a typed object of the Backend API.
+type PermissionAliasesCreateParams struct {
+	Alias         string `json:"alias"`
+	PermissionKey string `json:"permission_key"`
+}
+
+// PermissionAliasesCreateResult is a typed object of the Backend API.
+type PermissionAliasesCreateResult struct {
+	Object        string `json:"object"`
+	Alias         string `json:"alias"`
+	PermissionKey string `json:"permission_key"`
+	CreatedAt     int64  `json:"created_at"`
+}
+
+// PermissionAliasesSetParams is a typed object of the Backend API.
+type PermissionAliasesSetParams struct {
+	// The canonical permission key the alias stands for.
+	PermissionKey string `json:"permission_key"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p PermissionAliasesSetParams) MarshalJSON() ([]byte, error) {
+	type plain PermissionAliasesSetParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// PermissionAliasesSetResult is a typed object of the Backend API.
+type PermissionAliasesSetResult struct {
+	Object        string `json:"object"`
+	Alias         string `json:"alias"`
+	PermissionKey string `json:"permission_key"`
+	CreatedAt     int64  `json:"created_at"`
+}
+
+// PermissionAliasesDeleteResult is a typed object of the Backend API.
+type PermissionAliasesDeleteResult struct {
+	Object  string `json:"object"`
+	Alias   string `json:"alias"`
+	Deleted bool   `json:"deleted"`
+}
+
+// PermissionsRenameParams is a typed object of the Backend API.
+type PermissionsRenameParams struct {
+	// The new key, e.g. org:store:orders:refund (2 to 5 parts after org:, each 2 to 64 characters, at
+	// most 160 in all).
+	Key string `json:"key"`
+}
+
+// PermissionsRenameResult is a typed object of the Backend API.
+type PermissionsRenameResult struct {
+	Object      string `json:"object"`
+	ID          string `json:"id"`
+	Key         string `json:"key"`
+	PreviousKey string `json:"previous_key"`
+	Alias       string `json:"alias"`
+}
+
 // PlatformListAppsInstancesClonesItem is a typed object of the Backend API.
 type PlatformListAppsInstancesClonesItem struct {
 	Object string `json:"object"`
@@ -14824,6 +18654,57 @@ type PlatformDeleteAppsInstancesCloneResult struct {
 	DeletedAt *int64 `json:"deleted_at,omitempty"`
 }
 
+// PlatformRefreshAppInstanceCloneParamsSyntheticUsers is a typed object of the Backend API.
+type PlatformRefreshAppInstanceCloneParamsSyntheticUsers struct {
+	Count int64  `json:"count"`
+	Seed  string `json:"seed"`
+}
+
+// PlatformRefreshAppInstanceCloneParams is a typed object of the Backend API.
+type PlatformRefreshAppInstanceCloneParams struct {
+	Include        []string                                             `json:"include,omitempty"`
+	SyntheticUsers *PlatformRefreshAppInstanceCloneParamsSyntheticUsers `json:"synthetic_users,omitempty"`
+	TTLHours       *int64                                               `json:"ttl_hours,omitempty"`
+}
+
+// PlatformRefreshAppInstanceCloneResult is a typed object of the Backend API.
+type PlatformRefreshAppInstanceCloneResult struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// One of: clone, preview.
+	Kind string `json:"kind"`
+	// The new environment name (a preview is `preview-` and a slug of its ref).
+	Name string  `json:"name"`
+	Ref  *string `json:"ref,omitempty"`
+	// `copying` while a large clone is filled by a background job; poll GET until `completed` or
+	// `failed`. One of: pending, copying, completed, failed, deleted.
+	Status string `json:"status"`
+	// While copying: `sections.<name>` = { total, copied } rows.
+	Progress         map[string]interface{} `json:"progress,omitempty"`
+	SourceInstanceID string                 `json:"source_instance_id"`
+	// The new instance.
+	InstanceID      *string  `json:"instance_id,omitempty"`
+	Environment     string   `json:"environment"`
+	PublishableKey  *string  `json:"publishable_key,omitempty"`
+	FrontendAPIHost *string  `json:"frontend_api_host,omitempty"`
+	AllowedOrigins  []string `json:"allowed_origins,omitempty"`
+	Include         []string `json:"include"`
+	MaskEmails      bool     `json:"mask_emails"`
+	// What was copied, per section.
+	Counts map[string]interface{} `json:"counts,omitempty"`
+	// What could not be placed (at most 100).
+	Errors []map[string]interface{} `json:"errors,omitempty"`
+	// Epoch ms.
+	ExpiresAt *int64  `json:"expires_at,omitempty"`
+	CreatedBy *string `json:"created_by,omitempty"`
+	// Epoch ms.
+	CreatedAt int64 `json:"created_at"`
+	// Epoch ms.
+	CompletedAt *int64 `json:"completed_at,omitempty"`
+	// Epoch ms.
+	DeletedAt *int64 `json:"deleted_at,omitempty"`
+}
+
 // PlatformCreateAppsNarrowSecretKeyParams is a typed object of the Backend API.
 type PlatformCreateAppsNarrowSecretKeyParams struct {
 	// One of: app-runtime.
@@ -14851,6 +18732,28 @@ type PlatformCreateAppsNarrowSecretKeyResult struct {
 	Narrowed   []PlatformCreateAppsNarrowSecretKeyResultNarrowedItem `json:"narrowed,omitempty"`
 	Unchanged  *int64                                                `json:"unchanged,omitempty"`
 	Note       *string                                               `json:"note,omitempty"`
+}
+
+// PlatformRenewAppProvisioningKeyParams is a typed object of the Backend API.
+type PlatformRenewAppProvisioningKeyParams struct {
+	// Renew on this instance of the app instead of the primary one.
+	InstanceID *string `json:"instance_id,omitempty"`
+}
+
+// PlatformRenewAppProvisioningKeyResultRenewedItem is a typed object of the Backend API.
+type PlatformRenewAppProvisioningKeyResultRenewedItem struct {
+	KeyID  *string `json:"key_id,omitempty"`
+	Prefix *string `json:"prefix,omitempty"`
+}
+
+// PlatformRenewAppProvisioningKeyResult is a typed object of the Backend API.
+type PlatformRenewAppProvisioningKeyResult struct {
+	Object     *string                                            `json:"object,omitempty"`
+	AppID      *string                                            `json:"app_id,omitempty"`
+	InstanceID *string                                            `json:"instance_id,omitempty"`
+	Renewed    []PlatformRenewAppProvisioningKeyResultRenewedItem `json:"renewed,omitempty"`
+	// Epoch ms.
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
 }
 
 // PlatformListAtlasIDAppsAdoptionCodesItem is a typed object of the Backend API.
@@ -16003,6 +19906,66 @@ type ResourceServersListRevokedTokensResult struct {
 	RetentionSeconds int64 `json:"retention_seconds"`
 }
 
+// RevocationsListResultDataItemActor: Who ended it.
+type RevocationsListResultDataItemActor struct {
+	// api_key, user, scim, sso or system.
+	Type string  `json:"type"`
+	ID   *string `json:"id,omitempty"`
+}
+
+// RevocationsListResultDataItem is a typed object of the Backend API.
+type RevocationsListResultDataItem struct {
+	Object string `json:"object"`
+	// The event id.
+	ID string `json:"id"`
+	// Commit-ordered position in the stream. Pass it as `after` (or `Last-Event-ID`) to resume right
+	// after this event.
+	Seq int64 `json:"seq"`
+	// The event type: session.revoked, user.sessions_revoked, oauth_tokens.revoked, grant.revoked,
+	// api_key.revoked, machine.revoked, machine_grant.revoked, user.banned, user.deactivated or
+	// user.locked.
+	Type string `json:"type"`
+	// One of: session, user_sessions, token_family, grant, api_key, machine, machine_grant, user.
+	Kind string `json:"kind"`
+	// When it happened (epoch ms).
+	At int64 `json:"at"`
+	// The user the ended thing belonged to, when it has one.
+	UserID *string `json:"user_id,omitempty"`
+	// The ids of what ended: session_id, api_key_id, machine_id, machine_grant_id (with machine_id,
+	// resource_server_id and audience), family_id, grant_id, client_id, organization_id,
+	// kept_session_id. Only those the kind has.
+	IDs map[string]string `json:"ids"`
+	// Why it ended, e.g. signed_out, signed_out_everywhere, token_reuse, revoked_by_api,
+	// revoked_by_admin, owner_signed_out, membership_ended, banned.
+	Reason *string `json:"reason,omitempty"`
+	// Who ended it.
+	Actor RevocationsListResultDataItemActor `json:"actor"`
+	// `user_sessions`: how many sessions ended.
+	SessionsRevoked *int64 `json:"sessions_revoked,omitempty"`
+	// `user_sessions`: the session that stayed signed in (sign out of the other devices).
+	KeptSessionID *string `json:"kept_session_id,omitempty"`
+	// When it ended (epoch ms). For `user_sessions` the cutoff: every token issued at or before it is
+	// dead (except the kept session).
+	RevokedAt *int64 `json:"revoked_at,omitempty"`
+}
+
+// RevocationsListResultRetention: How long events are kept.
+type RevocationsListResultRetention struct {
+	Days *int64 `json:"days,omitempty"`
+}
+
+// RevocationsListResult is a typed object of the Backend API.
+type RevocationsListResult struct {
+	Object *string                         `json:"object,omitempty"`
+	Data   []RevocationsListResultDataItem `json:"data,omitempty"`
+	// True when a full page was returned: ask again at once.
+	HasMore *bool `json:"has_more,omitempty"`
+	// Pass as `after` on the next call.
+	NextCursor *string `json:"next_cursor,omitempty"`
+	// How long events are kept.
+	Retention *RevocationsListResultRetention `json:"retention,omitempty"`
+}
+
 // RiskBasedMFAReplayParams is a typed object of the Backend API.
 type RiskBasedMFAReplayParams struct {
 	// Default 7.
@@ -16870,6 +20833,107 @@ type SessionsListRevokedResult struct {
 	WindowStart int64 `json:"window_start"`
 }
 
+// SessionsSetActiveOrganizationParams is a typed object of the Backend API.
+type SessionsSetActiveOrganizationParams struct {
+	// The organization to make active, or null for none.
+	OrganizationID *string `json:"organization_id,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p SessionsSetActiveOrganizationParams) MarshalJSON() ([]byte, error) {
+	type plain SessionsSetActiveOrganizationParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// Session2NativeClient: Present for a native app session: kind unregistered, development or registered, the native app
+// id when one was named, and binding device_key when its refresh token is bound to a key the
+// device holds.
+type Session2NativeClient struct {
+	// One of: unregistered, development, registered.
+	Kind  *string `json:"kind,omitempty"`
+	AppID *string `json:"app_id,omitempty"`
+	// One of: device_key, None.
+	Binding *string `json:"binding,omitempty"`
+}
+
+// Session2Location is a typed object of the Backend API.
+type Session2Location struct {
+	// ISO country code.
+	Country string  `json:"country"`
+	Region  *string `json:"region,omitempty"`
+	City    *string `json:"city,omitempty"`
+}
+
+// Session2Risk is a typed object of the Backend API.
+type Session2Risk struct {
+	Score *int64 `json:"score,omitempty"`
+	// One of: low, medium, high.
+	Level      *string  `json:"level,omitempty"`
+	Reasons    []string `json:"reasons,omitempty"`
+	ComputedAt *int64   `json:"computed_at,omitempty"`
+}
+
+// Session2: The `Session` object.
+type Session2 struct {
+	Object                   string  `json:"object"`
+	ID                       string  `json:"id"`
+	UserID                   string  `json:"user_id"`
+	Status                   string  `json:"status"`
+	LastActiveOrganizationID *string `json:"last_active_organization_id,omitempty"`
+	ImpersonatedBy           *string `json:"impersonated_by,omitempty"`
+	// Last active (epoch ms).
+	LastActiveAt int64 `json:"last_active_at"`
+	// Expires (epoch ms).
+	ExpireAt int64 `json:"expire_at"`
+	// Abandoned (epoch ms).
+	AbandonAt int64 `json:"abandon_at"`
+	// Epoch ms when the session ends from inactivity unless there is activity first (same value as
+	// abandon_at). Slides on activity and on POST /v1/sessions/{id}/touch; never past expire_at.
+	IdleExpiresAt int64 `json:"idle_expires_at"`
+	// Created (epoch ms).
+	CreatedAt int64 `json:"created_at"`
+	// Custom per-session data the app attached (PUT/PATCH /v1/sessions/{id}/custom_data, or a
+	// post_login Action). Null when none.
+	CustomData map[string]interface{} `json:"custom_data,omitempty"`
+	// How the session was signed in: the first-factor strategy (password, email_code, email_link,
+	// phone_code, passkey, oauth, sso, saml, ticket, ...). Null for a session created before this was
+	// recorded.
+	SignInMethod *string `json:"sign_in_method,omitempty"`
+	// The social provider id when sign_in_method is oauth; otherwise null.
+	Provider *string `json:"provider,omitempty"`
+	// Present for a native app session: kind unregistered, development or registered, the native app
+	// id when one was named, and binding device_key when its refresh token is bound to a key the
+	// device holds.
+	NativeClient *Session2NativeClient `json:"native_client,omitempty"`
+	// Present for an unregistered or development native session: "Unregistered app on <device>" or
+	// "Development app on <device>".
+	DeviceLabel *string `json:"device_label,omitempty"`
+	// The authentication methods proven at sign-in (RFC 8176, e.g. pwd, otp, webauthn, ext, mfa);
+	// updated by a step-up. Null for a session created before this was recorded.
+	Amr []string `json:"amr,omitempty"`
+	// The user agent of the device that signed in. Null when none was sent.
+	UserAgent *string `json:"user_agent,omitempty"`
+	// The client IP at sign-in (through a path mount: the browser IP your proxy asserted with its
+	// proxy secret). Dropped 30 days after the session ends.
+	IPAddress *string `json:"ip_address,omitempty"`
+	// Coarse location of the sign-in, when a geo source resolved one.
+	Location *Session2Location `json:"location,omitempty"`
+	// Advisory risk assessment. Null = not assessed (never "safe"). Atlas decides nothing from it.
+	Risk *Session2Risk `json:"risk,omitempty"`
+	// Epoch ms when the session was ended (null while active, or when it simply ran out).
+	RevokedAt *int64 `json:"revoked_at,omitempty"`
+	// Why the session was ended, e.g. signed_out, revoked_by_api, token_reuse (a refresh token was
+	// presented after it had been replaced and its grace window had passed). Null while active.
+	RevokedReason *string `json:"revoked_reason,omitempty"`
+}
+
 // SessionsGetBindingResult is a typed object of the Backend API.
 type SessionsGetBindingResult struct {
 	Object    string `json:"object"`
@@ -16931,12 +20995,114 @@ type SessionsGetRiskResult struct {
 	ComputedAt *int64 `json:"computed_at,omitempty"`
 }
 
+// SSFAddSubjectAltParams is a typed object of the Backend API.
+type SSFAddSubjectAltParams struct {
+	StreamID string                 `json:"stream_id"`
+	Subject  map[string]interface{} `json:"subject"`
+	Verified *bool                  `json:"verified,omitempty"`
+}
+
+// SSFConfigurationParamsDelivery is a typed object of the Backend API.
+type SSFConfigurationParamsDelivery struct {
+	Method      *string `json:"method,omitempty"`
+	EndpointURL *string `json:"endpoint_url,omitempty"`
+}
+
+// SSFConfigurationParams is a typed object of the Backend API.
+type SSFConfigurationParams struct {
+	Iss                     *string                         `json:"iss,omitempty"`
+	Aud                     *string                         `json:"aud,omitempty"`
+	EventsSupported         []string                        `json:"events_supported,omitempty"`
+	EventsDelivered         []string                        `json:"events_delivered,omitempty"`
+	MinVerificationInterval *int64                          `json:"min_verification_interval,omitempty"`
+	EventsRequested         []string                        `json:"events_requested,omitempty"`
+	Delivery                *SSFConfigurationParamsDelivery `json:"delivery,omitempty"`
+	Description             *string                         `json:"description,omitempty"`
+}
+
+// SSFConfigurationResult is a typed object of the Backend API.
+type SSFConfigurationResult struct {
+	StreamID        *string                `json:"stream_id,omitempty"`
+	Iss             *string                `json:"iss,omitempty"`
+	Aud             *string                `json:"aud,omitempty"`
+	EventsSupported []string               `json:"events_supported,omitempty"`
+	EventsDelivered []string               `json:"events_delivered,omitempty"`
+	Delivery        map[string]interface{} `json:"delivery,omitempty"`
+}
+
+// SSFSetConfigurationParams is a typed object of the Backend API.
+type SSFSetConfigurationParams struct {
+	Iss                     *string                `json:"iss,omitempty"`
+	Aud                     *string                `json:"aud,omitempty"`
+	EventsSupported         []string               `json:"events_supported,omitempty"`
+	EventsDelivered         []string               `json:"events_delivered,omitempty"`
+	MinVerificationInterval *int64                 `json:"min_verification_interval,omitempty"`
+	StreamID                string                 `json:"stream_id"`
+	EventsRequested         []string               `json:"events_requested,omitempty"`
+	Delivery                map[string]interface{} `json:"delivery,omitempty"`
+	Description             *string                `json:"description,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p SSFSetConfigurationParams) MarshalJSON() ([]byte, error) {
+	type plain SSFSetConfigurationParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// SSFUpdateConfigurationParams is a typed object of the Backend API.
+type SSFUpdateConfigurationParams struct {
+	Iss                     *string                `json:"iss,omitempty"`
+	Aud                     *string                `json:"aud,omitempty"`
+	EventsSupported         []string               `json:"events_supported,omitempty"`
+	EventsDelivered         []string               `json:"events_delivered,omitempty"`
+	MinVerificationInterval *int64                 `json:"min_verification_interval,omitempty"`
+	StreamID                string                 `json:"stream_id"`
+	EventsRequested         []string               `json:"events_requested,omitempty"`
+	Delivery                map[string]interface{} `json:"delivery,omitempty"`
+	Description             *string                `json:"description,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p SSFUpdateConfigurationParams) MarshalJSON() ([]byte, error) {
+	type plain SSFUpdateConfigurationParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
 // SSFCreateEventParams is a typed object of the Backend API.
 type SSFCreateEventParams struct {
 	UserID  *string                `json:"user_id,omitempty"`
 	Event   *string                `json:"event,omitempty"`
 	Subject map[string]string      `json:"subject,omitempty"`
 	Data    map[string]interface{} `json:"data,omitempty"`
+}
+
+// SSFGetMetadataResult is a typed object of the Backend API.
+type SSFGetMetadataResult struct {
+	Issuer                   *string  `json:"issuer,omitempty"`
+	DeliveryMethodsSupported []string `json:"delivery_methods_supported,omitempty"`
+	ConfigurationEndpoint    *string  `json:"configuration_endpoint,omitempty"`
+	StatusEndpoint           *string  `json:"status_endpoint,omitempty"`
+	VerificationEndpoint     *string  `json:"verification_endpoint,omitempty"`
+}
+
+// SSFRemoveSubjectAltParams is a typed object of the Backend API.
+type SSFRemoveSubjectAltParams struct {
+	StreamID string                 `json:"stream_id"`
+	Subject  map[string]interface{} `json:"subject"`
 }
 
 // SSFGetStatusResult is a typed object of the Backend API.
@@ -16971,6 +21137,20 @@ type SSFListStreamsSubjectsResult struct {
 	DefaultSubjects *string                                `json:"default_subjects,omitempty"`
 }
 
+// SSFPollStreamParams is a typed object of the Backend API.
+type SSFPollStreamParams struct {
+	Ack               []string               `json:"ack,omitempty"`
+	SetErrs           map[string]interface{} `json:"setErrs,omitempty"`
+	MaxEvents         *int64                 `json:"maxEvents,omitempty"`
+	ReturnImmediately *bool                  `json:"returnImmediately,omitempty"`
+}
+
+// SSFPollStreamResult is a typed object of the Backend API.
+type SSFPollStreamResult struct {
+	Sets          map[string]interface{} `json:"sets,omitempty"`
+	MoreAvailable *bool                  `json:"moreAvailable,omitempty"`
+}
+
 // SSFAddSubjectParams is a typed object of the Backend API.
 type SSFAddSubjectParams struct {
 	StreamID *string           `json:"stream_id,omitempty"`
@@ -16982,6 +21162,12 @@ type SSFAddSubjectParams struct {
 type SSFRemoveSubjectParams struct {
 	StreamID *string           `json:"stream_id,omitempty"`
 	Subject  map[string]string `json:"subject,omitempty"`
+}
+
+// SSFVerificationParams is a typed object of the Backend API.
+type SSFVerificationParams struct {
+	StreamID string  `json:"stream_id"`
+	State    *string `json:"state,omitempty"`
 }
 
 // SSFVerifyParams is a typed object of the Backend API.
@@ -17294,6 +21480,15 @@ type StepUpAssertResult struct {
 	StepUp map[string]interface{} `json:"step_up,omitempty"`
 }
 
+// StepUpListPoliciesItemAcceptedFactorInfoItem is a typed object of the Backend API.
+type StepUpListPoliciesItemAcceptedFactorInfoItem struct {
+	Factor     *string `json:"factor,omitempty"`
+	Label      *string `json:"label,omitempty"`
+	NeedsInput *bool   `json:"needs_input,omitempty"`
+	// One of: password, otp, none, redirect, push, webauthn.
+	InputKind *string `json:"input_kind,omitempty"`
+}
+
 // StepUpListPoliciesItem is a typed object of the Backend API.
 type StepUpListPoliciesItem struct {
 	Object *string `json:"object,omitempty"`
@@ -17317,6 +21512,9 @@ type StepUpListPoliciesItem struct {
 	AllowedMethods []string `json:"allowed_methods,omitempty"`
 	// The step-up strategies that can satisfy it, after phishing resistance narrows allowed_methods.
 	AcceptedFactors []string `json:"accepted_factors,omitempty"`
+	// Render info for each accepted factor: label, whether the person types something, and the kind of
+	// input. A factor added later still comes with a label.
+	AcceptedFactorInfo []StepUpListPoliciesItemAcceptedFactorInfoItem `json:"accepted_factor_info,omitempty"`
 	// How long a signed receipt for an allowed assertion lives (10 to 300).
 	ReceiptTTLSeconds *int64 `json:"receipt_ttl_seconds,omitempty"`
 	// Created (epoch ms).
@@ -17346,6 +21544,15 @@ type StepUpCreatePolicyParams struct {
 	ReceiptTTLSeconds *int64 `json:"receipt_ttl_seconds,omitempty"`
 }
 
+// StepUpCreatePolicyResultAcceptedFactorInfoItem is a typed object of the Backend API.
+type StepUpCreatePolicyResultAcceptedFactorInfoItem struct {
+	Factor     *string `json:"factor,omitempty"`
+	Label      *string `json:"label,omitempty"`
+	NeedsInput *bool   `json:"needs_input,omitempty"`
+	// One of: password, otp, none, redirect, push, webauthn.
+	InputKind *string `json:"input_kind,omitempty"`
+}
+
 // StepUpCreatePolicyResult is a typed object of the Backend API.
 type StepUpCreatePolicyResult struct {
 	Object *string `json:"object,omitempty"`
@@ -17369,12 +21576,24 @@ type StepUpCreatePolicyResult struct {
 	AllowedMethods []string `json:"allowed_methods,omitempty"`
 	// The step-up strategies that can satisfy it, after phishing resistance narrows allowed_methods.
 	AcceptedFactors []string `json:"accepted_factors,omitempty"`
+	// Render info for each accepted factor: label, whether the person types something, and the kind of
+	// input. A factor added later still comes with a label.
+	AcceptedFactorInfo []StepUpCreatePolicyResultAcceptedFactorInfoItem `json:"accepted_factor_info,omitempty"`
 	// How long a signed receipt for an allowed assertion lives (10 to 300).
 	ReceiptTTLSeconds *int64 `json:"receipt_ttl_seconds,omitempty"`
 	// Created (epoch ms).
 	CreatedAt *int64 `json:"created_at,omitempty"`
 	// Updated (epoch ms).
 	UpdatedAt *int64 `json:"updated_at,omitempty"`
+}
+
+// StepUpGetPolicyResultAcceptedFactorInfoItem is a typed object of the Backend API.
+type StepUpGetPolicyResultAcceptedFactorInfoItem struct {
+	Factor     *string `json:"factor,omitempty"`
+	Label      *string `json:"label,omitempty"`
+	NeedsInput *bool   `json:"needs_input,omitempty"`
+	// One of: password, otp, none, redirect, push, webauthn.
+	InputKind *string `json:"input_kind,omitempty"`
 }
 
 // StepUpGetPolicyResult is a typed object of the Backend API.
@@ -17400,6 +21619,9 @@ type StepUpGetPolicyResult struct {
 	AllowedMethods []string `json:"allowed_methods,omitempty"`
 	// The step-up strategies that can satisfy it, after phishing resistance narrows allowed_methods.
 	AcceptedFactors []string `json:"accepted_factors,omitempty"`
+	// Render info for each accepted factor: label, whether the person types something, and the kind of
+	// input. A factor added later still comes with a label.
+	AcceptedFactorInfo []StepUpGetPolicyResultAcceptedFactorInfoItem `json:"accepted_factor_info,omitempty"`
 	// How long a signed receipt for an allowed assertion lives (10 to 300).
 	ReceiptTTLSeconds *int64 `json:"receipt_ttl_seconds,omitempty"`
 	// Created (epoch ms).
@@ -17442,6 +21664,15 @@ func (p StepUpUpdatePolicyParams) MarshalJSON() ([]byte, error) {
 	return marshalWithExtra(plain(p), extra)
 }
 
+// StepUpUpdatePolicyResultAcceptedFactorInfoItem is a typed object of the Backend API.
+type StepUpUpdatePolicyResultAcceptedFactorInfoItem struct {
+	Factor     *string `json:"factor,omitempty"`
+	Label      *string `json:"label,omitempty"`
+	NeedsInput *bool   `json:"needs_input,omitempty"`
+	// One of: password, otp, none, redirect, push, webauthn.
+	InputKind *string `json:"input_kind,omitempty"`
+}
+
 // StepUpUpdatePolicyResult is a typed object of the Backend API.
 type StepUpUpdatePolicyResult struct {
 	Object *string `json:"object,omitempty"`
@@ -17465,6 +21696,9 @@ type StepUpUpdatePolicyResult struct {
 	AllowedMethods []string `json:"allowed_methods,omitempty"`
 	// The step-up strategies that can satisfy it, after phishing resistance narrows allowed_methods.
 	AcceptedFactors []string `json:"accepted_factors,omitempty"`
+	// Render info for each accepted factor: label, whether the person types something, and the kind of
+	// input. A factor added later still comes with a label.
+	AcceptedFactorInfo []StepUpUpdatePolicyResultAcceptedFactorInfoItem `json:"accepted_factor_info,omitempty"`
 	// How long a signed receipt for an allowed assertion lives (10 to 300).
 	ReceiptTTLSeconds *int64 `json:"receipt_ttl_seconds,omitempty"`
 	// Created (epoch ms).
@@ -17819,6 +22053,218 @@ type UsersCancelBulkActionResult struct {
 	CompletedAt *int64 `json:"completed_at,omitempty"`
 }
 
+// UsersSetByExternalIDParams is a typed object of the Backend API.
+type UsersSetByExternalIDParams struct {
+	// Required when the call creates the user. Ignored on update.
+	EmailAddress *string `json:"email_address,omitempty"`
+	// On create only: make the user a test user (no message of any kind is sent to it, it is not
+	// billed). Ignored, never applied, when the call updates or adopts an existing user.
+	Sandbox *bool `json:"sandbox,omitempty"`
+	// On create only: whether a password or password hash in the body is usable at once (active) or
+	// held until an address on the account is proven (until_email_verified). Omitted: the instance
+	// setting accountUx.passwordImport.importedPasswordPolicy. One of: active, until_email_verified.
+	PasswordPolicy *string `json:"password_policy,omitempty"`
+	// Adopt an existing user that has this address (verified in Atlas) and no external_id yet. Default
+	// false: that case is a 409.
+	LinkByVerifiedEmail *bool   `json:"link_by_verified_email,omitempty"`
+	Password            *string `json:"password,omitempty"`
+	PasswordHash        *string `json:"password_hash,omitempty"`
+	FirstName           *string `json:"first_name,omitempty"`
+	LastName            *string `json:"last_name,omitempty"`
+	ImageURL            *string `json:"image_url,omitempty"`
+	// Create only.
+	EmailVerified *bool `json:"email_verified,omitempty"`
+	// Readable by the frontend (FAPI). Governed by trait rules.
+	PublicMetadata map[string]interface{} `json:"public_metadata,omitempty"`
+	// Backend-only; never exposed to the browser.
+	PrivateMetadata map[string]interface{} `json:"private_metadata,omitempty"`
+	// Writable by the end user from the frontend.
+	UnsafeMetadata map[string]interface{} `json:"unsafe_metadata,omitempty"`
+	ReferralCode   *string                `json:"referral_code,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p UsersSetByExternalIDParams) MarshalJSON() ([]byte, error) {
+	type plain UsersSetByExternalIDParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// EmailAddress2Verification is a typed object of the Backend API.
+type EmailAddress2Verification struct {
+	// verified only when the address was proven (an emailed code or link, a provider that vouches for
+	// it, or your backend). An address that signed up while requireEmailVerification was false is
+	// unverified. One of: verified, unverified.
+	Status string `json:"status"`
+	// How the address was verified: email_code, email_link, oauth, admin, import, scim, lti; skipped
+	// when it signed up without proof (held for sign-in, reported unverified); null when not verified.
+	Strategy *string `json:"strategy,omitempty"`
+}
+
+// EmailAddress2: The `EmailAddress` object.
+type EmailAddress2 struct {
+	ID           string                    `json:"id"`
+	Object       string                    `json:"object"`
+	EmailAddress string                    `json:"email_address"`
+	Verification EmailAddress2Verification `json:"verification"`
+	// Same as verification.status === "verified": the address was proven.
+	Verified bool `json:"verified"`
+	Primary  bool `json:"primary"`
+}
+
+// UserReferral2: A user's inbound referral: where attribution stands and, once attributed, who referred them.
+type UserReferral2 struct {
+	// Where attribution stands: pending (the platform has not answered yet), attributed, none (not
+	// referred), failed, held or flagged. One of: pending, attributed, none, failed, held, flagged.
+	Status string `json:"status"`
+	// The platform's id for the referring partner.
+	PartnerID *string `json:"partner_id,omitempty"`
+	// The referrer as the platform knows them (your external_id for that user, or their Atlas id).
+	PartnerExternalRef *string `json:"partner_external_ref,omitempty"`
+	// Same as partner_external_ref.
+	ReferrerExternalID *string `json:"referrer_external_id,omitempty"`
+	// The referrer's Atlas user id, when they are a user of this instance.
+	ReferrerUserID *string `json:"referrer_user_id,omitempty"`
+	// How the platform matched the referral, e.g. code, click, coupon.
+	MatchedVia *string `json:"matched_via,omitempty"`
+	// The platform's own status for the referral (e.g. active).
+	ReferralStatus *string `json:"referral_status,omitempty"`
+	// The platform's reasoning notes for its answer.
+	Notes []string `json:"notes"`
+	// The risk level assessed at sign-up, when one was. One of: low, medium, high, None.
+	RiskLevel *string `json:"risk_level,omitempty"`
+	// An admin marked the referral fraudulent.
+	Flagged *bool `json:"flagged,omitempty"`
+}
+
+// User2PhoneNumbersItem is a typed object of the Backend API.
+type User2PhoneNumbersItem struct {
+	Object      *string `json:"object,omitempty"`
+	ID          *string `json:"id,omitempty"`
+	PhoneNumber *string `json:"phone_number,omitempty"`
+	Verified    *bool   `json:"verified,omitempty"`
+	Primary     *bool   `json:"primary,omitempty"`
+}
+
+// UserExternalAccount2: A provider identity linked to the user. Tokens and the raw provider profile are never included.
+type UserExternalAccount2 struct {
+	Object         string `json:"object"`
+	ID             string `json:"id"`
+	Provider       string `json:"provider"`
+	ProviderUserID string `json:"provider_user_id"`
+	// The provider's address at the last sign-in or import (a snapshot, not proof of ownership).
+	ProviderEmail *string `json:"provider_email,omitempty"`
+	// Whether the provider (or the import) said that address is verified.
+	EmailVerified bool    `json:"email_verified"`
+	FirstName     *string `json:"first_name,omitempty"`
+	LastName      *string `json:"last_name,omitempty"`
+	// The provider's avatar for this identity.
+	ImageURL *string `json:"image_url,omitempty"`
+	// Linked (epoch ms).
+	ConnectedAt int64 `json:"connected_at"`
+}
+
+// User2: A user as the Backend API serializes it. Never includes private/unsafe metadata (those are
+// write-only here).
+type User2 struct {
+	Object   string  `json:"object"`
+	ID       string  `json:"id"`
+	Username *string `json:"username,omitempty"`
+	// false for a link-only account added with POST /v1/users/{id}/external_accounts: it is shown and
+	// delivered but can never sign anyone in.
+	SignIn                *bool           `json:"sign_in,omitempty"`
+	FirstName             *string         `json:"first_name,omitempty"`
+	LastName              *string         `json:"last_name,omitempty"`
+	ImageURL              *string         `json:"image_url,omitempty"`
+	EmailAddresses        []EmailAddress2 `json:"email_addresses"`
+	PrimaryEmailAddressID *string         `json:"primary_email_address_id,omitempty"`
+	// The primary address as a flat string; null until a verified primary exists.
+	PrimaryEmail *string `json:"primary_email,omitempty"`
+	// The relying party's own id for this user, if set/imported.
+	ExternalID *string `json:"external_id,omitempty"`
+	// Whether the account has a usable password (never the hash).
+	PasswordEnabled bool                   `json:"password_enabled"`
+	PublicMetadata  map[string]interface{} `json:"public_metadata"`
+	MFAEnabled      bool                   `json:"mfa_enabled"`
+	// Whether the user holds at least one passkey.
+	HasPasskey *bool `json:"has_passkey,omitempty"`
+	// Factor classes this user must always use (POL-04); empty = none.
+	RequiredFactors []string `json:"required_factors,omitempty"`
+	// Whether this identity is still an anonymous guest.
+	IsAnonymous bool `json:"is_anonymous"`
+	// A sandbox user: set at creation, never changed. Nothing is ever sent to it (email, SMS, push,
+	// voice, WhatsApp), it is not counted as a monthly active user or billed, and its tokens carry
+	// `env: sandbox`.
+	Sandbox   *bool   `json:"sandbox,omitempty"`
+	Banned    bool    `json:"banned"`
+	BanReason *string `json:"ban_reason,omitempty"`
+	BanNote   *string `json:"ban_note,omitempty"`
+	Locked    bool    `json:"locked"`
+	// One account state, the same value as the ID token's account_status: banned (an active ban;
+	// deactivation by SCIM, directory sync or a workflow is a ban), suspended (a lock, suspension
+	// directive or sign-in lockout is in force), else active. One of: active, suspended, banned.
+	Status *string `json:"status,omitempty"`
+	// Epoch-ms; non-null once soft-deleted.
+	DeletedAt *int64 `json:"deleted_at,omitempty"`
+	// Epoch-ms.
+	LastSignInAt *int64 `json:"last_sign_in_at,omitempty"`
+	// Epoch-ms when ALL of the user's sessions last ended together (BAPI revoke-all, dashboard
+	// revoke-all, sign out everywhere, a password change or reset that revokes all, a ban or lock, a
+	// compromise signal); null = never. Treat any token issued before it as ended. Also the
+	// `user.sessions_revoked` event.
+	SessionsRevokedAt *int64 `json:"sessions_revoked_at,omitempty"`
+	// Created (epoch ms).
+	CreatedAt int64 `json:"created_at"`
+	// Last updated (epoch ms).
+	UpdatedAt int64 `json:"updated_at"`
+	// Strictly increases with every change to the user. Webhook payloads carry the same value: apply
+	// an update only if its version is higher than the one you hold.
+	Version int64 `json:"version"`
+	// How the user arrived through a referral program (referral attribution on). Null only when the
+	// user was never reported to the referral platform; otherwise `status` says where attribution
+	// stands (`pending` until the platform answers). Present on read, list, create and update
+	// responses.
+	Referral *UserReferral2 `json:"referral,omitempty"`
+	// The user's own referral code: set once the referral platform enrolled the user as a partner (its
+	// answer carried a code) or an admin set one (PATCH /v1/users/{id} referral_code). null when the
+	// user is not enrolled, referrals are off, or the code was cleared.
+	ReferralCode *string `json:"referral_code,omitempty"`
+	// PATCH answers only, when there is something to know: e.g. the referral platform has not
+	// confirmed a new referral_code yet (always so in a dry run, which does not ask it).
+	Warnings []string `json:"warnings,omitempty"`
+	// The user's own share link: the link the referral platform returned for the partner, else the
+	// referral settings' link_template with {code} replaced by the URL-encoded referral_code. null
+	// while there is no referral_code, or no platform link and no link_template.
+	ReferralLink *string `json:"referral_link,omitempty"`
+	// Every phone number of the user. Present on read, list, update and user webhooks.
+	PhoneNumbers []User2PhoneNumbersItem `json:"phone_numbers,omitempty"`
+	// The primary phone number (E.164): the one the person made primary, else their oldest verified
+	// number; null when none.
+	PrimaryPhoneNumber *string `json:"primary_phone_number,omitempty"`
+	// True only when the primary phone number was proven.
+	PhoneNumberVerified *bool `json:"phone_number_verified,omitempty"`
+	// Every linked provider identity, however it was linked (a sign-in, a connect flow, identities on
+	// create, a bulk import or identities/import); the same set GET /v1/users/{id}/identities lists.
+	// Present on read, list, create, update and password responses.
+	ExternalAccounts []UserExternalAccount2 `json:"external_accounts,omitempty"`
+}
+
+// UsersListDeletedItem is a typed object of the Backend API.
+type UsersListDeletedItem struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// Your own id for the user, when one was set.
+	ExternalID *string `json:"external_id,omitempty"`
+	// Deleted, Unix ms.
+	DeletedAt int64 `json:"deleted_at"`
+}
+
 // UsersCreateDeletedAddressParams is a typed object of the Backend API.
 type UsersCreateDeletedAddressParams struct {
 	Addresses []string `json:"addresses"`
@@ -18041,13 +22487,26 @@ type UsersDeleteApprovalDeviceResult struct {
 	RevokedAt *int64  `json:"revoked_at,omitempty"`
 }
 
+// UsersListApprovalRequestsItem is a typed object of the Backend API.
+type UsersListApprovalRequestsItem struct {
+	Object *string `json:"object,omitempty"`
+	// One of: approval_request, sign_in_approval.
+	Kind   *string `json:"kind,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	Status *string `json:"status,omitempty"`
+}
+
 // UsersCancelApprovalRequestResultApprovers is a typed object of the Backend API.
 type UsersCancelApprovalRequestResultApprovers struct {
-	// One of: subject, users, role.
+	// One of: subject, users, role, group.
 	Mode           *string  `json:"mode,omitempty"`
 	UserIDs        []string `json:"user_ids,omitempty"`
 	OrganizationID *string  `json:"organization_id,omitempty"`
 	Role           *string  `json:"role,omitempty"`
+	// Present when several roles of the organization were named.
+	Roles []string `json:"roles,omitempty"`
+	// Present in mode `group`.
+	GroupID *string `json:"group_id,omitempty"`
 	// How many distinct approvers must approve.
 	Required *int64 `json:"required,omitempty"`
 }
@@ -18057,9 +22516,12 @@ type UsersCancelApprovalRequestResultDecisionsItem struct {
 	ApproverUserID *string `json:"approver_user_id,omitempty"`
 	// One of: approve, deny.
 	Decision *string `json:"decision,omitempty"`
-	// One of: device_key, passkey, number_match.
+	// `step_up` means the approver decided with a fresh step-up for the request's step-up policy
+	// instead of a device signature. One of: device_key, passkey, step_up, number_match.
 	Method *string `json:"method,omitempty"`
-	KeyID  *string `json:"key_id,omitempty"`
+	// The free-text note the approver left with this decision.
+	Note  *string `json:"note,omitempty"`
+	KeyID *string `json:"key_id,omitempty"`
 	// The trusted device the decision came from; null when it came from a device that is not trusted.
 	TrustedDeviceID *string `json:"trusted_device_id,omitempty"`
 	DecidedAt       *int64  `json:"decided_at,omitempty"`
@@ -18088,8 +22550,12 @@ type UsersCancelApprovalRequestResult struct {
 	Binding          *string `json:"binding,omitempty"`
 	RequireSignature *bool   `json:"require_signature,omitempty"`
 	// The request only accepts an approval from a trusted device.
-	RequireTrustedDevice *bool                                      `json:"require_trusted_device,omitempty"`
-	Approvers            *UsersCancelApprovalRequestResultApprovers `json:"approvers,omitempty"`
+	RequireTrustedDevice *bool `json:"require_trusted_device,omitempty"`
+	// The user the request is about cannot decide it.
+	ExcludeRequester *bool `json:"exclude_requester,omitempty"`
+	// The step-up policy an approver may satisfy instead of a device signature.
+	StepUpPolicy *string                                    `json:"step_up_policy,omitempty"`
+	Approvers    *UsersCancelApprovalRequestResultApprovers `json:"approvers,omitempty"`
 	// SHA-256 of the canonical request (base64url): what an approver signs.
 	Digest *string `json:"digest,omitempty"`
 	// The exact text the approver is shown and signs.
@@ -18132,143 +22598,73 @@ type UsersDeleteCookieConsentResult struct {
 	Removed *int64  `json:"removed,omitempty"`
 }
 
-// EmailAddress2Verification is a typed object of the Backend API.
-type EmailAddress2Verification struct {
-	// verified only when the address was proven (an emailed code or link, a provider that vouches for
-	// it, or your backend). An address that signed up while requireEmailVerification was false is
-	// unverified. One of: verified, unverified.
-	Status string `json:"status"`
-	// How the address was verified: email_code, email_link, oauth, admin, import, scim, lti; skipped
-	// when it signed up without proof (held for sign-in, reported unverified); null when not verified.
-	Strategy *string `json:"strategy,omitempty"`
+// UsersCreateDelegationTokenParamsActor is a typed object of the Backend API.
+type UsersCreateDelegationTokenParamsActor struct {
+	// Who is acting: a service name or a staff user id.
+	Sub string `json:"sub"`
+	// What kind of actor `sub` is, for example `service` or `staff`.
+	Type *string `json:"type,omitempty"`
 }
 
-// EmailAddress2: The `EmailAddress` object.
-type EmailAddress2 struct {
-	ID           string                    `json:"id"`
-	Object       string                    `json:"object"`
-	EmailAddress string                    `json:"email_address"`
-	Verification EmailAddress2Verification `json:"verification"`
-	// Same as verification.status === "verified": the address was proven.
-	Verified bool `json:"verified"`
-	Primary  bool `json:"primary"`
+// UsersCreateDelegationTokenParams is a typed object of the Backend API.
+type UsersCreateDelegationTokenParams struct {
+	// The service the token is for. Must be listed in `delegationTokens.audiences`.
+	Audience string `json:"audience"`
+	// What the token may do; each must be listed for the audience.
+	Scopes []string                              `json:"scopes"`
+	Actor  UsersCreateDelegationTokenParamsActor `json:"actor"`
+	// Lifetime in seconds, up to `delegationTokens.maxTtlSeconds` (300 at most). Default
+	// `delegationTokens.defaultTtlSeconds` (120).
+	TTLSeconds *int64 `json:"ttl_seconds,omitempty"`
+	// Speak for the user inside this organization (they must be a member). Adds `org_id` to the token.
+	OrgID *string `json:"org_id,omitempty"`
+	// Why, up to 500 characters, kept in the audit row.
+	Reason *string `json:"reason,omitempty"`
 }
 
-// UserReferral2: A user's inbound referral: where attribution stands and, once attributed, who referred them.
-type UserReferral2 struct {
-	// Where attribution stands: pending (the platform has not answered yet), attributed, none (not
-	// referred), failed, held or flagged. One of: pending, attributed, none, failed, held, flagged.
-	Status string `json:"status"`
-	// The platform's id for the referring partner.
-	PartnerID *string `json:"partner_id,omitempty"`
-	// The referrer as the platform knows them (your external_id for that user, or their Atlas id).
-	PartnerExternalRef *string `json:"partner_external_ref,omitempty"`
-	// Same as partner_external_ref.
-	ReferrerExternalID *string `json:"referrer_external_id,omitempty"`
-	// The referrer's Atlas user id, when they are a user of this instance.
-	ReferrerUserID *string `json:"referrer_user_id,omitempty"`
-	// How the platform matched the referral, e.g. code, click, coupon.
-	MatchedVia *string `json:"matched_via,omitempty"`
-	// The platform's own status for the referral (e.g. active).
-	ReferralStatus *string `json:"referral_status,omitempty"`
-	// The platform's reasoning notes for its answer.
-	Notes []string `json:"notes"`
-	// The risk level assessed at sign-up, when one was. One of: low, medium, high, None.
-	RiskLevel *string `json:"risk_level,omitempty"`
-	// An admin marked the referral fraudulent.
-	Flagged *bool `json:"flagged,omitempty"`
+// UsersCreateDelegationTokenResultActor is a typed object of the Backend API.
+type UsersCreateDelegationTokenResultActor struct {
+	Sub  *string `json:"sub,omitempty"`
+	Type *string `json:"type,omitempty"`
 }
 
-// UserExternalAccount2: A provider identity linked to the user. Tokens and the raw provider profile are never included.
-type UserExternalAccount2 struct {
-	Object         string `json:"object"`
-	ID             string `json:"id"`
-	Provider       string `json:"provider"`
-	ProviderUserID string `json:"provider_user_id"`
-	// The provider's address at the last sign-in or import (a snapshot, not proof of ownership).
-	ProviderEmail *string `json:"provider_email,omitempty"`
-	// Whether the provider (or the import) said that address is verified.
-	EmailVerified bool    `json:"email_verified"`
-	FirstName     *string `json:"first_name,omitempty"`
-	LastName      *string `json:"last_name,omitempty"`
-	// The provider's avatar for this identity.
-	ImageURL *string `json:"image_url,omitempty"`
-	// Linked (epoch ms).
-	ConnectedAt int64 `json:"connected_at"`
+// UsersCreateDelegationTokenResult is a typed object of the Backend API.
+type UsersCreateDelegationTokenResult struct {
+	Object string `json:"object"`
+	// The signed JWT. Shown once; verify it with the instance JWKS.
+	Token string `json:"token"`
+	// One of: Bearer.
+	TokenType string                                `json:"token_type"`
+	UserID    string                                `json:"user_id"`
+	Audience  string                                `json:"audience"`
+	Scopes    []string                              `json:"scopes"`
+	Actor     UsersCreateDelegationTokenResultActor `json:"actor"`
+	Jti       string                                `json:"jti"`
+	// ISO time.
+	ExpiresAt string `json:"expires_at"`
+	// Seconds.
+	ExpiresIn int64 `json:"expires_in"`
 }
 
-// User2: A user as the Backend API serializes it. Never includes private/unsafe metadata (those are
-// write-only here).
-type User2 struct {
-	Object   string  `json:"object"`
-	ID       string  `json:"id"`
-	Username *string `json:"username,omitempty"`
-	// false for a link-only account added with POST /v1/users/{id}/external_accounts: it is shown and
-	// delivered but can never sign anyone in.
-	SignIn                *bool           `json:"sign_in,omitempty"`
-	FirstName             *string         `json:"first_name,omitempty"`
-	LastName              *string         `json:"last_name,omitempty"`
-	ImageURL              *string         `json:"image_url,omitempty"`
-	EmailAddresses        []EmailAddress2 `json:"email_addresses"`
-	PrimaryEmailAddressID *string         `json:"primary_email_address_id,omitempty"`
-	// The primary address as a flat string; null until a verified primary exists.
-	PrimaryEmail *string `json:"primary_email,omitempty"`
-	// The relying party's own id for this user, if set/imported.
-	ExternalID *string `json:"external_id,omitempty"`
-	// Whether the account has a usable password (never the hash).
-	PasswordEnabled bool                   `json:"password_enabled"`
-	PublicMetadata  map[string]interface{} `json:"public_metadata"`
-	MFAEnabled      bool                   `json:"mfa_enabled"`
-	// Whether the user holds at least one passkey.
-	HasPasskey *bool `json:"has_passkey,omitempty"`
-	// Factor classes this user must always use (POL-04); empty = none.
-	RequiredFactors []string `json:"required_factors,omitempty"`
-	// Whether this identity is still an anonymous guest.
-	IsAnonymous bool    `json:"is_anonymous"`
-	Banned      bool    `json:"banned"`
-	BanReason   *string `json:"ban_reason,omitempty"`
-	BanNote     *string `json:"ban_note,omitempty"`
-	Locked      bool    `json:"locked"`
-	// One account state, the same value as the ID token's account_status: banned (an active ban;
-	// deactivation by SCIM, directory sync or a workflow is a ban), suspended (a lock, suspension
-	// directive or sign-in lockout is in force), else active. One of: active, suspended, banned.
-	Status *string `json:"status,omitempty"`
-	// Epoch-ms; non-null once soft-deleted.
-	DeletedAt *int64 `json:"deleted_at,omitempty"`
-	// Epoch-ms.
-	LastSignInAt *int64 `json:"last_sign_in_at,omitempty"`
-	// Epoch-ms when ALL of the user's sessions last ended together (BAPI revoke-all, dashboard
-	// revoke-all, sign out everywhere, a password change or reset that revokes all, a ban or lock, a
-	// compromise signal); null = never. Treat any token issued before it as ended. Also the
-	// `user.sessions_revoked` event.
-	SessionsRevokedAt *int64 `json:"sessions_revoked_at,omitempty"`
-	// Created (epoch ms).
-	CreatedAt int64 `json:"created_at"`
-	// Last updated (epoch ms).
-	UpdatedAt int64 `json:"updated_at"`
-	// Strictly increases with every change to the user. Webhook payloads carry the same value: apply
-	// an update only if its version is higher than the one you hold.
-	Version int64 `json:"version"`
-	// How the user arrived through a referral program (referral attribution on). Null only when the
-	// user was never reported to the referral platform; otherwise `status` says where attribution
-	// stands (`pending` until the platform answers). Present on read, list, create and update
-	// responses.
-	Referral *UserReferral2 `json:"referral,omitempty"`
-	// The user's own referral code: set once the referral platform enrolled the user as a partner (its
-	// answer carried a code) or an admin set one (PATCH /v1/users/{id} referral_code). null when the
-	// user is not enrolled, referrals are off, or the code was cleared.
-	ReferralCode *string `json:"referral_code,omitempty"`
-	// PATCH answers only, when there is something to know: e.g. the referral platform has not
-	// confirmed a new referral_code yet (always so in a dry run, which does not ask it).
-	Warnings []string `json:"warnings,omitempty"`
-	// The user's own share link: the link the referral platform returned for the partner, else the
-	// referral settings' link_template with {code} replaced by the URL-encoded referral_code. null
-	// while there is no referral_code, or no platform link and no link_template.
-	ReferralLink *string `json:"referral_link,omitempty"`
-	// Every linked provider identity, however it was linked (a sign-in, a connect flow, identities on
-	// create, a bulk import or identities/import); the same set GET /v1/users/{id}/identities lists.
-	// Present on read, list, create, update and password responses.
-	ExternalAccounts []UserExternalAccount2 `json:"external_accounts,omitempty"`
+// UsersUpdateDeletionParams is a typed object of the Backend API.
+type UsersUpdateDeletionParams struct {
+	// The new deletion date. Not in the past.
+	EffectiveAt *string `json:"effective_at,omitempty"`
+	// The new deletion date as seconds from now. Alternative to effective_at.
+	GraceSeconds *float64 `json:"grace_seconds,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p UsersUpdateDeletionParams) MarshalJSON() ([]byte, error) {
+	type plain UsersUpdateDeletionParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
 }
 
 // UsersCreateExternalAccountParams is a typed object of the Backend API.
@@ -18296,6 +22692,14 @@ type UsersImportIdentityVerificationParams struct {
 	SessionID string `json:"session_id"`
 }
 
+// UsersImportIdentityVerificationResultLastError: The latest failed attempt the person can retry: the check stays `pending` and `url` stays
+// usable. Null when no attempt has failed.
+type UsersImportIdentityVerificationResultLastError struct {
+	// The service's error code, e.g. `document_unverified_other`, `selfie_face_mismatch`.
+	Code   string  `json:"code"`
+	Reason *string `json:"reason,omitempty"`
+}
+
 // UsersImportIdentityVerificationResult is a typed object of the Backend API.
 type UsersImportIdentityVerificationResult struct {
 	Object string `json:"object"`
@@ -18303,10 +22707,17 @@ type UsersImportIdentityVerificationResult struct {
 	UserID string `json:"user_id"`
 	// One of: persona, onfido, veriff, stripe_identity.
 	Provider string `json:"provider"`
-	// One of: pending, approved, declined, needs_review.
+	// `pending` (not finished, or a failed attempt the person can retry), `processing` (submitted,
+	// being checked), then a verdict: `approved`, `declined` or `needs_review`. One of: pending,
+	// processing, approved, declined, needs_review.
 	Status string `json:"status"`
 	// The service's short reason for a decline or review.
 	Reason *string `json:"reason,omitempty"`
+	// The latest failed attempt the person can retry: the check stays `pending` and `url` stays
+	// usable. Null when no attempt has failed.
+	LastError *UsersImportIdentityVerificationResultLastError `json:"last_error,omitempty"`
+	// How many failed attempts the service reported for this check.
+	Attempts int64 `json:"attempts"`
 	// True when the check was recorded from an existing session through the import route.
 	Imported bool `json:"imported"`
 	// When the verification service verified the person (epoch ms); an imported check keeps the
@@ -18325,6 +22736,14 @@ type UsersImportIdentityVerificationResult struct {
 	CreatedAt int64 `json:"created_at"`
 	// When the check was approved or declined (epoch ms).
 	CompletedAt *int64 `json:"completed_at,omitempty"`
+}
+
+// UsersGetIdentityVerificationResultLastError: The latest failed attempt the person can retry: the check stays `pending` and `url` stays
+// usable. Null when no attempt has failed.
+type UsersGetIdentityVerificationResultLastError struct {
+	// The service's error code, e.g. `document_unverified_other`, `selfie_face_mismatch`.
+	Code   string  `json:"code"`
+	Reason *string `json:"reason,omitempty"`
 }
 
 // UsersGetIdentityVerificationResultVerifiedAttributes: Present only on the first read after the check is approved, and only when you opted in. Atlas
@@ -18346,10 +22765,17 @@ type UsersGetIdentityVerificationResult struct {
 	UserID string `json:"user_id"`
 	// One of: persona, onfido, veriff, stripe_identity.
 	Provider string `json:"provider"`
-	// One of: pending, approved, declined, needs_review.
+	// `pending` (not finished, or a failed attempt the person can retry), `processing` (submitted,
+	// being checked), then a verdict: `approved`, `declined` or `needs_review`. One of: pending,
+	// processing, approved, declined, needs_review.
 	Status string `json:"status"`
 	// The service's short reason for a decline or review.
 	Reason *string `json:"reason,omitempty"`
+	// The latest failed attempt the person can retry: the check stays `pending` and `url` stays
+	// usable. Null when no attempt has failed.
+	LastError *UsersGetIdentityVerificationResultLastError `json:"last_error,omitempty"`
+	// How many failed attempts the service reported for this check.
+	Attempts int64 `json:"attempts"`
 	// True when the check was recorded from an existing session through the import route.
 	Imported bool `json:"imported"`
 	// When the verification service verified the person (epoch ms); an imported check keeps the
@@ -18495,6 +22921,7 @@ type UsersReleaseLegalHoldResult struct {
 type UsersMergeParams struct {
 	SourceUserID *string `json:"source_user_id,omitempty"`
 	DryRun       *bool   `json:"dry_run,omitempty"`
+	ExternalID   *string `json:"external_id,omitempty"`
 }
 
 // UsersListOwnedOrganizationsItem is a typed object of the Backend API.
@@ -18537,6 +22964,150 @@ type UsersReleaseResult struct {
 	// Contained (epoch ms).
 	CreatedAt  int64  `json:"created_at"`
 	ReleasedAt *int64 `json:"released_at,omitempty"`
+}
+
+// UsersListRiskSignalsItemSubject is a typed object of the Backend API.
+type UsersListRiskSignalsItemSubject struct {
+	// One of: user, ip.
+	Type  *string `json:"type,omitempty"`
+	Value *string `json:"value,omitempty"`
+}
+
+// UsersListRiskSignalsItem is a typed object of the Backend API.
+type UsersListRiskSignalsItem struct {
+	Object     *string                          `json:"object,omitempty"`
+	ID         *string                          `json:"id,omitempty"`
+	Subject    *UsersListRiskSignalsItemSubject `json:"subject,omitempty"`
+	SignalType *string                          `json:"signal_type,omitempty"`
+	// One of: low, medium, high, critical.
+	Severity *string                `json:"severity,omitempty"`
+	Source   *string                `json:"source,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	// Expires (epoch ms).
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	RevokedAt *int64 `json:"revoked_at,omitempty"`
+	// One of: active, expired, revoked.
+	Status *string `json:"status,omitempty"`
+	// Created (epoch ms).
+	CreatedAt *int64 `json:"created_at,omitempty"`
+}
+
+// UsersCreateRiskSignalParams is a typed object of the Backend API.
+type UsersCreateRiskSignalParams struct {
+	// Your own type, e.g. `credential_stuffing`. Lowercase letters, digits and `_ . : -`.
+	SignalType string `json:"signal_type"`
+	// One of: low, medium, high, critical.
+	Severity   string `json:"severity"`
+	TTLSeconds *int64 `json:"ttl_seconds,omitempty"`
+	// Up to 2 KB. Kept private: never sent in webhooks.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	// Which of your systems reported it. Default `api`.
+	Source *string `json:"source,omitempty"`
+}
+
+// UsersCreateRiskSignalResultSubject is a typed object of the Backend API.
+type UsersCreateRiskSignalResultSubject struct {
+	// One of: user, ip.
+	Type  *string `json:"type,omitempty"`
+	Value *string `json:"value,omitempty"`
+}
+
+// UsersCreateRiskSignalResult is a typed object of the Backend API.
+type UsersCreateRiskSignalResult struct {
+	Object     *string                             `json:"object,omitempty"`
+	ID         *string                             `json:"id,omitempty"`
+	Subject    *UsersCreateRiskSignalResultSubject `json:"subject,omitempty"`
+	SignalType *string                             `json:"signal_type,omitempty"`
+	// One of: low, medium, high, critical.
+	Severity *string                `json:"severity,omitempty"`
+	Source   *string                `json:"source,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	// Expires (epoch ms).
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+	RevokedAt *int64 `json:"revoked_at,omitempty"`
+	// One of: active, expired, revoked.
+	Status *string `json:"status,omitempty"`
+	// Created (epoch ms).
+	CreatedAt *int64 `json:"created_at,omitempty"`
+}
+
+// UsersDeleteRiskSignalResult is a typed object of the Backend API.
+type UsersDeleteRiskSignalResult struct {
+	Object  *string `json:"object,omitempty"`
+	UserID  *string `json:"user_id,omitempty"`
+	Cleared *int64  `json:"cleared,omitempty"`
+}
+
+// UsersGetSecuritySummaryResultLinkedProvidersItem is a typed object of the Backend API.
+type UsersGetSecuritySummaryResultLinkedProvidersItem struct {
+	ID             *string `json:"id,omitempty"`
+	Provider       *string `json:"provider,omitempty"`
+	ProviderUserID *string `json:"provider_user_id,omitempty"`
+	EmailAddress   *string `json:"email_address,omitempty"`
+	EmailVerified  *bool   `json:"email_verified,omitempty"`
+}
+
+// UsersGetSecuritySummaryResultMFAFactorsItem is a typed object of the Backend API.
+type UsersGetSecuritySummaryResultMFAFactorsItem struct {
+	ID        *string `json:"id,omitempty"`
+	Type      *string `json:"type,omitempty"`
+	Verified  *bool   `json:"verified,omitempty"`
+	CreatedAt *int64  `json:"created_at,omitempty"`
+}
+
+// UsersGetSecuritySummaryResultPasskeysItem is a typed object of the Backend API.
+type UsersGetSecuritySummaryResultPasskeysItem struct {
+	ID         *string `json:"id,omitempty"`
+	Name       *string `json:"name,omitempty"`
+	CreatedAt  *int64  `json:"created_at,omitempty"`
+	LastUsedAt *int64  `json:"last_used_at,omitempty"`
+}
+
+// UsersGetSecuritySummaryResultTrustedDevicesItem is a typed object of the Backend API.
+type UsersGetSecuritySummaryResultTrustedDevicesItem struct {
+	// One of: remembered_browser, device_key.
+	Kind       *string `json:"kind,omitempty"`
+	ID         *string `json:"id,omitempty"`
+	Label      *string `json:"label,omitempty"`
+	CreatedAt  *int64  `json:"created_at,omitempty"`
+	LastUsedAt *int64  `json:"last_used_at,omitempty"`
+	ExpiresAt  *int64  `json:"expires_at,omitempty"`
+}
+
+// UsersGetSecuritySummaryResultActiveSessionsLatest is a typed object of the Backend API.
+type UsersGetSecuritySummaryResultActiveSessionsLatest struct {
+	ID           *string `json:"id,omitempty"`
+	LastActiveAt *int64  `json:"last_active_at,omitempty"`
+	// The end-user variant only: whether the newest session is the caller's own.
+	Current   *bool   `json:"current,omitempty"`
+	IPAddress *string `json:"ip_address,omitempty"`
+	Country   *string `json:"country,omitempty"`
+}
+
+// UsersGetSecuritySummaryResultActiveSessions is a typed object of the Backend API.
+type UsersGetSecuritySummaryResultActiveSessions struct {
+	Count  *int64                                             `json:"count,omitempty"`
+	Latest *UsersGetSecuritySummaryResultActiveSessionsLatest `json:"latest,omitempty"`
+}
+
+// UsersGetSecuritySummaryResult is a typed object of the Backend API.
+type UsersGetSecuritySummaryResult struct {
+	Object          string `json:"object"`
+	UserID          string `json:"user_id"`
+	PasswordEnabled bool   `json:"password_enabled"`
+	// Epoch milliseconds.
+	PasswordChangedAt *int64 `json:"password_changed_at,omitempty"`
+	MFAEnabled        bool   `json:"mfa_enabled"`
+	HasPasskey        bool   `json:"has_passkey"`
+	// What the user can sign in with right now: password, passkey, email_code, email_link, phone_code,
+	// oauth_<provider>.
+	SignInMethods        []string                                           `json:"sign_in_methods"`
+	LinkedProviders      []UsersGetSecuritySummaryResultLinkedProvidersItem `json:"linked_providers"`
+	MFAFactors           []UsersGetSecuritySummaryResultMFAFactorsItem      `json:"mfa_factors"`
+	BackupCodesRemaining *int64                                             `json:"backup_codes_remaining,omitempty"`
+	Passkeys             []UsersGetSecuritySummaryResultPasskeysItem        `json:"passkeys"`
+	TrustedDevices       []UsersGetSecuritySummaryResultTrustedDevicesItem  `json:"trusted_devices"`
+	ActiveSessions       UsersGetSecuritySummaryResultActiveSessions        `json:"active_sessions"`
 }
 
 // UsersListTemporaryAccessItem is a typed object of the Backend API.
@@ -18675,6 +23246,21 @@ type WebBotAuthDeleteDirectoryResult struct {
 	Object  *string `json:"object,omitempty"`
 	ID      *string `json:"id,omitempty"`
 	Deleted *bool   `json:"deleted,omitempty"`
+}
+
+// WebhookDlqListResultDataItem is a typed object of the Backend API.
+type WebhookDlqListResultDataItem struct {
+	EndpointID string `json:"endpoint_id"`
+}
+
+// WebhookDlqListResult is a typed object of the Backend API.
+type WebhookDlqListResult struct {
+	Object      string                         `json:"object"`
+	Data        []WebhookDlqListResultDataItem `json:"data"`
+	HasMore     bool                           `json:"has_more"`
+	NextCursor  *string                        `json:"next_cursor,omitempty"`
+	MaxAttempts *int64                         `json:"max_attempts,omitempty"`
+	Retention   map[string]interface{}         `json:"retention,omitempty"`
 }
 
 // WebhookEndpointsOpsListDlqResult is a typed object of the Backend API.
