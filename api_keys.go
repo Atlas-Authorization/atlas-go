@@ -40,6 +40,13 @@ type APIKey struct {
 	ExpiresAt  *int64 `json:"expires_at"`
 	RevokedAt  *int64 `json:"revoked_at"`
 	CreatedAt  int64  `json:"created_at"`
+	// Credential is "secret" or "key_pair"; Audience and PublicKey are set for
+	// key-pair keys. KeyID is the JWT kid (equal to ID).
+	Credential   string  `json:"credential,omitempty"`
+	Audience     *string `json:"audience,omitempty"`
+	KeyID        string  `json:"key_id,omitempty"`
+	PublicKey    *string `json:"public_key,omitempty"`
+	PublicKeyJKT *string `json:"public_key_jkt,omitempty"`
 }
 
 // APIKeyRateLimit throttles verifies of one key: at most Max per
@@ -153,6 +160,9 @@ type APIKeyWithSecret struct {
 	APIKey
 	Secret string `json:"secret"`
 	Note   string `json:"note"`
+	// PrivateKey is the PKCS#8 PEM of an Atlas-generated key pair, revealed
+	// once (key-pair keys only; empty when you brought your own public key).
+	PrivateKey string `json:"private_key,omitempty"`
 }
 
 // CreateAPIKeyParams is the body of POST /v1/api_keys.
@@ -181,6 +191,13 @@ type CreateAPIKeyParams struct {
 	// Import registers an existing key by its hash instead of minting one: the
 	// response has no secret, and the original secret verifies from then on.
 	Import *APIKeyImport `json:"import,omitempty"`
+	// Credential is "secret" (default) or "key_pair".
+	Credential string `json:"credential,omitempty"`
+	// Audience is the assertion audience of a key-pair key (default: the instance id).
+	Audience string `json:"audience,omitempty"`
+	// PublicKey is your own SPKI PEM (P-256 or Ed25519) for a key-pair key;
+	// without it Atlas generates the pair and returns PrivateKey once.
+	PublicKey string `json:"public_key,omitempty"`
 }
 
 // APIKeyImport is the import body of CreateAPIKeyParams.
@@ -268,6 +285,10 @@ type APIKeyVerification struct {
 	Usage      []APIKeyLimitState `json:"usage,omitempty"`
 	LastUsedAt *int64             `json:"last_used_at,omitempty"`
 	ExpiresAt  *int64             `json:"expires_at,omitempty"`
+	// Credential is "key_pair" when an assertion was verified; JTI and Exp are the assertion's.
+	Credential string `json:"credential,omitempty"`
+	JTI        string `json:"jti,omitempty"`
+	Exp        *int64 `json:"exp,omitempty"`
 }
 
 // ListAPIKeysParams optionally narrows the listing to one subject.
@@ -311,7 +332,9 @@ func (s *APIKeysService) Verify(ctx context.Context, secret string, opts ...Requ
 // RequiredScopes must all be on the key, else the verdict is Valid=false with
 // Code=insufficient_scope and the MissingScopes.
 type VerifyAPIKeyParams struct {
-	Secret         string   `json:"secret"`
+	Secret string `json:"secret,omitempty"`
+	// Token is a signed assertion (SignAPIKeyAssertion); send it instead of Secret.
+	Token          string   `json:"token,omitempty"`
 	RequiredScopes []string `json:"required_scopes,omitempty"`
 }
 
@@ -384,7 +407,9 @@ type ListRevokedAPIKeysParams struct {
 // MintAPIKeyTokenParams is the body of POST /v1/api_keys/token. Audience is a
 // string or a []string.
 type MintAPIKeyTokenParams struct {
-	Secret     string      `json:"secret"`
+	Secret string `json:"secret,omitempty"`
+	// Assertion is a signed key-pair assertion, sent instead of Secret.
+	Assertion  string      `json:"assertion,omitempty"`
 	TTLSeconds int         `json:"ttl_seconds,omitempty"`
 	Audience   interface{} `json:"audience,omitempty"`
 }

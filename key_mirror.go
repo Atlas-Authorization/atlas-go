@@ -50,6 +50,24 @@ type MirroredAPIKey struct {
 	// RevokedReason says why it was revoked, when Atlas said (membership_ended,
 	// creator_departed, organization_deleted, user_banned, rotated).
 	RevokedReason *string `json:"revoked_reason,omitempty"`
+	// Enabled is false for a disabled key (refused like an unknown one); nil = enabled.
+	Enabled *bool `json:"enabled,omitempty"`
+	// Credential is "secret" or "key_pair". A key-pair row has no secret hash (Hash is a placeholder
+	// nothing matches); its assertions verify against PublicKeyPEM.
+	Credential string `json:"credential,omitempty"`
+	// PublicKeyPEM is the SPKI PEM a key-pair key's assertions are verified against.
+	PublicKeyPEM *string `json:"public_key_pem,omitempty"`
+	// Audience is the aud an assertion must carry.
+	Audience *string `json:"audience,omitempty"`
+	// MaxTokenLifetimeSeconds is the longest assertion lifetime; nil = 3600.
+	MaxTokenLifetimeSeconds *int64 `json:"max_token_lifetime_seconds,omitempty"`
+}
+
+// KeyMirrorJTIStore is optional on a KeyMirrorStore: record an assertion jti as used until
+// expiresAtMS and report false when it was already used (a replay). Without it the mirror
+// keeps used ids in process memory, which a restart or a second instance does not share.
+type KeyMirrorJTIStore interface {
+	ClaimAssertionJTI(ctx context.Context, keyID, jti string, expiresAtMS int64) (bool, error)
 }
 
 // KeyMirrorStore is the smallest store that works. Get and GetByHash return
@@ -216,6 +234,13 @@ type KeyMirrorKeyRecord struct {
 	Secret string `json:"secret,omitempty"`
 	// Outcome is created or already_present on an import.
 	Outcome string `json:"outcome,omitempty"`
+	// Credential, PublicKey, Audience and MaxTokenLifetimeSeconds describe a key-pair key
+	// (Secret is empty for one).
+	Enabled                 *bool   `json:"enabled,omitempty"`
+	Credential              string  `json:"credential,omitempty"`
+	PublicKey               *string `json:"public_key,omitempty"`
+	Audience                *string `json:"audience,omitempty"`
+	MaxTokenLifetimeSeconds *int64  `json:"max_token_lifetime_seconds,omitempty"`
 }
 
 // KeyMirrorRevokedKey is one entry of the revocation feed.
@@ -356,6 +381,15 @@ const (
 	KeyMirrorCodeMembershipUnresolve = "membership_unresolved"
 	// KeyMirrorCodeStale: the mirror is not fresh enough to answer (never synced, or the last Sync is older than MaxStaleness). Retry after Sync.
 	KeyMirrorCodeStale = "stale"
+
+	// Refusals of a key-pair assertion, the same strings Atlas verify answers.
+	KeyMirrorCodeInvalidAssertion         = "invalid_assertion"
+	KeyMirrorCodeAssertionExpired         = "assertion_expired"
+	KeyMirrorCodeAssertionNotYetValid     = "assertion_not_yet_valid"
+	KeyMirrorCodeWrongAudience            = "wrong_audience"
+	KeyMirrorCodeAssertionLifetimeTooLong = "assertion_lifetime_too_long"
+	KeyMirrorCodeAssertionReplayed        = "assertion_replayed"
+	KeyMirrorCodeScopeNotGranted          = "scope_not_granted"
 )
 
 // KeyMirrorOptions configures a KeyMirror.
@@ -395,6 +429,7 @@ type KeyMirror struct {
 	mu         sync.Mutex
 	memSyncAt  int64
 	memSynced  bool
+	usedJTIs   map[string]int64
 	clock      KeyMirrorSyncClock
 	membership KeyMirrorMembershipStore
 }
@@ -438,7 +473,16 @@ func keyRecordToMirrored(r *KeyMirrorKeyRecord, hash string) MirroredAPIKey {
 		ID: r.ID, Hash: hash, Prefix: r.Prefix, SubjectType: r.SubjectType, SubjectID: r.SubjectID, Name: r.Name,
 		Scopes: r.Scopes, AllowedIPs: r.AllowedIPs, ExpiresAt: r.ExpiresAt, RevokedAt: r.RevokedAt,
 		OrganizationID: r.OrganizationID, RevokedReason: r.RevokedReason,
+		Enabled: r.Enabled, Credential: r.Credential, PublicKeyPEM: r.PublicKey, Audience: r.Audience, MaxTokenLifetimeSeconds: r.MaxTokenLifetimeSeconds,
 	}
+}
+
+// keyRecordHash is the secret's sha256; a key-pair key has no secret, so its row carries a placeholder nothing can match.
+func keyRecordHash(r *KeyMirrorKeyRecord) string {
+	if r.Secret == "" && r.Credential == "key_pair" {
+		return "key_pair:" + r.ID
+	}
+	return HashAPIKeySecret(r.Secret)
 }
 
 // Mint creates a key at Atlas, then mirrors it. The returned record carries the one-time Secret.
@@ -448,7 +492,7 @@ func (m *KeyMirror) Mint(ctx context.Context, params CreateAPIKeyParams, opts ..
 	if err != nil {
 		return nil, err
 	}
-	if err := m.opts.Store.Put(ctx, keyRecordToMirrored(created, HashAPIKeySecret(created.Secret))); err != nil {
+	if err := m.opts.Store.Put(ctx, keyRecordToMirrored(created, keyRecordHash(created))); err != nil {
 		return nil, err
 	}
 	return created, nil
@@ -550,7 +594,7 @@ func (m *KeyMirror) Rotate(ctx context.Context, id string, params KeyMirrorRotat
 	if err != nil {
 		return nil, err
 	}
-	if err := m.opts.Store.Put(ctx, keyRecordToMirrored(&rotated.KeyMirrorKeyRecord, HashAPIKeySecret(rotated.Secret))); err != nil {
+	if err := m.opts.Store.Put(ctx, keyRecordToMirrored(&rotated.KeyMirrorKeyRecord, keyRecordHash(&rotated.KeyMirrorKeyRecord))); err != nil {
 		return nil, err
 	}
 	old, err := m.opts.Store.Get(ctx, id)
@@ -599,6 +643,10 @@ type KeyMirrorVerification struct {
 	Organization *KeyMirrorMembership
 	// LastSyncAt is set with KeyMirrorCodeStale: epoch ms of the last completed sync (nil = never).
 	LastSyncAt *int64
+	// Credential is "key_pair" after VerifyAssertion; JTI and Exp (epoch seconds) are the assertion's.
+	Credential string
+	JTI        string
+	Exp        int64
 }
 
 func keyMirrorExpand(held []string, implications map[string][]string, allowed []string) []string {
@@ -700,6 +748,35 @@ func IntersectScopesWithPermissions(scopes, permissions []string) []string {
 	return out
 }
 
+// freshness returns a refusal when the mirror is too stale to answer, and whether the answer is served stale.
+func (m *KeyMirror) freshness(ctx context.Context) (*KeyMirrorVerification, bool, error) {
+	if m.opts.MaxStaleness <= 0 {
+		return nil, false, nil
+	}
+	at, ok, err := m.LastSyncAt(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	var behind int64
+	if ok {
+		behind = m.nowMS() - at - m.opts.MaxStaleness.Milliseconds()
+	}
+	if ok && behind <= 0 {
+		return nil, false, nil
+	}
+	if !ok || behind > m.opts.ServeStaleFor.Milliseconds() {
+		v := &KeyMirrorVerification{Code: KeyMirrorCodeStale}
+		if ok {
+			v.LastSyncAt = &at
+		}
+		return v, false, nil
+	}
+	if m.opts.OnServeStale != nil {
+		m.opts.OnServeStale(time.UnixMilli(at), time.Duration(behind)*time.Millisecond)
+	}
+	return nil, true, nil
+}
+
 // Verify checks a presented secret against the mirror, with no network call
 // (except VerifyAtAtlas on a local miss, and an org-bound key without Membership).
 // Unknown, revoked and expired keys all answer Valid=false; a mirror that is not
@@ -709,29 +786,9 @@ func (m *KeyMirror) Verify(ctx context.Context, secret string, opts KeyVerifyOpt
 	if secret == "" {
 		return &KeyMirrorVerification{}, nil
 	}
-	servedStale := false
-	if m.opts.MaxStaleness > 0 {
-		at, ok, err := m.LastSyncAt(ctx)
-		if err != nil {
-			return nil, err
-		}
-		var behind int64
-		if ok {
-			behind = m.nowMS() - at - m.opts.MaxStaleness.Milliseconds()
-		}
-		if !ok || behind > 0 {
-			if !ok || behind > m.opts.ServeStaleFor.Milliseconds() {
-				v := &KeyMirrorVerification{Code: KeyMirrorCodeStale}
-				if ok {
-					v.LastSyncAt = &at
-				}
-				return v, nil
-			}
-			servedStale = true
-			if m.opts.OnServeStale != nil {
-				m.opts.OnServeStale(time.UnixMilli(at), time.Duration(behind)*time.Millisecond)
-			}
-		}
+	refuse, servedStale, err := m.freshness(ctx)
+	if err != nil || refuse != nil {
+		return refuse, err
 	}
 	hash := HashAPIKeySecret(secret)
 	key, err := m.opts.Store.GetByHash(ctx, hash)
@@ -756,7 +813,7 @@ func (m *KeyMirror) Verify(ctx context.Context, secret string, opts KeyVerifyOpt
 			key = &mk
 		}
 	}
-	if key == nil || key.RevokedAt != nil {
+	if key == nil || key.RevokedAt != nil || (key.Enabled != nil && !*key.Enabled) {
 		return &KeyMirrorVerification{}, nil
 	}
 	if key.ExpiresAt != nil && *key.ExpiresAt <= m.nowMS() {
@@ -814,6 +871,185 @@ func (m *KeyMirror) Verify(ctx context.Context, secret string, opts KeyVerifyOpt
 		return &KeyMirrorVerification{Code: KeyMirrorCodeInsufficientScope, MissingScopes: missing}, nil
 	}
 	return &KeyMirrorVerification{Valid: true, Key: key, EffectiveScopes: effective, Organization: organization, Stale: servedStale}, nil
+}
+
+// VerifyAssertion verifies a key-pair assertion (SignAPIKeyAssertion) locally with the checks Atlas
+// verify makes: the signature with the stored public key (alg must fit its type), iss = kid, aud, iat,
+// exp and the lifetime cap, nbf, scope (a subset of the key's, narrows the result), revocation, expiry,
+// the IP allowlist, then the single-use jti. A refusal carries the server's Code; a key the mirror does
+// not hold answers Valid=false with no code. The jti is claimed through the store's optional
+// KeyMirrorJTIStore, else in this process's memory, and only after every other check passed.
+func (m *KeyMirror) VerifyAssertion(ctx context.Context, token string, opts KeyVerifyOptions) (*KeyMirrorVerification, error) {
+	refuse, servedStale, err := m.freshness(ctx)
+	if err != nil || refuse != nil {
+		return refuse, err
+	}
+	refused := func(code string) (*KeyMirrorVerification, error) { return &KeyMirrorVerification{Code: code}, nil }
+	parsed := parseAPIKeyAssertion(token)
+	if parsed == nil || parsed.kid == "" {
+		return refused(KeyMirrorCodeInvalidAssertion)
+	}
+	key, err := m.opts.Store.Get(ctx, parsed.kid)
+	if err != nil {
+		return nil, err
+	}
+	if key == nil {
+		return &KeyMirrorVerification{}, nil
+	}
+	if key.Credential != "key_pair" || key.PublicKeyPEM == nil || *key.PublicKeyPEM == "" {
+		return refused(KeyMirrorCodeInvalidAssertion)
+	}
+	if !parsed.verifySignature(*key.PublicKeyPEM) || parsed.claimString("iss") != parsed.kid {
+		return refused(KeyMirrorCodeInvalidAssertion)
+	}
+	if key.Enabled != nil && !*key.Enabled {
+		return refused(KeyMirrorCodeInvalidAssertion)
+	}
+	if key.RevokedAt != nil {
+		return &KeyMirrorVerification{}, nil
+	}
+	nowMS := m.nowMS()
+	if key.ExpiresAt != nil && *key.ExpiresAt <= nowMS {
+		return &KeyMirrorVerification{}, nil
+	}
+	nowS := nowMS / 1000
+	audOK := false
+	switch aud := parsed.claims["aud"].(type) {
+	case string:
+		audOK = key.Audience != nil && aud == *key.Audience
+	case []interface{}:
+		for _, a := range aud {
+			if as, ok := a.(string); ok && key.Audience != nil && as == *key.Audience {
+				audOK = true
+			}
+		}
+	}
+	if !audOK {
+		return refused(KeyMirrorCodeWrongAudience)
+	}
+	iat, iatOK := parsed.claimInt("iat")
+	exp, expOK := parsed.claimInt("exp")
+	nbf, nbfOK := parsed.claimInt("nbf")
+	_, hasNbf := parsed.claims["nbf"]
+	jti, hasJti := parsed.claims["jti"]
+	jtiStr, jtiIsStr := jti.(string)
+	scopeClaim, hasScope := parsed.claims["scope"]
+	scopeStr, scopeIsStr := scopeClaim.(string)
+	if !iatOK || !expOK || (hasNbf && !nbfOK) || (hasJti && (!jtiIsStr || jtiStr == "")) || (hasScope && !scopeIsStr) {
+		return refused(KeyMirrorCodeInvalidAssertion)
+	}
+	if iat > nowS+60 || (hasNbf && nbf > nowS+60) {
+		return refused(KeyMirrorCodeAssertionNotYetValid)
+	}
+	if exp <= nowS-30 {
+		return refused(KeyMirrorCodeAssertionExpired)
+	}
+	maxLife := int64(3600)
+	if key.MaxTokenLifetimeSeconds != nil {
+		maxLife = *key.MaxTokenLifetimeSeconds
+	}
+	if maxLife > 86400 {
+		maxLife = 86400
+	}
+	if exp-iat > maxLife {
+		return refused(KeyMirrorCodeAssertionLifetimeTooLong)
+	}
+	if len(key.AllowedIPs) > 0 {
+		if opts.ClientIP == "" {
+			return refused(KeyMirrorCodeClientIPRequired)
+		}
+		if !IPInAllowlist(opts.ClientIP, key.AllowedIPs) {
+			return refused(KeyMirrorCodeIPNotAllowed)
+		}
+	}
+	effective := keyMirrorExpand(key.Scopes, m.opts.ScopeImplications, m.opts.AllowedScopes)
+	var organization *KeyMirrorMembership
+	if key.SubjectType == "user" && key.OrganizationID != nil && *key.OrganizationID != "" {
+		if m.opts.Membership == nil {
+			return refused(KeyMirrorCodeMembershipUnresolve)
+		}
+		held, merr := m.opts.Membership(ctx, key.SubjectID, *key.OrganizationID)
+		if merr != nil {
+			return nil, merr
+		}
+		if held == nil {
+			return &KeyMirrorVerification{}, nil
+		}
+		organization = held
+		effective = IntersectScopesWithPermissions(effective, held.Permissions)
+	}
+	if asked := strings.Fields(scopeStr); len(asked) > 0 {
+		has := map[string]bool{}
+		for _, s := range effective {
+			has[s] = true
+		}
+		var notGranted []string
+		for _, s := range asked {
+			if !has[s] {
+				notGranted = append(notGranted, s)
+			}
+		}
+		if len(notGranted) > 0 {
+			return &KeyMirrorVerification{Code: KeyMirrorCodeScopeNotGranted, MissingScopes: notGranted}, nil
+		}
+		narrowed := []string{}
+		for _, s := range effective {
+			for _, a := range asked {
+				if s == a {
+					narrowed = append(narrowed, s)
+					break
+				}
+			}
+		}
+		effective = narrowed
+	}
+	held := map[string]bool{}
+	for _, s := range effective {
+		held[s] = true
+	}
+	var missing []string
+	for _, s := range opts.RequiredScopes {
+		if !held[s] {
+			missing = append(missing, s)
+		}
+	}
+	if len(missing) > 0 {
+		return &KeyMirrorVerification{Code: KeyMirrorCodeInsufficientScope, MissingScopes: missing}, nil
+	}
+	// Last, so a refused assertion never burns its jti.
+	if hasJti {
+		first, cerr := m.claimJTI(ctx, key.ID, jtiStr, exp*1000, nowMS)
+		if cerr != nil {
+			return nil, cerr
+		}
+		if !first {
+			return refused(KeyMirrorCodeAssertionReplayed)
+		}
+	}
+	return &KeyMirrorVerification{Valid: true, Key: key, EffectiveScopes: effective, Organization: organization, Stale: servedStale,
+		Credential: "key_pair", JTI: jtiStr, Exp: exp}, nil
+}
+
+func (m *KeyMirror) claimJTI(ctx context.Context, keyID, jti string, untilMS, nowMS int64) (bool, error) {
+	if s, ok := m.opts.Store.(KeyMirrorJTIStore); ok {
+		return s.ClaimAssertionJTI(ctx, keyID, jti, untilMS)
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.usedJTIs == nil {
+		m.usedJTIs = map[string]int64{}
+	}
+	for k, t := range m.usedJTIs {
+		if t <= nowMS {
+			delete(m.usedJTIs, k)
+		}
+	}
+	id := keyID + "\n" + jti
+	if _, seen := m.usedJTIs[id]; seen {
+		return false, nil
+	}
+	m.usedJTIs[id] = untilMS
+	return true, nil
 }
 
 // Sync consumes the revocation feed from the stored cursor, revoking each listed key
@@ -891,6 +1127,7 @@ func (m *KeyMirror) ApplyWebhook(ctx context.Context, eventType string, data jso
 		Name          json.RawMessage `json:"name"`
 		Scopes        json.RawMessage `json:"scopes"`
 		AllowedIPs    json.RawMessage `json:"allowed_ips"`
+		Enabled       *bool           `json:"enabled"`
 		ExpiresAt     json.RawMessage `json:"expires_at"`
 		RevokedAt     *int64          `json:"revoked_at"`
 		RevokedReason *string         `json:"revoked_reason"`
@@ -942,6 +1179,9 @@ func (m *KeyMirror) ApplyWebhook(ctx context.Context, eventType string, data jso
 			var v []string
 			_ = json.Unmarshal(d.AllowedIPs, &v)
 			updated.AllowedIPs = v
+		}
+		if d.Enabled != nil {
+			updated.Enabled = d.Enabled
 		}
 		return true, m.opts.Store.Put(ctx, updated)
 	}

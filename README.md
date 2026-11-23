@@ -107,6 +107,26 @@ if errors.As(err, &apiErr) {
 `apiErr.HasCode("...")` checks any error in the envelope; `apiErr.Errors[i].Meta`
 carries extras such as a rate limit's `retry_after`.
 
+## Key-pair API keys
+
+A key-pair key has no shared secret: Atlas returns a PKCS#8 private key once and keeps only the public key. Sign a short-lived assertion and present it where you would present a secret.
+
+```go
+key, err := c.APIKeys.Create(ctx, atlas.CreateAPIKeyParams{
+	SubjectType: "user", SubjectID: "user_123",
+	Credential: "key_pair", Audience: "https://api.example.com",
+})
+assertion, err := atlas.SignAPIKeyAssertion(key.PrivateKey, atlas.SignAPIKeyAssertionOptions{
+	KeyID: key.KeyID, Audience: "https://api.example.com",
+})
+verdict, err := c.APIKeys.VerifyWithParams(ctx, atlas.VerifyAPIKeyParams{Token: assertion})
+token, err := c.APIKeys.MintToken(ctx, atlas.MintAPIKeyTokenParams{Assertion: assertion})
+```
+
+ES256 (P-256) and EdDSA (Ed25519) keys are supported.
+
+`mirror.VerifyAssertion(ctx, assertion, atlas.KeyVerifyOptions{})` checks an assertion against the mirrored public key with no network call, with the same refusal codes Atlas answers.
+
 ## API key spend caps
 
 Give an end-user API key caps per unit and period (`request`, `day`, `month` or

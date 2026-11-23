@@ -4,6 +4,12 @@ All notable changes to `atlas-go` are documented here. Go modules are versioned
 by git tag: tag a release `vX.Y.Z` (and `gin/vX.Y.Z`, `echo/vX.Y.Z` for the
 middleware modules) to match an entry below.
 
+## 0.28.0 — 2026-11-22
+
+### Added
+
+- Key-pair API keys: `SignAPIKeyAssertion` signs the short-lived JWT (ES256 for P-256, EdDSA for Ed25519). `CreateAPIKeyParams` takes `Credential`, `Audience` and `PublicKey`, `APIKeyWithSecret` returns `PrivateKey` once, and `VerifyAPIKeyParams.Token` / `MintAPIKeyTokenParams.Assertion` present an assertion instead of a secret. `KeyMirror.VerifyAssertion` verifies an assertion locally with the server's refusal codes (`KeyMirrorCode...`); `MirroredAPIKey` carries `Credential`, `PublicKeyPEM`, `Audience`, `MaxTokenLifetimeSeconds` and `Enabled` (a disabled key is refused by `Verify` and `VerifyAssertion`), and `ApplyWebhook` copies `enabled`. A store may implement `KeyMirrorJTIStore` to share used ids between processes.
+
 ## 0.27.0 — 2026-11-14
 
 ### Changed

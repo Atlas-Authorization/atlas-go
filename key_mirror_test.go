@@ -268,3 +268,25 @@ func TestKeyMirrorUpstreamRotatePath(t *testing.T) {
 		t.Fatalf("decoded %+v", rot)
 	}
 }
+
+func TestKeyMirrorDisabledKeyIsRefusedAndWebhookCopiesEnabled(t *testing.T) {
+	ctx := context.Background()
+	up := &fakeKeyUpstream{}
+	m, _, _ := newKeyMirrorForTest(t, up, nil)
+	if _, err := m.Mint(ctx, CreateAPIKeyParams{SubjectType: "user", SubjectID: "usr_1"}); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := m.Verify(ctx, "ak_demo_secret", KeyVerifyOptions{}); !v.Valid {
+		t.Fatal("enabled by default")
+	}
+	if ok, err := m.ApplyWebhook(ctx, "api_key.updated", json.RawMessage(`{"id":"eak_1","enabled":false}`)); !ok || err != nil {
+		t.Fatalf("webhook: %v %v", ok, err)
+	}
+	if v, _ := m.Verify(ctx, "ak_demo_secret", KeyVerifyOptions{}); v.Valid || v.Code != "" {
+		t.Fatalf("disabled: %+v", v)
+	}
+	_, _ = m.ApplyWebhook(ctx, "api_key.updated", json.RawMessage(`{"id":"eak_1","enabled":true}`))
+	if v, _ := m.Verify(ctx, "ak_demo_secret", KeyVerifyOptions{}); !v.Valid {
+		t.Fatal("re-enabled")
+	}
+}
