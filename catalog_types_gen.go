@@ -3323,6 +3323,21 @@ type BetterAuthImportsSetPartResult struct {
 	Sha256   *string `json:"sha256,omitempty"`
 }
 
+// BillingSyncCheckoutParams is a typed object of the Backend API.
+type BillingSyncCheckoutParams struct {
+	// A Stripe Checkout Session id (cs_…).
+	SessionID string `json:"session_id"`
+}
+
+// BillingSyncCheckoutResult is a typed object of the Backend API.
+type BillingSyncCheckoutResult struct {
+	Object string `json:"object"`
+	// One of: synced, pending.
+	Status string `json:"status"`
+	// The subscription the session created or updated (a billing_subscription), null while pending.
+	Subscription map[string]interface{} `json:"subscription,omitempty"`
+}
+
 // BillingListConnectAccountsItem is a typed object of the Backend API.
 type BillingListConnectAccountsItem struct {
 	Object string `json:"object"`
@@ -3864,8 +3879,11 @@ type BillingSetProviderByProviderResult struct {
 	// Which secrets are stored (e.g. {"secret_key": true}); values are never returned.
 	SecretsSet map[string]bool `json:"secrets_set"`
 	// Register this URL in the provider's dashboard.
-	WebhookURL     string                 `json:"webhook_url"`
-	Capabilities   map[string]interface{} `json:"capabilities,omitempty"`
+	WebhookURL   string                 `json:"webhook_url"`
+	Capabilities map[string]interface{} `json:"capabilities,omitempty"`
+	// Stripe only: how subscription state reaches Atlas (mode webhook or no_webhook, the checkout
+	// return, the re-read cadence and the forwarded-events URL). The webhook secret is optional.
+	Sync           map[string]interface{} `json:"sync,omitempty"`
 	LastVerifiedAt *int64                 `json:"last_verified_at,omitempty"`
 	LastWebhookAt  *int64                 `json:"last_webhook_at,omitempty"`
 	UpdatedAt      *int64                 `json:"updated_at,omitempty"`
@@ -3913,6 +3931,21 @@ type BillingCreateStoreLinkResult struct {
 	CreatedAt int64 `json:"created_at"`
 }
 
+// BillingCreateStripeEventParams is a typed object of the Backend API.
+type BillingCreateStripeEventParams struct {
+	// A Stripe event id (evt_…).
+	ID string `json:"id"`
+}
+
+// BillingCreateStripeEventResult is a typed object of the Backend API.
+type BillingCreateStripeEventResult struct {
+	Object string  `json:"object"`
+	ID     string  `json:"id"`
+	Type   *string `json:"type,omitempty"`
+	// One of: processed, ignored.
+	Outcome string `json:"outcome"`
+}
+
 // BillingExtendTrialSubscriptionParams is a typed object of the Backend API.
 type BillingExtendTrialSubscriptionParams struct {
 	Days *int64 `json:"days,omitempty"`
@@ -3937,6 +3970,38 @@ type BillingExtendTrialSubscriptionResult struct {
 	ExtendedDaysTotal *int64  `json:"extended_days_total,omitempty"`
 	Reason            *string `json:"reason,omitempty"`
 	CreatedAt         *int64  `json:"created_at,omitempty"`
+}
+
+// SubscriptionEntitlements: What an entitlement provider (Autumn, Commet) reports this subscription grants: { features,
+// limits }.
+type SubscriptionEntitlements struct {
+	Features []string           `json:"features,omitempty"`
+	Limits   map[string]float64 `json:"limits,omitempty"`
+}
+
+// Subscription: The `Subscription` object.
+type Subscription struct {
+	Object string `json:"object"`
+	ID     string `json:"id"`
+	// One of: user, org.
+	SubjectType          string  `json:"subject_type"`
+	SubjectID            string  `json:"subject_id"`
+	PlanID               string  `json:"plan_id"`
+	Status               string  `json:"status"`
+	StripeSubscriptionID *string `json:"stripe_subscription_id,omitempty"`
+	StripeCustomerID     *string `json:"stripe_customer_id,omitempty"`
+	CurrentPeriodEnd     *int64  `json:"current_period_end,omitempty"`
+	Provider             *string `json:"provider,omitempty"`
+	CancelAtPeriodEnd    *bool   `json:"cancel_at_period_end,omitempty"`
+	// What an entitlement provider (Autumn, Commet) reports this subscription grants: { features,
+	// limits }.
+	Entitlements *SubscriptionEntitlements `json:"entitlements,omitempty"`
+	// FAPI subscription read only: every subscription the subject holds (base + add-ons).
+	Subscriptions []map[string]interface{} `json:"subscriptions,omitempty"`
+	// Created (epoch ms).
+	CreatedAt int64 `json:"created_at"`
+	// Last updated (epoch ms).
+	UpdatedAt int64 `json:"updated_at"`
 }
 
 // BillingGetUsageFullResultByFeatureItem is a typed object of the Backend API.
@@ -9767,6 +9832,10 @@ type InstanceUpdateCookieConsentResult struct {
 	// path_mount (base_path on your own host, routed by Atlas's ingress or by your reverse proxy; the
 	// cookies are the same either way).
 	FrontendMode *InstanceUpdateCookieConsentResultFrontendMode `json:"frontend_mode,omitempty"`
+	// With session.cookieIsolation on, the suffix every Frontend API cookie name carries
+	// (__session_<suffix>); null otherwise. Derived from the publishable key: the SDKs compute it
+	// themselves.
+	CookieSuffix *string `json:"cookie_suffix,omitempty"`
 	// Where the effective setting comes from: manual (PUT, always wins), integration (an enabled
 	// integration with a cmp, else a consent manager's outbound partner link), or none. One of:
 	// manual, integration, none.
@@ -10227,6 +10296,29 @@ type InstanceTestHookBeforeFirstSessionResult struct {
 	Error     *InstanceTestHookBeforeFirstSessionResultError  `json:"error,omitempty"`
 }
 
+// InstanceCreateHostedMethodFilterParams is a typed object of the Backend API.
+type InstanceCreateHostedMethodFilterParams struct {
+	// The sign-in methods to keep, e.g. ["password", "passkey", "oauth_google"].
+	Methods []string `json:"methods"`
+}
+
+// InstanceCreateHostedMethodFilterResult is a typed object of the Backend API.
+type InstanceCreateHostedMethodFilterResult struct {
+	Object string `json:"object"`
+	// The list as stored in the signature: unique, sorted.
+	Methods []string `json:"methods"`
+	// The list, comma-separated. Add as the `allowed_methods` query parameter.
+	AllowedMethods string `json:"allowed_methods"`
+	// The signature. Add as the `allowed_methods_sig` query parameter.
+	AllowedMethodsSig string `json:"allowed_methods_sig"`
+	// The list and signature as one value, `<allowed_methods>.<allowed_methods_sig>`: pass it as
+	// `allowedMethods` to the React panels or as `methodFilter` to the browser SDK client. Sent in the
+	// `X-Atlas-Allowed-Methods` header.
+	Token string `json:"token"`
+	// Both parameters, URL-encoded, ready to append to the hosted page URL.
+	Query string `json:"query"`
+}
+
 // InstanceGetImpersonationPolicyResult is a typed object of the Backend API.
 type InstanceGetImpersonationPolicyResult struct {
 	Object             string   `json:"object"`
@@ -10374,9 +10466,12 @@ type InstanceGetImportResult struct {
 // InstanceGetIntegrationsForwardingResult is a typed object of the Backend API.
 type InstanceGetIntegrationsForwardingResult struct {
 	Object *string `json:"object,omitempty"`
-	// One of: lucida, hermetica, seolyticize, webhook.
+	// One of: lucida, hermetica, seolyticize, webhook, watchtower.
 	Forwarding *string `json:"forwarding,omitempty"`
-	Event      *string `json:"event,omitempty"`
+	// The first event delivered: user.created, or for watchtower user.locked.
+	Event *string `json:"event,omitempty"`
+	// Every event this destination receives: user.created, or for watchtower the security events.
+	Events []string `json:"events,omitempty"`
 	// The managed webhook endpoint.
 	ID     *string `json:"id,omitempty"`
 	Active *bool   `json:"active,omitempty"`
@@ -10398,8 +10493,11 @@ type InstanceSetIntegrationsForwardingParams struct {
 	// lucida, seolyticize: send email, name, ip and user agent. Default false.
 	IncludePII *bool `json:"include_pii,omitempty"`
 	// webhook: the https receiver.
-	URL    *string `json:"url,omitempty"`
-	Active *bool   `json:"active,omitempty"`
+	URL *string `json:"url,omitempty"`
+	// watchtower: your Watchtower ingest host (https). `server_key` is then an ingestion key with the
+	// ingest:logs scope.
+	Endpoint *string `json:"endpoint,omitempty"`
+	Active   *bool   `json:"active,omitempty"`
 	// ClearFields lists JSON field names to send as null, which clears them on the server.
 	// Fields left unset are omitted.
 	ClearFields []string `json:"-"`
@@ -10418,14 +10516,36 @@ func (p InstanceSetIntegrationsForwardingParams) MarshalJSON() ([]byte, error) {
 // InstanceSetIntegrationsForwardingResult is a typed object of the Backend API.
 type InstanceSetIntegrationsForwardingResult struct {
 	Object *string `json:"object,omitempty"`
-	// One of: lucida, hermetica, seolyticize, webhook.
+	// One of: lucida, hermetica, seolyticize, webhook, watchtower.
 	Forwarding *string `json:"forwarding,omitempty"`
-	Event      *string `json:"event,omitempty"`
-	Created    *bool   `json:"created,omitempty"`
+	// The first event delivered: user.created, or for watchtower user.locked.
+	Event *string `json:"event,omitempty"`
+	// Every event this destination receives: user.created, or for watchtower the security events.
+	Events  []string `json:"events,omitempty"`
+	Created *bool    `json:"created,omitempty"`
 	// The managed webhook endpoint.
 	ID *string `json:"id,omitempty"`
 	// webhook only, on create: the signing secret, shown once.
 	Secret *string `json:"secret,omitempty"`
+}
+
+// InstanceListIntegrationsHealthResultDuplicateDeliveryPathsItem is a typed object of the Backend API.
+type InstanceListIntegrationsHealthResultDuplicateDeliveryPathsItem struct {
+	// One of: forwarding, integration.
+	Kind                 *string  `json:"kind,omitempty"`
+	Destination          *string  `json:"destination,omitempty"`
+	ForwardingEndpointID *string  `json:"forwarding_endpoint_id,omitempty"`
+	WebhookEndpointIDs   []string `json:"webhook_endpoint_ids,omitempty"`
+}
+
+// InstanceListIntegrationsHealthResultDataItemDuplicateDeliveryPath: Present when this endpoint is one of two delivery paths to the same destination.
+type InstanceListIntegrationsHealthResultDataItemDuplicateDeliveryPath struct {
+	Code *string `json:"code,omitempty"`
+	// One of: forwarding, integration.
+	Kind                 *string  `json:"kind,omitempty"`
+	Destination          *string  `json:"destination,omitempty"`
+	ForwardingEndpointID *string  `json:"forwarding_endpoint_id,omitempty"`
+	WebhookEndpointIDs   []string `json:"webhook_endpoint_ids,omitempty"`
 }
 
 // InstanceListIntegrationsHealthResultDataItemLastFailure is a typed object of the Backend API.
@@ -10447,6 +10567,8 @@ type InstanceListIntegrationsHealthResultDataItem struct {
 	// The receiver type: https, a destination such as lucida, events_receiver, tokens_only or
 	// case_api.
 	Destination *string `json:"destination,omitempty"`
+	// Present when this endpoint is one of two delivery paths to the same destination.
+	DuplicateDeliveryPath *InstanceListIntegrationsHealthResultDataItemDuplicateDeliveryPath `json:"duplicate_delivery_path,omitempty"`
 	// One of: healthy, failing, disabled, inactive, no_deliveries, unknown.
 	State               string                                                   `json:"state"`
 	LastSuccessAt       *int64                                                   `json:"last_success_at,omitempty"`
@@ -10458,11 +10580,12 @@ type InstanceListIntegrationsHealthResultDataItem struct {
 
 // InstanceListIntegrationsHealthResult is a typed object of the Backend API.
 type InstanceListIntegrationsHealthResult struct {
-	Object         string                                         `json:"object"`
-	Data           []InstanceListIntegrationsHealthResultDataItem `json:"data"`
-	HasMore        *bool                                          `json:"has_more,omitempty"`
-	UnhealthyCount int64                                          `json:"unhealthy_count"`
-	GeneratedAt    *int64                                         `json:"generated_at,omitempty"`
+	Object                 string                                                           `json:"object"`
+	DuplicateDeliveryPaths []InstanceListIntegrationsHealthResultDuplicateDeliveryPathsItem `json:"duplicate_delivery_paths,omitempty"`
+	Data                   []InstanceListIntegrationsHealthResultDataItem                   `json:"data"`
+	HasMore                *bool                                                            `json:"has_more,omitempty"`
+	UnhealthyCount         int64                                                            `json:"unhealthy_count"`
+	GeneratedAt            *int64                                                           `json:"generated_at,omitempty"`
 }
 
 // InstanceListIntegrationsMintsItem is a typed object of the Backend API.
@@ -10741,6 +10864,7 @@ type InstanceListScopesItem struct {
 	// One of: any, verified, certified.
 	RequiresClientLevel *string `json:"requires_client_level,omitempty"`
 	OwnerExempt         *bool   `json:"owner_exempt,omitempty"`
+	Optional            *bool   `json:"optional,omitempty"`
 	Wildcard            *bool   `json:"wildcard,omitempty"`
 }
 
@@ -10761,6 +10885,9 @@ type InstanceSetScopesParamsScopesItem struct {
 	// The developer who owns a client may request the scope with it on their own account whatever its
 	// level.
 	OwnerExempt *bool `json:"owner_exempt,omitempty"`
+	// The consent screen lets the user leave this scope out; an app that asked for it must work
+	// without it. Never for openid.
+	Optional *bool `json:"optional,omitempty"`
 	// ClearFields lists JSON field names to send as null, which clears them on the server.
 	// Fields left unset are omitted.
 	ClearFields []string `json:"-"`
@@ -10842,6 +10969,11 @@ type InstanceListSecretKeysItem struct {
 	// Partner admin: the organizations this key is limited to (empty = unrestricted).
 	OrganizationIDs []string `json:"organization_ids,omitempty"`
 	RotatedFrom     *string  `json:"rotated_from,omitempty"`
+	// The last call from the application itself (a call from a CLI, an HTTP tool or a browser does not
+	// count), so research reads do not hide a dead key. null = none seen.
+	LastAppUsedAt *int64 `json:"last_app_used_at,omitempty"`
+	// The User-Agent of the last call (first 200 characters).
+	LastUsedUserAgent *string `json:"last_used_user_agent,omitempty"`
 	// Provisioning tags.
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	// The idempotent-create key, if any.
@@ -10862,10 +10994,16 @@ type InstanceCreateSecretKeyParams struct {
 	// preflight. No webhook secret reveal or rotation, no instance settings writes, no key management.
 	// `web-app`: a web app's server: read and delete users, read and revoke sessions, privacy
 	// requests. `provisioning`: a deploy script's key (instance settings, domains, messaging,
-	// webhooks, OAuth, branding, keys). `integrations`: the key a connected platform's connect flow
-	// needs: instance settings, webhook endpoints, OAuth clients, keys, and the executor scopes
-	// `privacy:execute` and `privacy:grants:revoke` it mints its narrower key from. Send either preset
-	// or scopes. One of: app-runtime, web-app, provisioning, integrations.
+	// webhooks, OAuth, branding, keys). `operator`: instance settings, integrations and forwarding,
+	// webhooks and app events, log streams, resource servers, logout notifications and keys, with no
+	// user, session, organization or billing data. `end-user-pools`: `end_users:read` and
+	// `end_users:write` for an organization's end-user (reader) pool. `oauth-apps`: a backend that
+	// runs OAuth apps: `users:read` and `users:write`, `oauth_clients:read` and `oauth_clients:write`,
+	// `grants:read` and `grants:write`, `resource_servers:read`. `integrations`: the key a connected
+	// platform's connect flow needs: instance settings, webhook endpoints, OAuth clients, keys, and
+	// the executor scopes `privacy:execute` and `privacy:grants:revoke` it mints its narrower key
+	// from. Send either preset or scopes. One of: app-runtime, web-app, provisioning, operator,
+	// end-user-pools, oauth-apps, integrations.
 	Preset *string `json:"preset,omitempty"`
 	// Unix ms or ISO 8601; at most one year away. Default one year from now.
 	ExpiresAt  interface{} `json:"expires_at,omitempty"`
@@ -10938,6 +11076,11 @@ type InstanceCreateSecretKeyResult struct {
 	// Partner admin: the organizations this key is limited to (empty = unrestricted).
 	OrganizationIDs []string `json:"organization_ids,omitempty"`
 	RotatedFrom     *string  `json:"rotated_from,omitempty"`
+	// The last call from the application itself (a call from a CLI, an HTTP tool or a browser does not
+	// count), so research reads do not hide a dead key. null = none seen.
+	LastAppUsedAt *int64 `json:"last_app_used_at,omitempty"`
+	// The User-Agent of the last call (first 200 characters).
+	LastUsedUserAgent *string `json:"last_used_user_agent,omitempty"`
 	// Provisioning tags.
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	// The idempotent-create key, if any.
@@ -14151,6 +14294,13 @@ type OAuthClientsGetWebhookResult struct {
 	EnabledEvents   []string `json:"enabled_events,omitempty"`
 	Active          *bool    `json:"active,omitempty"`
 	AvailableEvents []string `json:"available_events,omitempty"`
+	// When the webhook was created (epoch ms).
+	CreatedAt *int64 `json:"created_at,omitempty"`
+	// When Atlas last attempted a delivery to it (epoch ms), or null if it never has. A read never
+	// returns the signing secret.
+	LastDeliveryAt *int64 `json:"last_delivery_at,omitempty"`
+	// Only while a secret rotation overlap is open: when the previous secret stops signing (epoch ms).
+	PreviousSecretExpiresAt *int64 `json:"previous_secret_expires_at,omitempty"`
 	// The signing secret, returned once when the webhook is created.
 	WebhookSecret *string `json:"webhook_secret,omitempty"`
 	Note          *string `json:"note,omitempty"`
@@ -14185,9 +14335,61 @@ type OAuthClientsSetWebhookResult struct {
 	EnabledEvents   []string `json:"enabled_events,omitempty"`
 	Active          *bool    `json:"active,omitempty"`
 	AvailableEvents []string `json:"available_events,omitempty"`
+	// When the webhook was created (epoch ms).
+	CreatedAt *int64 `json:"created_at,omitempty"`
+	// When Atlas last attempted a delivery to it (epoch ms), or null if it never has. A read never
+	// returns the signing secret.
+	LastDeliveryAt *int64 `json:"last_delivery_at,omitempty"`
+	// Only while a secret rotation overlap is open: when the previous secret stops signing (epoch ms).
+	PreviousSecretExpiresAt *int64 `json:"previous_secret_expires_at,omitempty"`
 	// The signing secret, returned once when the webhook is created.
 	WebhookSecret *string `json:"webhook_secret,omitempty"`
 	Note          *string `json:"note,omitempty"`
+}
+
+// OAuthClientsRotateSecretWebhookParams is a typed object of the Backend API.
+type OAuthClientsRotateSecretWebhookParams struct {
+	OverlapSeconds *int64 `json:"overlap_seconds,omitempty"`
+}
+
+// OAuthClientsRotateSecretWebhookResult is a typed object of the Backend API.
+type OAuthClientsRotateSecretWebhookResult struct {
+	Object string `json:"object"`
+	// The new signing secret, returned exactly once.
+	WebhookSecret  string `json:"webhook_secret"`
+	OverlapSeconds int64  `json:"overlap_seconds"`
+	// When the previous secret stops signing (epoch ms), or null when it already has.
+	PreviousSecretExpiresAt *int64  `json:"previous_secret_expires_at,omitempty"`
+	Note                    *string `json:"note,omitempty"`
+}
+
+// OAuthClientsTestWebhookParams is a typed object of the Backend API.
+type OAuthClientsTestWebhookParams struct {
+	// The Atlas user id, or the sub this client receives for the user.
+	UserID *string `json:"user_id,omitempty"`
+}
+
+// OAuthClientsTestWebhookResult is a typed object of the Backend API.
+type OAuthClientsTestWebhookResult struct {
+	Object     *string `json:"object,omitempty"`
+	Ok         *bool   `json:"ok,omitempty"`
+	DeliveryID *string `json:"delivery_id,omitempty"`
+	EventID    *string `json:"event_id,omitempty"`
+	EventType  *string `json:"event_type,omitempty"`
+	URL        *string `json:"url,omitempty"`
+	// One of: success, failed.
+	Status *string `json:"status,omitempty"`
+	// The HTTP status your endpoint answered with, or null when it never answered.
+	StatusCode *int64 `json:"status_code,omitempty"`
+	HTTPStatus *int64 `json:"http_status,omitempty"`
+	// How long your endpoint took to answer.
+	DurationMs          *int64  `json:"duration_ms,omitempty"`
+	LatencyMs           *int64  `json:"latency_ms,omitempty"`
+	ResponseSnippet     *string `json:"response_snippet,omitempty"`
+	Error               *string `json:"error,omitempty"`
+	ErrorKind           *string `json:"error_kind,omitempty"`
+	SignatureHeaderSent *string `json:"signature_header_sent,omitempty"`
+	WillRetry           *bool   `json:"will_retry,omitempty"`
 }
 
 // OAuthConsentRequestsSetSwitchAccountResult is a typed object of the Backend API.
@@ -15711,6 +15913,63 @@ type OrganizationsCreateMembershipImportResult struct {
 	CreatedAt   int64            `json:"created_at"`
 	UpdatedAt   int64            `json:"updated_at"`
 	CompletedAt *int64           `json:"completed_at,omitempty"`
+}
+
+// OrganizationsSetMembershipsByExternalIDParams is a typed object of the Backend API.
+type OrganizationsSetMembershipsByExternalIDParams struct {
+	Role string `json:"role"`
+	// Who manages the role (manual, or a directory source of this organization).
+	RoleSource     *string                `json:"role_source,omitempty"`
+	PublicMetadata map[string]interface{} `json:"public_metadata,omitempty"`
+	// Backend only.
+	PrivateMetadata map[string]interface{} `json:"private_metadata,omitempty"`
+	// Permission keys held on top of the role; they join org_permissions.
+	Permissions          []string `json:"permissions,omitempty"`
+	AllowedSignInMethods []string `json:"allowed_sign_in_methods,omitempty"`
+	// When the seat ends (ISO 8601 or epoch ms, in the future).
+	ExpiresAt interface{} `json:"expires_at,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p OrganizationsSetMembershipsByExternalIDParams) MarshalJSON() ([]byte, error) {
+	type plain OrganizationsSetMembershipsByExternalIDParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// OrganizationsSetMembershipsByExternalIDResult is a typed object of the Backend API.
+type OrganizationsSetMembershipsByExternalIDResult struct {
+	// One of: organization_membership, pending_organization_membership.
+	Object         string  `json:"object"`
+	ID             *string `json:"id,omitempty"`
+	OrganizationID *string `json:"organization_id,omitempty"`
+	UserID         *string `json:"user_id,omitempty"`
+	Role           *string `json:"role,omitempty"`
+	RoleSource     *string `json:"role_source,omitempty"`
+	// The administrator scope (groups, teams, units), or null when organization-wide.
+	Scope     map[string]interface{} `json:"scope,omitempty"`
+	ExpiresAt *int64                 `json:"expires_at,omitempty"`
+	// Epoch ms.
+	CreatedAt *int64 `json:"created_at,omitempty"`
+	// `active`: the user exists and holds the seat. `pending`: it waits for a user with this
+	// external_id. One of: active, pending.
+	Status         string  `json:"status"`
+	UserExternalID *string `json:"user_external_id,omitempty"`
+	Unchanged      *bool   `json:"unchanged,omitempty"`
+}
+
+// OrganizationsDeleteMembershipsByExternalIDResult is a typed object of the Backend API.
+type OrganizationsDeleteMembershipsByExternalIDResult struct {
+	Object         string `json:"object"`
+	OrganizationID string `json:"organization_id"`
+	UserExternalID string `json:"user_external_id"`
+	Deleted        bool   `json:"deleted"`
 }
 
 // OrganizationsGetMembershipResult is a typed object of the Backend API.
@@ -19879,13 +20138,20 @@ type RegionGetFailoverResult struct {
 
 // ResourceServersListRevokedTokensResultDataItem is a typed object of the Backend API.
 type ResourceServersListRevokedTokensResultDataItem struct {
+	// `family`: every access token with this `fid`. `jti`: that one access token. `client`: every
+	// token of `client_id` issued at or before `revoked_at` (the client was deleted), including
+	// client_credentials tokens. One of: family, jti, client.
+	Kind string `json:"kind"`
 	// The refresh-token family (the `fid` claim). Null for a single access token.
 	FamilyID *string `json:"family_id,omitempty"`
 	// The `jti` of a single revoked access token. Null for a family.
 	Jti    *string `json:"jti,omitempty"`
 	UserID *string `json:"user_id,omitempty"`
-	// The OAuth client row id.
+	// The public client_id (client_…), the same value as the client_id claim and the
+	// `oauth_tokens.revoked` event.
 	ClientID *string `json:"client_id,omitempty"`
+	// The internal OAuth client id (oac_…) the Backend API paths use.
+	OAuthClientID *string `json:"oauth_client_id,omitempty"`
 	// refresh_token_reuse, client_revoked, admin_revoked, user_revoked, grant_revoked or logout.
 	Reason string `json:"reason"`
 	// Epoch ms.

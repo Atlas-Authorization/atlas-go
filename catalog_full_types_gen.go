@@ -238,6 +238,10 @@ type BillingPlan2 struct {
 	// One of: flat, per_seat, metered.
 	PricingModel string `json:"pricing_model"`
 	TrialDays    *int64 `json:"trial_days,omitempty"`
+	// Days a past_due subscription keeps its entitlement (1 to 90); null for none.
+	GraceDays *int64 `json:"grace_days,omitempty"`
+	// The same number as grace_days, under the name that says what it is. Either may be sent.
+	PastDueGraceDays *int64 `json:"past_due_grace_days,omitempty"`
 	// A display-only promotion shown on the plan card: { label, percent_off | amount_off (minor
 	// units), ends_at (epoch ms), code }. It never changes what the provider charges; on the public
 	// list an expired promotion is null.
@@ -1665,11 +1669,14 @@ type AuthConfigEntitlements struct {
 
 // AuthConfigExternalJWTIssuersItem is a typed object of the Backend API.
 type AuthConfigExternalJWTIssuersItem struct {
-	Audience   string  `json:"audience"`
-	EmailClaim *string `json:"emailClaim,omitempty"`
-	ID         string  `json:"id"`
-	Issuer     string  `json:"issuer"`
-	JWKSURI    string  `json:"jwksUri"`
+	// One of: email, none, same_org_only.
+	AccountLinking *string `json:"accountLinking,omitempty"`
+	Audience       string  `json:"audience"`
+	EmailClaim     *string `json:"emailClaim,omitempty"`
+	ID             string  `json:"id"`
+	Issuer         string  `json:"issuer"`
+	JWKSURI        string  `json:"jwksUri"`
+	OrganizationID *string `json:"organizationId,omitempty"`
 }
 
 // AuthConfigExternalJWT: Trust JWTs minted by an EXTERNAL issuer as a sign-in credential (e.g. a legacy IdP or your own
@@ -2082,12 +2089,20 @@ type AuthConfigOAuthProviderCustomScopesItem struct {
 	Descriptions map[string]string `json:"descriptions,omitempty"`
 	Labels       map[string]string `json:"labels,omitempty"`
 	Name         string            `json:"name"`
+	Optional     *bool             `json:"optional,omitempty"`
 	OwnerExempt  *bool             `json:"ownerExempt,omitempty"`
 	Parameters   []string          `json:"parameters,omitempty"`
 	// One of: any, certified, verified.
 	RequiresClientLevel    *string `json:"requiresClientLevel,omitempty"`
 	RequiresVerifiedClient *bool   `json:"requiresVerifiedClient,omitempty"`
 	Sensitive              *bool   `json:"sensitive,omitempty"`
+}
+
+// AuthConfigOAuthProviderDynamicRegistrationLimits is a typed object of the Backend API.
+type AuthConfigOAuthProviderDynamicRegistrationLimits struct {
+	MaxClients                float64  `json:"maxClients"`
+	PruneUnusedAfterDays      *float64 `json:"pruneUnusedAfterDays,omitempty"`
+	RegistrationsPerHourPerIP float64  `json:"registrationsPerHourPerIp"`
 }
 
 // AuthConfigOAuthProviderTokenClaimsItem is a typed object of the Backend API.
@@ -2121,6 +2136,7 @@ type AuthConfigOAuthProvider struct {
 	DeviceApprovalRequiresStepUp       bool                                             `json:"deviceApprovalRequiresStepUp"`
 	DynamicClientSecretTTLSeconds      float64                                          `json:"dynamicClientSecretTtlSeconds"`
 	DynamicRegistration                bool                                             `json:"dynamicRegistration"`
+	DynamicRegistrationLimits          AuthConfigOAuthProviderDynamicRegistrationLimits `json:"dynamicRegistrationLimits"`
 	LoginURL                           *string                                          `json:"loginUrl,omitempty"`
 	RequireInitialAccessToken          bool                                             `json:"requireInitialAccessToken"`
 	RequirePKCE                        bool                                             `json:"requirePkce"`
@@ -2489,8 +2505,13 @@ type AuthConfigSession struct {
 	// Explicit Domain for the session cookies, for example ".example.com". Needed by a path-mounted
 	// instance, where cookies are otherwise host-only. It must cover your sign-in host and can never
 	// be a public suffix or Atlas's own domain; an invalid value is refused on write. Default null.
-	CookieDomain          *string `json:"cookieDomain,omitempty"`
-	CrossSubdomainCookies bool    `json:"crossSubdomainCookies"`
+	CookieDomain *string `json:"cookieDomain,omitempty"`
+	// Give this instance's Frontend API cookies a short suffix derived from its publishable key
+	// (__session_<suffix>, __atlas_rt_<suffix>, ...), so two instances on one host or registrable
+	// domain never read, overwrite or clear each other's cookies. Required to share a hostname between
+	// two path mounts. Existing browsers sign in again once when it changes. Default false.
+	CookieIsolation       bool `json:"cookieIsolation"`
+	CrossSubdomainCookies bool `json:"crossSubdomainCookies"`
 	// Set a readable __atlas_csrf cookie with each session token: a signed token tied to the session,
 	// replaced whenever the session token is. Verify it in your backend with the instance JWKS.
 	// Default false.
@@ -2945,6 +2966,10 @@ type InstanceGetCookieConsentFullResult struct {
 	// path_mount (base_path on your own host, routed by Atlas's ingress or by your reverse proxy; the
 	// cookies are the same either way).
 	FrontendMode *InstanceGetCookieConsentFullResultFrontendMode `json:"frontend_mode,omitempty"`
+	// With session.cookieIsolation on, the suffix every Frontend API cookie name carries
+	// (__session_<suffix>); null otherwise. Derived from the publishable key: the SDKs compute it
+	// themselves.
+	CookieSuffix *string `json:"cookie_suffix,omitempty"`
 	// Where the effective setting comes from: manual (PUT, always wins), integration (an enabled
 	// integration with a cmp, else a consent manager's outbound partner link), or none. One of:
 	// manual, integration, none.
@@ -4501,15 +4526,23 @@ type OAuthClientsListFullItemClientSecretReveal struct {
 type OAuthClientsListFullItem struct {
 	Object *string `json:"object,omitempty"`
 	// Per-application settings (see /v1/oauth_clients/{id}/app_settings).
-	AppSettings             *OAuthClientsListFullItemAppSettings `json:"app_settings,omitempty"`
-	ID                      *string                              `json:"id,omitempty"`
-	ClientID                *string                              `json:"client_id,omitempty"`
-	Name                    *string                              `json:"name,omitempty"`
-	LogoURL                 *string                              `json:"logo_url,omitempty"`
-	RedirectURIs            []string                             `json:"redirect_uris,omitempty"`
-	AllowedScopes           []string                             `json:"allowed_scopes,omitempty"`
-	GrantTypes              []string                             `json:"grant_types,omitempty"`
-	TokenEndpointAuthMethod *string                              `json:"token_endpoint_auth_method,omitempty"`
+	AppSettings *OAuthClientsListFullItemAppSettings `json:"app_settings,omitempty"`
+	ID          *string                              `json:"id,omitempty"`
+	ClientID    *string                              `json:"client_id,omitempty"`
+	Name        *string                              `json:"name,omitempty"`
+	LogoURL     *string                              `json:"logo_url,omitempty"`
+	// The app's homepage (RFC 7591), shown on the consent page.
+	ClientURI *string `json:"client_uri,omitempty"`
+	// Alias of client_uri.
+	HomepageURL *string `json:"homepage_url,omitempty"`
+	// The app's privacy policy (RFC 7591), linked from the consent page.
+	PolicyURI *string `json:"policy_uri,omitempty"`
+	// The app's terms of service (RFC 7591), linked from the consent page.
+	TOSURI                  *string  `json:"tos_uri,omitempty"`
+	RedirectURIs            []string `json:"redirect_uris,omitempty"`
+	AllowedScopes           []string `json:"allowed_scopes,omitempty"`
+	GrantTypes              []string `json:"grant_types,omitempty"`
+	TokenEndpointAuthMethod *string  `json:"token_endpoint_auth_method,omitempty"`
 	// Create and update responses only: the origins this write added to allowed_origins
 	// (add_redirect_origins, or because a connected integration signs users in with this client). []
 	// when none were added.
@@ -4550,10 +4583,17 @@ type OAuthClientsListFullItem struct {
 	// fails (first-party clients only).
 	RefreshTouchesSession *bool `json:"refresh_touches_session,omitempty"`
 	// No authorization code is issued for a user whose primary email is not verified.
-	RequireVerifiedEmail *bool   `json:"require_verified_email,omitempty"`
-	Owner                *string `json:"owner,omitempty"`
-	// Review state. development: only the owner and testers can authorize; suspended: refused at
-	// /oauth2/authorize and the token endpoint. One of: development, in_review, approved, suspended.
+	RequireVerifiedEmail *bool `json:"require_verified_email,omitempty"`
+	// The consent screen is shown, first-party clients included, until the user approves with remember
+	// (prompt=consent asks every time).
+	RequireConsent *bool `json:"require_consent,omitempty"`
+	// Consent is kept per organization (null = whenever the request names one; true = always; false =
+	// one consent for all).
+	ConsentPerOrganization *bool   `json:"consent_per_organization,omitempty"`
+	Owner                  *string `json:"owner,omitempty"`
+	// Review state. development and in_review: only the owner and testers can authorize; suspended:
+	// refused at /oauth2/authorize and the token endpoint. One of: development, in_review, approved,
+	// suspended.
 	Status *string `json:"status,omitempty"`
 	// User ids besides the owner who may authorize a client in development.
 	Testers []string `json:"testers,omitempty"`
@@ -4595,6 +4635,38 @@ type OAuthClientsListFullItem struct {
 	CreatedAt *int64 `json:"created_at,omitempty"`
 	// Updated (epoch ms).
 	UpdatedAt *int64 `json:"updated_at,omitempty"`
+}
+
+// OAuthConsentRequestsGetFullResultClient is a typed object of the Backend API.
+type OAuthConsentRequestsGetFullResultClient struct {
+	ID         *string `json:"id,omitempty"`
+	ClientID   *string `json:"client_id,omitempty"`
+	Name       *string `json:"name,omitempty"`
+	FirstParty *bool   `json:"first_party,omitempty"`
+}
+
+// OAuthConsentRequestsGetFullResult is a typed object of the Backend API.
+type OAuthConsentRequestsGetFullResult struct {
+	Object *string `json:"object,omitempty"`
+	// The signed-in Atlas user id.
+	Subject              *string                                  `json:"subject,omitempty"`
+	Client               *OAuthConsentRequestsGetFullResultClient `json:"client,omitempty"`
+	RequestedScope       []string                                 `json:"requested_scope,omitempty"`
+	Audience             *string                                  `json:"audience,omitempty"`
+	AuthorizationDetails []map[string]interface{}                 `json:"authorization_details,omitempty"`
+	OrganizationID       *string                                  `json:"organization_id,omitempty"`
+	// The requested scopes the scope catalogue marks optional: the user may leave them out.
+	OptionalScopes []string `json:"optional_scopes,omitempty"`
+	RedirectURI    *string  `json:"redirect_uri,omitempty"`
+	// The application's original /oauth2/authorize request on this instance, every parameter included
+	// (use switch_account to restart it at login). Null when too large to carry.
+	RequestURL *string `json:"request_url,omitempty"`
+	// The prompt values the application sent.
+	Prompt []string `json:"prompt,omitempty"`
+	// The max_age (seconds) the application sent, if any.
+	MaxAge *int64 `json:"max_age,omitempty"`
+	// The challenge expires (epoch ms).
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
 }
 
 // OAuthInitialAccessTokensListFullItem is a typed object of the Backend API.
@@ -4721,8 +4793,11 @@ type OAuthProvider2 struct {
 	// now; `redirect_uri` is the URL to register with the provider for it. Null for other providers.
 	HostedIDToken *OAuthProvider2HostedIDToken `json:"hosted_id_token,omitempty"`
 	Configured    bool                         `json:"configured"`
-	ClientID      *string                      `json:"client_id,omitempty"`
-	HasSecret     *bool                        `json:"has_secret,omitempty"`
+	// Whether this development instance signs in with Atlas's shared development application (set with
+	// PUT { use_shared_dev_credentials }).
+	UseSharedDevCredentials *bool   `json:"use_shared_dev_credentials,omitempty"`
+	ClientID                *string `json:"client_id,omitempty"`
+	HasSecret               *bool   `json:"has_secret,omitempty"`
 	// Whether the provider is turned on. Saving credentials via PUT does NOT enable it; toggle with
 	// POST /v1/oauth_providers/{provider}/enabled.
 	Enabled     bool     `json:"enabled"`
@@ -5744,6 +5819,12 @@ type SSOConnectionsListFullItem struct {
 	// The configured field mapping (only the set keys).
 	AttributeMapping map[string]string `json:"attribute_mapping,omitempty"`
 	OIDCScopes       []string          `json:"oidc_scopes,omitempty"`
+	// The explicit linking mode; null = the default for the connection. One of: email, same_org_only,
+	// none, None.
+	AccountLinking *string `json:"account_linking,omitempty"`
+	// The linking mode in force: the explicit setting, else same_org_only for an organization-bound
+	// connection, else email. One of: email, same_org_only, none.
+	AccountLinkingEffective *string `json:"account_linking_effective,omitempty"`
 	// Whether later sign-ins also re-role members with no recorded role source when claims map
 	// elsewhere.
 	ReroleOnSignIn *bool `json:"rerole_on_sign_in,omitempty"`
@@ -5941,8 +6022,8 @@ type WhoamiGetFullResultKey struct {
 	Scopes      []string `json:"scopes,omitempty"`
 	// Presets (read_only, privacy:execute, …) expanded.
 	EffectiveScopes []string `json:"effective_scopes,omitempty"`
-	// The named key preset (app-runtime, provisioning, integrations) whose scopes are exactly this
-	// key's; null otherwise.
+	// The named key preset (app-runtime, web-app, provisioning, operator, end-user-pools, oauth-apps,
+	// integrations) whose scopes are exactly this key's; null otherwise.
 	Preset *string `json:"preset,omitempty"`
 	// What this key may hand out through POST /v1/secret_keys: nothing without secret_keys:write;
 	// otherwise only scopes it holds itself.
@@ -9060,6 +9141,495 @@ type NotificationTemplatesOpsCreateFullResult struct {
 	UpdatedAt int64                                                           `json:"updated_at"`
 }
 
+// OAuthClientsCreateFullParamsJWKS: Client public keys (JWK Set) for private_key_jwt and signed request objects.
+type OAuthClientsCreateFullParamsJWKS struct {
+	Keys []map[string]interface{} `json:"keys,omitempty"`
+}
+
+// OAuthClientsCreateFullParamsTokenLifetimes: Token lifetime overrides for this client, in seconds. A field that is absent or null inherits
+// (the API's for an access token issued for an API, else the instance's, else the default). null
+// for the whole object clears every override.
+type OAuthClientsCreateFullParamsTokenLifetimes struct {
+	// Default 3600.
+	AccessTokenTTLSeconds *int64 `json:"access_token_ttl_seconds,omitempty"`
+	// Default 3600.
+	IDTokenTTLSeconds *int64 `json:"id_token_ttl_seconds,omitempty"`
+	// The longest a refresh token can be used. Default 2592000 (30 days).
+	RefreshTokenAbsoluteTTLSeconds *int64 `json:"refresh_token_absolute_ttl_seconds,omitempty"`
+	// How long a refresh token survives unused; at most the absolute lifetime. Default 2592000.
+	RefreshTokenIdleTTLSeconds *int64 `json:"refresh_token_idle_ttl_seconds,omitempty"`
+	// Default 60.
+	AuthorizationCodeTTLSeconds *int64 `json:"authorization_code_ttl_seconds,omitempty"`
+	// Default 600.
+	DeviceCodeTTLSeconds *int64 `json:"device_code_ttl_seconds,omitempty"`
+	// The oldest a sign-in may be (age since the user authenticated) and still authorize this app
+	// silently; past it the user signs in again. Default: no limit beyond the session lifetime.
+	SessionAbsoluteTTLSeconds *int64 `json:"session_absolute_ttl_seconds,omitempty"`
+	// How long the user's session may sit idle before this app asks them to sign in again; at most the
+	// session absolute limit. Default: no limit.
+	SessionIdleTTLSeconds *int64 `json:"session_idle_ttl_seconds,omitempty"`
+}
+
+// OAuthClientsCreateFullParams is a typed object of the Backend API.
+type OAuthClientsCreateFullParams struct {
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	IDTokenSignedResponseAlg *string `json:"id_token_signed_response_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	UserinfoSignedResponseAlg *string `json:"userinfo_signed_response_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	AuthorizationSignedResponseAlg *string `json:"authorization_signed_response_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	IntrospectionSignedResponseAlg *string `json:"introspection_signed_response_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	IDTokenEncryptedResponseAlg *string `json:"id_token_encrypted_response_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	IDTokenEncryptedResponseEnc *string `json:"id_token_encrypted_response_enc,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	UserinfoEncryptedResponseAlg *string `json:"userinfo_encrypted_response_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	UserinfoEncryptedResponseEnc *string `json:"userinfo_encrypted_response_enc,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	AuthorizationEncryptedResponseAlg *string `json:"authorization_encrypted_response_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	AuthorizationEncryptedResponseEnc *string `json:"authorization_encrypted_response_enc,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	IntrospectionEncryptedResponseAlg *string `json:"introspection_encrypted_response_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	IntrospectionEncryptedResponseEnc *string `json:"introspection_encrypted_response_enc,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	RequestObjectSigningAlg *string `json:"request_object_signing_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	RequestObjectEncryptionAlg *string `json:"request_object_encryption_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	RequestObjectEncryptionEnc *string `json:"request_object_encryption_enc,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	InitiateLoginURI *string `json:"initiate_login_uri,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	BackchannelTokenDeliveryMode *string `json:"backchannel_token_delivery_mode,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	BackchannelClientNotificationEndpoint *string `json:"backchannel_client_notification_endpoint,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	BackchannelAuthenticationRequestSigningAlg *string `json:"backchannel_authentication_request_signing_alg,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	WimseWorkloadID *string `json:"wimse_workload_id,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	MinAppVersion *string `json:"min_app_version,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	NativeSSOGroup *string `json:"native_sso_group,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	OrgSelection *string `json:"org_selection,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	SoftwareID *string `json:"software_id,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	SoftwareVersion *string `json:"software_version,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	TLSClientAuthSanDNS *string `json:"tls_client_auth_san_dns,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	TLSClientAuthSanURI *string `json:"tls_client_auth_san_uri,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	TLSClientAuthSanIP *string `json:"tls_client_auth_san_ip,omitempty"`
+	// OIDC / RFC 7591 client metadata (see the OpenID Provider guide).
+	TLSClientAuthSanEmail *string `json:"tls_client_auth_san_email,omitempty"`
+	// OIDC / RFC 7591 client metadata.
+	RequireSignedRequestObject *bool `json:"require_signed_request_object,omitempty"`
+	// OIDC / RFC 7591 client metadata.
+	RequireAuthTime *bool `json:"require_auth_time,omitempty"`
+	// OIDC / RFC 7591 client metadata.
+	TLSClientCertificateBoundAccessTokens *bool `json:"tls_client_certificate_bound_access_tokens,omitempty"`
+	// OIDC / RFC 7591 client metadata.
+	DPoPBoundAccessTokens *bool `json:"dpop_bound_access_tokens,omitempty"`
+	// OIDC / RFC 7591 client metadata.
+	TxnTokenUnsignedSubject *bool `json:"txn_token_unsigned_subject,omitempty"`
+	// OIDC / RFC 7591 client metadata.
+	BackchannelUserCodeParameter *bool `json:"backchannel_user_code_parameter,omitempty"`
+	// OIDC response types the client may use (default `code`).
+	ResponseTypes []string `json:"response_types,omitempty"`
+	// Pre-registered https request object URIs.
+	RequestURIs []string `json:"request_uris,omitempty"`
+	// Default maximum authentication age in seconds.
+	DefaultMaxAge    *int64   `json:"default_max_age,omitempty"`
+	DefaultAcrValues []string `json:"default_acr_values,omitempty"`
+	// Contact addresses of the app's developers.
+	Contacts      []string `json:"contacts,omitempty"`
+	Name          string   `json:"name"`
+	RedirectURIs  []string `json:"redirect_uris"`
+	AllowedScopes []string `json:"allowed_scopes,omitempty"`
+	GrantTypes    []string `json:"grant_types,omitempty"`
+	// `none` makes it a public (PKCE) client. One of: client_secret_basic, client_secret_post, none,
+	// private_key_jwt, workload_jwt.
+	TokenEndpointAuthMethod *string `json:"token_endpoint_auth_method,omitempty"`
+	LogoURL                 *string `json:"logo_url,omitempty"`
+	// RFC 7591 name for logo_url.
+	LogoURI *string `json:"logo_uri,omitempty"`
+	// RFC 7591: the app's homepage (absolute https URL), shown on the consent page. null clears
+	// (update).
+	ClientURI *string `json:"client_uri,omitempty"`
+	// Alias of client_uri.
+	HomepageURL *string `json:"homepage_url,omitempty"`
+	// RFC 7591: the app's privacy policy (absolute https URL), linked from the consent page. null
+	// clears (update).
+	PolicyURI *string `json:"policy_uri,omitempty"`
+	// RFC 7591: the app's terms of service (absolute https URL), linked from the consent page. null
+	// clears (update).
+	TOSURI *string `json:"tos_uri,omitempty"`
+	// Provisioning tags (filter lists with ?metadata[key]=value). Update replaces them.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	// Client public keys (JWK Set) for private_key_jwt and signed request objects.
+	JWKS *OAuthClientsCreateFullParamsJWKS `json:"jwks,omitempty"`
+	// https URL of the client's JWK Set, instead of jwks.
+	JWKSURI *string `json:"jwks_uri,omitempty"`
+	// RFC 8705 expected certificate Subject DN for tls_client_auth.
+	TLSClientAuthSubjectDn *string `json:"tls_client_auth_subject_dn,omitempty"`
+	// Skips the consent screen for a first-party app.
+	FirstParty             *bool    `json:"first_party,omitempty"`
+	PostLogoutRedirectURIs []string `json:"post_logout_redirect_uris,omitempty"`
+	// UMA 2.0 claims-gathering redirect allowlist (exact match).
+	ClaimsRedirectURIs []string `json:"claims_redirect_uris,omitempty"`
+	// Also add the origins of redirect_uris to the instance's allowed_origins: https origins, plus
+	// http://localhost, 127.0.0.1 and [::1] on a development instance; private-use schemes never.
+	// Append only (never removes an origin); an origin already allowed (exactly or by a wildcard) is
+	// skipped. Each write is an instance.updated entry in the config changelog. The response lists
+	// what was added in added_origins. A client a connected integration signs users in with gets this
+	// automatically.
+	AddRedirectOrigins                *bool   `json:"add_redirect_origins,omitempty"`
+	BackchannelLogoutURI              *string `json:"backchannel_logout_uri,omitempty"`
+	BackchannelLogoutSessionRequired  *bool   `json:"backchannel_logout_session_required,omitempty"`
+	FrontchannelLogoutURI             *string `json:"frontchannel_logout_uri,omitempty"`
+	FrontchannelLogoutSessionRequired *bool   `json:"frontchannel_logout_session_required,omitempty"`
+	// First-party clients only (422 otherwise). When true, RP-initiated logout (/oauth2/logout) with
+	// this client_id and an exactly registered post_logout_redirect_uri ends the browser session (with
+	// back- and front-channel logout) and redirects straight back with state, without the "Sign out?"
+	// page. Default false.
+	SkipLogoutConfirmation *bool `json:"skip_logout_confirmation,omitempty"`
+	// First-party clients only (422 otherwise). When true, the sign-in of the app follows the Atlas
+	// session it came from: every successful refresh_token grant (and POST /oauth2/session/touch) also
+	// counts as activity on that Atlas session, sliding its inactivity window (never past its absolute
+	// expiry, at most one write a minute), and once that session has ended (signed out, revoked,
+	// inactive or expired) the refresh fails with invalid_grant and the grant is revoked,
+	// offline_access included. Grants not issued under a browser session (device flow, CIBA) are
+	// unaffected. Default false.
+	RefreshTouchesSession *bool `json:"refresh_touches_session,omitempty"`
+	// When true, /oauth2/authorize issues no code to this client for a user whose primary email is not
+	// proven (a sign-up that skipped verification does not count). The first time, the user is sent
+	// through the hosted sign-in, which asks them to verify the address with a code, and the
+	// authorization then continues; if they come back still unverified, or under prompt=none, or when
+	// the account has no email, the application has no email provider, or the client uses its own
+	// login_url, the redirect carries error=access_denied with an error_description saying why. Only
+	// new authorizations are checked (existing refresh tokens keep working). Default false.
+	RequireVerifiedEmail *bool `json:"require_verified_email,omitempty"`
+	// When true, /oauth2/authorize shows the consent screen for this client, a first-party client
+	// included, until the user approves with remember; a remembered approval (for that organization,
+	// under per-organization consent) skips it next time. Send prompt=consent to ask every time. Under
+	// prompt=none with no remembered approval the request fails with consent_required. Default false.
+	RequireConsent *bool `json:"require_consent,omitempty"`
+	// Keep the user's consent per organization. null (default): per organization whenever the request
+	// names one (`organization`, an organization choice, or the request resolves to one), so approving
+	// the app for organization A never covers organization B and revoking one organization's consent
+	// ends only that organization's tokens. true: always per organization. false: one consent for the
+	// user whatever the organization. null clears (update).
+	ConsentPerOrganization *bool `json:"consent_per_organization,omitempty"`
+	// The developer (an Atlas user or organization id) who owns this client. null clears (update).
+	Owner *string `json:"owner,omitempty"`
+	// Review state; default approved. development and in_review: only the owner and testers can
+	// authorize (in_review is a development client awaiting review). suspended: new authorizations and
+	// refreshes are refused at once and `oauth_client.status_changed` fires on every change. One of:
+	// development, in_review, approved, suspended.
+	Status *string `json:"status,omitempty"`
+	// User ids besides the owner who may authorize a client in development.
+	Testers []string `json:"testers,omitempty"`
+	// Gated scopes (requires_verified_client) approved for this client alone, so it may request them
+	// before the whole app is approved. Only the instance sets this; changes are audited. The owner
+	// and testers of a client in development may request gated scopes without it.
+	ApprovedScopes []string `json:"approved_scopes,omitempty"`
+	// The scopes an authorization or device request without `scope` gets (each must be one the client
+	// may request; include `openid` unless require_openid is false). Including offline_access here
+	// makes every sign-in a long-lived grant: a refresh token with offline_access already outlives the
+	// browser session. null clears.
+	DefaultScopes []string `json:"default_scopes,omitempty"`
+	// The identifier of the API (resource server) an authorization or device request without
+	// `resource` or `audience` is made for. Must be a registered API. null clears.
+	DefaultResource *string `json:"default_resource,omitempty"`
+	// Default true. false makes this a pure-API client: /oauth2/authorize accepts a request without
+	// `openid` and the token response carries an access token and no ID token. Confidential clients
+	// without the implicit grant only; PKCE rules are unchanged.
+	RequireOpenid *bool `json:"require_openid,omitempty"`
+	// The instance certifies (true) or withdraws certification of an approved client: the level above
+	// verified, for scopes whose requires_client_level is certified. Update only; an unapproved client
+	// cannot be certified.
+	Certified *bool `json:"certified,omitempty"`
+	// Most token endpoint requests per minute this client may make; over it the endpoint answers 429
+	// with Retry-After. null removes the limit.
+	RateLimitPerMinute *int64 `json:"rate_limit_per_minute,omitempty"`
+	// https URL of your own sign-in page; /oauth2/authorize then redirects there with a
+	// login_challenge. null clears (update).
+	LoginURL *string `json:"login_url,omitempty"`
+	// https URL of your own consent page (consent_challenge). null clears (update).
+	ConsentURL *string `json:"consent_url,omitempty"`
+	// 'always': a first-party client's consent is also sent to its consent_url instead of being
+	// granted silently. Needs the client's own consent_url. null clears (update). One of: always,
+	// None.
+	DelegateConsent *string `json:"delegate_consent,omitempty"`
+	// https URL of your own device-approval page; /oauth2/device then sends the signed-in user there
+	// with a device_challenge. null clears (update).
+	DeviceURL *string `json:"device_url,omitempty"`
+	// How long the issued client secret authenticates, in seconds (reported as
+	// client_secret_expires_at). Omit for a secret that does not expire. Ignored for a public client.
+	SecretExpiresInSeconds *int64 `json:"secret_expires_in_seconds,omitempty"`
+	// OpenID Connect `sub` for this client. `public` (default): the user id. `pairwise`: a per-sector
+	// identifier, the same in the id_token, access token, userinfo, introspection and back-channel
+	// logout tokens, that clients on other sectors cannot correlate. `external_id`: the user's
+	// external_id, in all of those places (a user without one follows subject_fallback). Changing it
+	// changes the `sub` of every user of the client. One of: public, pairwise, external_id.
+	SubjectType *string `json:"subject_type,omitempty"`
+	// With subject_type external_id, for a user who has no external_id: `atlas_user_id` (default) uses
+	// the Atlas user id as `sub`; `refuse` fails the authorization with access_denied. One of:
+	// atlas_user_id, refuse.
+	SubjectFallback *string `json:"subject_fallback,omitempty"`
+	// An https URL serving a JSON array that lists every redirect_uri of the client. Its host is the
+	// pairwise sector. Required for a pairwise client whose redirect_uris span more than one host;
+	// null clears it.
+	SectorIdentifierURI *string `json:"sector_identifier_uri,omitempty"`
+	// `jwt`: a signed JWT verifiable against the JWKS. `opaque`: a random `oat_…` reference validated
+	// at the introspection endpoint (and by Atlas's own endpoints). null inherits: the API's format,
+	// then the client's, then the instance default. One of: jwt, opaque, None.
+	AccessTokenFormat *string `json:"access_token_format,omitempty"`
+	// Token lifetime overrides for this client, in seconds. A field that is absent or null inherits
+	// (the API's for an access token issued for an API, else the instance's, else the default). null
+	// for the whole object clears every override.
+	TokenLifetimes *OAuthClientsCreateFullParamsTokenLifetimes `json:"token_lifetimes,omitempty"`
+	// A preset for the fields not given (GET /v1/oauth_application_types). One of: web, spa, native,
+	// device, mcp.
+	ApplicationType *string `json:"application_type,omitempty"`
+	// Idempotent-create key: a second create with the same ref returns the existing client (200,
+	// idempotent_replay).
+	ExternalRef *string `json:"external_ref,omitempty"`
+	// Import: keep the client_id your apps already use (letters, digits and . _ ~ : -; unique on the
+	// instance, 409 otherwise). Omit it and Atlas generates one.
+	ClientID *string `json:"client_id,omitempty"`
+	// Import: the bcrypt (or base64url SHA-256) hash of the existing secret, instead of client_secret.
+	// The first successful authentication verifies it and stores it in Atlas's own format; no secret
+	// is returned.
+	ClientSecretHash *string `json:"client_secret_hash,omitempty"`
+	// Your own secret for a confidential client, so a provisioning script can write it into its config
+	// before the client exists. 32 to 256 printable ASCII characters (no spaces), random: at least 10
+	// different characters, none more than a quarter of the secret, no repeating pattern (422
+	// otherwise). Generate it with a CSPRNG, e.g. 32 random bytes in base64url. Omit it and Atlas
+	// generates one. Refused for a client without a secret (public, key-based or workload auth).
+	ClientSecret *string `json:"client_secret,omitempty"`
+}
+
+// OAuthClientsCreateFullResultAppSettingsBranding: The heading, sub-heading, logo and primary colour of the hosted sign-in and sign-up pages when
+// the sign-in is for this app.
+type OAuthClientsCreateFullResultAppSettingsBranding struct {
+	Heading    *string `json:"heading,omitempty"`
+	Subheading *string `json:"subheading,omitempty"`
+	// An https URL.
+	LogoURL *string `json:"logo_url,omitempty"`
+	// A hex, rgb() or named CSS colour.
+	PrimaryColor *string `json:"primary_color,omitempty"`
+}
+
+// OAuthClientsCreateFullResultAppSettingsRiskLevelActions is a typed object of the Backend API.
+type OAuthClientsCreateFullResultAppSettingsRiskLevelActions struct {
+	// One of: default, allow, notify, mfa, block, None.
+	Medium *string `json:"medium,omitempty"`
+	// One of: default, allow, notify, mfa, block, None.
+	High *string `json:"high,omitempty"`
+}
+
+// OAuthClientsCreateFullResultAppSettingsRiskMidSession: The refresh-time check for sessions that came from this app (its native token exchange).
+type OAuthClientsCreateFullResultAppSettingsRiskMidSession struct {
+	Enabled *bool `json:"enabled,omitempty"`
+	// One of: revoke, notify, audit, None.
+	Action *string `json:"action,omitempty"`
+}
+
+// OAuthClientsCreateFullResultAppSettingsRisk: Overrides of the instance's riskBasedMfa for sign-ins to this app (a sign-in started from this
+// app's /oauth2/authorize request). A field left null keeps the instance value; weights, signals
+// and reputation feeds stay instance-wide.
+type OAuthClientsCreateFullResultAppSettingsRisk struct {
+	// Turn risk-based MFA on or off for sign-ins to this app.
+	Enabled *bool `json:"enabled,omitempty"`
+	// audit scores and records sign-ins without changing them. One of: enforce, audit, None.
+	Mode *string `json:"mode,omitempty"`
+	// One of: low, medium, high, None.
+	StepUpThreshold *string `json:"step_up_threshold,omitempty"`
+	// One of: allow, block, require_enroll, None.
+	OnHighRiskNoFactor *string                                                  `json:"on_high_risk_no_factor,omitempty"`
+	LevelActions       *OAuthClientsCreateFullResultAppSettingsRiskLevelActions `json:"level_actions,omitempty"`
+	// The refresh-time check for sessions that came from this app (its native token exchange).
+	MidSession *OAuthClientsCreateFullResultAppSettingsRiskMidSession `json:"mid_session,omitempty"`
+}
+
+// OAuthClientsCreateFullResultAppSettings: Per-application settings (see /v1/oauth_clients/{id}/app_settings).
+type OAuthClientsCreateFullResultAppSettings struct {
+	// The sign-in methods a session must have used for this app: password, email_code, email_link,
+	// passkey, phone_code, siwe, siws, siwb, siwf, a provider such as oauth_google, or the families
+	// oauth (any social provider) and enterprise_sso (any enterprise connection). The hosted pages
+	// offer only these when the sign-in is for this app; a session made another way signs in again at
+	// /oauth2/authorize.
+	AllowedSignInMethods []string `json:"allowed_sign_in_methods,omitempty"`
+	// The heading, sub-heading, logo and primary colour of the hosted sign-in and sign-up pages when
+	// the sign-in is for this app.
+	Branding *OAuthClientsCreateFullResultAppSettingsBranding `json:"branding,omitempty"`
+	// The user claims this app receives in its ID token and from userinfo (for example email, name,
+	// org_id). Protocol claims (iss, sub, aud, exp, iat, nonce, auth_time, acr, amr, azp, sid) always
+	// pass. [] = protocol claims only.
+	ClaimsAllowlist []string `json:"claims_allowlist,omitempty"`
+	// The identity traits a session that came from this app (a native app that exchanged its token for
+	// a session) may change through PATCH /v1/client/me. Others are refused with 403.
+	WritableTraits []string `json:"writable_traits,omitempty"`
+	// Overrides of the instance's riskBasedMfa for sign-ins to this app (a sign-in started from this
+	// app's /oauth2/authorize request). A field left null keeps the instance value; weights, signals
+	// and reputation feeds stay instance-wide.
+	Risk *OAuthClientsCreateFullResultAppSettingsRisk `json:"risk,omitempty"`
+}
+
+// OAuthClientsCreateFullResultTokenLifetimes: This client's token lifetime overrides (seconds); null = inherited.
+type OAuthClientsCreateFullResultTokenLifetimes struct {
+	// Default 3600.
+	AccessTokenTTLSeconds *int64 `json:"access_token_ttl_seconds,omitempty"`
+	// Default 3600.
+	IDTokenTTLSeconds *int64 `json:"id_token_ttl_seconds,omitempty"`
+	// The longest a refresh token can be used. Default 2592000 (30 days).
+	RefreshTokenAbsoluteTTLSeconds *int64 `json:"refresh_token_absolute_ttl_seconds,omitempty"`
+	// How long a refresh token survives unused; at most the absolute lifetime. Default 2592000.
+	RefreshTokenIdleTTLSeconds *int64 `json:"refresh_token_idle_ttl_seconds,omitempty"`
+	// Default 60.
+	AuthorizationCodeTTLSeconds *int64 `json:"authorization_code_ttl_seconds,omitempty"`
+	// Default 600.
+	DeviceCodeTTLSeconds *int64 `json:"device_code_ttl_seconds,omitempty"`
+	// The oldest a sign-in may be (age since the user authenticated) and still authorize this app
+	// silently; past it the user signs in again. Default: no limit beyond the session lifetime.
+	SessionAbsoluteTTLSeconds *int64 `json:"session_absolute_ttl_seconds,omitempty"`
+	// How long the user's session may sit idle before this app asks them to sign in again; at most the
+	// session absolute limit. Default: no limit.
+	SessionIdleTTLSeconds *int64 `json:"session_idle_ttl_seconds,omitempty"`
+}
+
+// OAuthClientsCreateFullResultClientSecretReveal: Where and until when the secret can be fetched once more (POST
+// /v1/oauth_clients/{id}/secret/reveal). Absent when you chose the secret yourself.
+type OAuthClientsCreateFullResultClientSecretReveal struct {
+	Path *string `json:"path,omitempty"`
+	// Epoch ms.
+	ExpiresAt *int64 `json:"expires_at,omitempty"`
+}
+
+// OAuthClientsCreateFullResult is a typed object of the Backend API.
+type OAuthClientsCreateFullResult struct {
+	Object *string `json:"object,omitempty"`
+	// Per-application settings (see /v1/oauth_clients/{id}/app_settings).
+	AppSettings *OAuthClientsCreateFullResultAppSettings `json:"app_settings,omitempty"`
+	ID          *string                                  `json:"id,omitempty"`
+	ClientID    *string                                  `json:"client_id,omitempty"`
+	Name        *string                                  `json:"name,omitempty"`
+	LogoURL     *string                                  `json:"logo_url,omitempty"`
+	// The app's homepage (RFC 7591), shown on the consent page.
+	ClientURI *string `json:"client_uri,omitempty"`
+	// Alias of client_uri.
+	HomepageURL *string `json:"homepage_url,omitempty"`
+	// The app's privacy policy (RFC 7591), linked from the consent page.
+	PolicyURI *string `json:"policy_uri,omitempty"`
+	// The app's terms of service (RFC 7591), linked from the consent page.
+	TOSURI                  *string  `json:"tos_uri,omitempty"`
+	RedirectURIs            []string `json:"redirect_uris,omitempty"`
+	AllowedScopes           []string `json:"allowed_scopes,omitempty"`
+	GrantTypes              []string `json:"grant_types,omitempty"`
+	TokenEndpointAuthMethod *string  `json:"token_endpoint_auth_method,omitempty"`
+	// Create and update responses only: the origins this write added to allowed_origins
+	// (add_redirect_origins, or because a connected integration signs users in with this client). []
+	// when none were added.
+	AddedOrigins []string `json:"added_origins,omitempty"`
+	SecretPrefix *string  `json:"secret_prefix,omitempty"`
+	// After a rotation with overlap: when the previous secret stops working (epoch ms). Null when only
+	// the current secret is accepted.
+	PreviousSecretExpiresAt *int64 `json:"previous_secret_expires_at,omitempty"`
+	IsPublic                *bool  `json:"is_public,omitempty"`
+	FirstParty              *bool  `json:"first_party,omitempty"`
+	// A disabled client is refused at every OAuth endpoint (kept, not deleted).
+	Disabled *bool `json:"disabled,omitempty"`
+	// PKCE is required for this client even though it is confidential.
+	RequirePKCE *bool `json:"require_pkce,omitempty"`
+	// The policy profile the client is assigned (PUT /v1/oauth_clients/{id}/profile).
+	Profile *string `json:"profile,omitempty"`
+	// Your own sign-in page for this client (PUT /v1/oauth_clients/{id}/delegated_ui).
+	LoginURL *string `json:"login_url,omitempty"`
+	// Your own consent page for this client.
+	ConsentURL *string `json:"consent_url,omitempty"`
+	// 'always' when a first-party client's consent is sent to consent_url. One of: always, None.
+	DelegateConsent *string `json:"delegate_consent,omitempty"`
+	// Your own device-approval page for this client.
+	DeviceURL *string `json:"device_url,omitempty"`
+	// `cimd` when the client was created from its Client ID Metadata Document (its client_id is that
+	// document's URL); null for a registered client. One of: cimd, None.
+	DiscoverySource        *string  `json:"discovery_source,omitempty"`
+	PostLogoutRedirectURIs []string `json:"post_logout_redirect_uris,omitempty"`
+	// UMA 2.0 claims-gathering redirect allowlist (exact match).
+	ClaimsRedirectURIs                []string `json:"claims_redirect_uris,omitempty"`
+	BackchannelLogoutURI              *string  `json:"backchannel_logout_uri,omitempty"`
+	BackchannelLogoutSessionRequired  *bool    `json:"backchannel_logout_session_required,omitempty"`
+	FrontchannelLogoutURI             *string  `json:"frontchannel_logout_uri,omitempty"`
+	FrontchannelLogoutSessionRequired *bool    `json:"frontchannel_logout_session_required,omitempty"`
+	// RP-initiated logout skips the confirmation page (first-party clients only).
+	SkipLogoutConfirmation *bool `json:"skip_logout_confirmation,omitempty"`
+	// A refresh slides the Atlas session the grant came from; once that session has ended the refresh
+	// fails (first-party clients only).
+	RefreshTouchesSession *bool `json:"refresh_touches_session,omitempty"`
+	// No authorization code is issued for a user whose primary email is not verified.
+	RequireVerifiedEmail *bool `json:"require_verified_email,omitempty"`
+	// The consent screen is shown, first-party clients included, until the user approves with remember
+	// (prompt=consent asks every time).
+	RequireConsent *bool `json:"require_consent,omitempty"`
+	// Consent is kept per organization (null = whenever the request names one; true = always; false =
+	// one consent for all).
+	ConsentPerOrganization *bool   `json:"consent_per_organization,omitempty"`
+	Owner                  *string `json:"owner,omitempty"`
+	// Review state. development and in_review: only the owner and testers can authorize; suspended:
+	// refused at /oauth2/authorize and the token endpoint. One of: development, in_review, approved,
+	// suspended.
+	Status *string `json:"status,omitempty"`
+	// User ids besides the owner who may authorize a client in development.
+	Testers []string `json:"testers,omitempty"`
+	// Gated scopes approved for this client alone (per-scope review).
+	ApprovedScopes []string `json:"approved_scopes,omitempty"`
+	// Token endpoint requests per minute this client may make; null = no limit.
+	RateLimitPerMinute *int64 `json:"rate_limit_per_minute,omitempty"`
+	// Scopes a request without `scope` gets; null = none.
+	DefaultScopes   []string `json:"default_scopes,omitempty"`
+	DefaultResource *string  `json:"default_resource,omitempty"`
+	// false = a pure-API client: no openid required, no ID token issued.
+	RequireOpenid *bool `json:"require_openid,omitempty"`
+	// The instance certified this client (the level above approved).
+	Certified *bool `json:"certified,omitempty"`
+	// When the client was certified (epoch ms); null = not certified.
+	CertifiedAt *int64 `json:"certified_at,omitempty"`
+	// The `sub` this client sees: the user id, a per-sector pairwise identifier, or the user's
+	// external_id. One of: public, pairwise, external_id.
+	SubjectType *string `json:"subject_type,omitempty"`
+	// With subject_type external_id: what a user without an external_id gets. One of: atlas_user_id,
+	// refuse.
+	SubjectFallback     *string `json:"subject_fallback,omitempty"`
+	SectorIdentifierURI *string `json:"sector_identifier_uri,omitempty"`
+	// When the current client secret stops authenticating (epoch ms). Null = it does not expire.
+	ClientSecretExpiresAt *int64 `json:"client_secret_expires_at,omitempty"`
+	// `jwt`: a signed JWT verifiable against the JWKS. `opaque`: a random `oat_…` reference validated
+	// at the introspection endpoint (and by Atlas's own endpoints). null inherits: the API's format,
+	// then the client's, then the instance default. One of: jwt, opaque, None.
+	AccessTokenFormat *string `json:"access_token_format,omitempty"`
+	// This client's token lifetime overrides (seconds); null = inherited.
+	TokenLifetimes *OAuthClientsCreateFullResultTokenLifetimes `json:"token_lifetimes,omitempty"`
+	// The client secret — returned on create (absent when auth method is `none`); a generated one can
+	// be fetched once more within 10 minutes (client_secret_reveal).
+	ClientSecret *string `json:"client_secret,omitempty"`
+	// Where and until when the secret can be fetched once more (POST
+	// /v1/oauth_clients/{id}/secret/reveal). Absent when you chose the secret yourself.
+	ClientSecretReveal *OAuthClientsCreateFullResultClientSecretReveal `json:"client_secret_reveal,omitempty"`
+	// Created (epoch ms).
+	CreatedAt *int64 `json:"created_at,omitempty"`
+	// Updated (epoch ms).
+	UpdatedAt *int64 `json:"updated_at,omitempty"`
+}
+
 // OrganizationsCreateInvitationFullParams is a typed object of the Backend API.
 type OrganizationsCreateInvitationFullParams struct {
 	Email         *string `json:"email,omitempty"`
@@ -9562,9 +10132,13 @@ type UserImportsCreateFullParamsPasswordHashConfig struct {
 
 // UserImportsCreateFullParams is a typed object of the Backend API.
 type UserImportsCreateFullParams struct {
-	Users               []map[string]interface{} `json:"users,omitempty"`
-	Upsert              *bool                    `json:"upsert,omitempty"`
-	CreateOrganizations *bool                    `json:"create_organizations,omitempty"`
+	Users  []map[string]interface{} `json:"users,omitempty"`
+	Upsert *bool                    `json:"upsert,omitempty"`
+	// The Unicode form the old system normalised passwords to before hashing. Applied to the typed
+	// password before the imported hash is checked, and dropped when the first sign-in rehashes to
+	// Argon2id. A row's own password_normalize overrides it. One of: nfkc, nfc, none.
+	PasswordNormalize   *string `json:"password_normalize,omitempty"`
+	CreateOrganizations *bool   `json:"create_organizations,omitempty"`
 	// until_email_verified holds a row's password until an email on the account is proven: a correct
 	// password is refused with password_not_yet_usable until then. A row with email_verified true is
 	// never held. One of: active, until_email_verified.
@@ -9582,6 +10156,14 @@ type Job2ResultsItemWarningsItem struct {
 	Message string `json:"message"`
 }
 
+// Job2ResultsItemFactorsItem is a typed object of the Backend API.
+type Job2ResultsItemFactorsItem struct {
+	// One of: password, totp, hotp, backup_codes.
+	Kind       string `json:"kind"`
+	WillVerify bool   `json:"will_verify"`
+	Detail     string `json:"detail"`
+}
+
 // Job2ResultsItem is a typed object of the Backend API.
 type Job2ResultsItem struct {
 	EmailAddress *string `json:"email_address,omitempty"`
@@ -9591,6 +10173,9 @@ type Job2ResultsItem struct {
 	// About a row that succeeded: password_policy_not_applied, unverified_without_hold or
 	// account_claim_not_applied. Absent when there are none.
 	Warnings []Job2ResultsItemWarningsItem `json:"warnings,omitempty"`
+	// Per credential the row carries (password, totp, hotp, backup_codes): whether it will verify at
+	// the next sign-in. A dry run reports what a real run stores.
+	Factors []Job2ResultsItemFactorsItem `json:"factors,omitempty"`
 }
 
 // Job2WarningsItem is a typed object of the Backend API.
@@ -9675,6 +10260,7 @@ type UsersCreateFullParams struct {
 	PasswordHashAlgorithm  *string                               `json:"password_hash_algorithm,omitempty"`
 	PasswordHashParams     map[string]interface{}                `json:"password_hash_params,omitempty"`
 	PasswordSalt           *string                               `json:"password_salt,omitempty"`
+	PasswordNormalize      *string                               `json:"password_normalize,omitempty"`
 	PasswordHasher         *string                               `json:"password_hasher,omitempty"`
 	FirstName              *string                               `json:"first_name,omitempty"`
 	LastName               *string                               `json:"last_name,omitempty"`
@@ -9799,7 +10385,8 @@ type WebhookEndpointsOpsCreateFullParams struct {
 	External *bool `json:"external,omitempty"`
 	// Mark an endpoint you created for a connected platform as that platform's, so config export, plan
 	// and preflight treat it like one the platform set up itself. The url must be an https URL on that
-	// platform's API host. null clears it. One of: cookiemunch, chatly, forumulate, referalli, None.
+	// platform's API host. null clears it. One of: cookiemunch, chatly, forumulate, referalli,
+	// seolyticize, None.
 	ManagedBy *string `json:"managed_by,omitempty"`
 	// Signature entries in atlas-signature: v1 (id.timestamp.body, default) and/or v2
 	// (id.timestamp.url.body).
@@ -10849,4 +11436,43 @@ func (p MessagingProvidersSetSMSFullParams) MarshalJSON() ([]byte, error) {
 		extra[f] = nil
 	}
 	return marshalWithExtra(plain(p), extra)
+}
+
+// OAuthConsentRequestsSetAcceptFullParams is a typed object of the Backend API.
+type OAuthConsentRequestsSetAcceptFullParams struct {
+	// The scopes to grant: a subset of requested_scope that includes openid and every scope that is
+	// not in optional_scopes. The token and the grant carry exactly these. Default: all requested.
+	GrantedScopes []string `json:"granted_scopes,omitempty"`
+	// Older name for granted_scopes that may drop any scope but openid. Send one of the two.
+	GrantScope []string `json:"grant_scope,omitempty"`
+	// The organization to authorize for, when your page lets the user pick one: a member organization
+	// the app is enabled for. Default: the one the request resolved to.
+	OrganizationID *string `json:"organization_id,omitempty"`
+	// Record the consent so the user is not asked again. Default true. With false the consent is still
+	// recorded so its tokens can be revoked, but the user is asked again next time.
+	Remember *bool `json:"remember,omitempty"`
+	// Your own JSON (at most 4 KB) stored on the recorded consent and returned by the grant API and in
+	// grant.revoked. Atlas adds `granted_by`, the actor that accepted. Not stored when remember is
+	// false.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	// ClearFields lists JSON field names to send as null, which clears them on the server.
+	// Fields left unset are omitted.
+	ClearFields []string `json:"-"`
+}
+
+// MarshalJSON sends the set fields and a null for each name in ClearFields.
+func (p OAuthConsentRequestsSetAcceptFullParams) MarshalJSON() ([]byte, error) {
+	type plain OAuthConsentRequestsSetAcceptFullParams
+	extra := map[string]interface{}{}
+	for _, f := range p.ClearFields {
+		extra[f] = nil
+	}
+	return marshalWithExtra(plain(p), extra)
+}
+
+// OAuthConsentRequestsSetAcceptFullResult is a typed object of the Backend API.
+type OAuthConsentRequestsSetAcceptFullResult struct {
+	Object *string `json:"object,omitempty"`
+	// Send the end user’s browser here next.
+	RedirectTo *string `json:"redirect_to,omitempty"`
 }

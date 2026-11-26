@@ -1184,7 +1184,7 @@ func (q OAuthClientsListFullQuery) values() url.Values {
 	return v
 }
 
-// ListFull: List "Sign in with Atlas" OAuth clients. The client secret is never returned. Filter with
+// ListFull: List the OAuth clients of this instance. The client secret is never returned. Filter with
 // ?metadata[key]=value or ?owner=<developer id>; each item carries `metadata` and `external_ref`.
 // GET /v1/oauth_clients.
 func (s *OAuthClientsService) ListFull(ctx context.Context, query OAuthClientsListFullQuery, opts ...RequestOption) (*CursorPage[OAuthClientsListFullItem], error) {
@@ -1204,6 +1204,78 @@ func (s *OAuthClientsService) ListFullIter(ctx context.Context, query OAuthClien
 		}
 		return s.ListFull(ctx, q, opts...)
 	})
+}
+
+// CreateFull: Register an OAuth client (confidential or public PKCE). A confidential client's secret is in the
+// response; a generated one can be fetched once more within 10 minutes with POST
+// /v1/oauth_clients/{id}/secret/reveal (`client_secret_reveal` gives the path and deadline). Send
+// `client_secret` to choose the secret yourself (32-256 random printable characters), so a
+// provisioning script can re-run safely. `require_verified_email: true` makes /oauth2/authorize
+// refuse users whose primary email is not verified. Idempotent create: `external_ref` returns the
+// existing object on a repeat (200, `idempotent_replay: true`, no secret re-shown); `metadata`
+// tags it (filter lists with ?metadata[key]=value). `add_redirect_origins: true` also adds the
+// redirect URIs' origins to allowed_origins (append only; listed in added_origins); a client that
+// a connected integration signs users in with (its oauth_client_id, or tagged metadata
+// product=<integration id>) gets them automatically.
+// POST /v1/oauth_clients.
+func (s *OAuthClientsService) CreateFull(ctx context.Context, params OAuthClientsCreateFullParams, opts ...RequestOption) (*OAuthClientsCreateFullResult, error) {
+	out := &OAuthClientsCreateFullResult{}
+	if err := s.client.do(ctx, "POST", "/v1/oauth_clients", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// OAuthConsentRequestsGetFullQuery holds the query parameters of OAuthConsentRequestsService.GetFull.
+type OAuthConsentRequestsGetFullQuery struct {
+	// The consent_challenge your consent page received from /oauth2/authorize.
+	ConsentChallenge string
+}
+
+func (q OAuthConsentRequestsGetFullQuery) values() url.Values {
+	v := url.Values{}
+	if q.ConsentChallenge != "" {
+		v.Set("consent_challenge", q.ConsentChallenge)
+	}
+	return v
+}
+
+// GetFull: Read a consent challenge: the signed-in user, the application and the scopes, audience,
+// authorization details and organization it asks for.
+// GET /v1/oauth_consent_requests.
+func (s *OAuthConsentRequestsService) GetFull(ctx context.Context, query OAuthConsentRequestsGetFullQuery, opts ...RequestOption) (*OAuthConsentRequestsGetFullResult, error) {
+	out := &OAuthConsentRequestsGetFullResult{}
+	if err := s.client.do(ctx, "GET", "/v1/oauth_consent_requests", query.values(), nil, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// OAuthConsentRequestsSetAcceptFullQuery holds the query parameters of OAuthConsentRequestsService.SetAcceptFull.
+type OAuthConsentRequestsSetAcceptFullQuery struct {
+	// The consent_challenge your consent page received from /oauth2/authorize.
+	ConsentChallenge string
+}
+
+func (q OAuthConsentRequestsSetAcceptFullQuery) values() url.Values {
+	v := url.Values{}
+	if q.ConsentChallenge != "" {
+		v.Set("consent_challenge", q.ConsentChallenge)
+	}
+	return v
+}
+
+// SetAcceptFull: Accept a consent challenge, optionally narrowing the granted scopes (only optional scopes may be
+// dropped with granted_scopes) or choosing the organization. Following redirect_to (in the same
+// browser that started the flow) records the consent (kept for revocation only when remember is
+// false), and returns the application to its redirect_uri with a code.
+// PUT /v1/oauth_consent_requests/accept.
+func (s *OAuthConsentRequestsService) SetAcceptFull(ctx context.Context, query OAuthConsentRequestsSetAcceptFullQuery, params OAuthConsentRequestsSetAcceptFullParams, opts ...RequestOption) (*OAuthConsentRequestsSetAcceptFullResult, error) {
+	out := &OAuthConsentRequestsSetAcceptFullResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/oauth_consent_requests/accept", query.values(), params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // OAuthInitialAccessTokensListFullQuery holds the query parameters of OAuthInitialAccessTokensService.ListFull.
@@ -1840,8 +1912,11 @@ func (s *SessionsService) CreateFull(ctx context.Context, params SessionsCreateF
 }
 
 // CreateFull: Bulk-create users from an array, deduping by verified email, through the same path sign-up uses.
-// Plaintext passwords are Argon2id-hashed; Argon2id, bcrypt, PBKDF2/scrypt (Django, passlib),
-// Firebase scrypt (with password_hash_config.firebase), Better Auth scrypt and Node crypto.scrypt
+// Plaintext passwords are Argon2id-hashed; `password_normalize` (nfkc, nfc or none) names the
+// Unicode form the old system hashed the password in: the typed password is put through it before
+// the imported hash is checked, and the first sign-in rehash drops it. Also a job-level default.
+// Argon2id, bcrypt, PBKDF2/scrypt (Django, passlib), Firebase scrypt (with
+// password_hash_config.firebase), Better Auth scrypt and Node crypto.scrypt
 // `scrypt$N$r$p$salt$key` hashes are imported verbatim (a Node string with an all-digit salt is
 // also a valid Django one and must be named: password_hash_algorithm scrypt_node or scrypt_django;
 // scrypt_node takes salt_encoding, default utf8 = the salt text as written). A hash that does not
@@ -1990,11 +2065,15 @@ func (s *UsersService) ListSessionsFullIter(ctx context.Context, id string, quer
 	})
 }
 
-// CreateFull: Create a user from an email and optional password (plaintext `password`, Argon2id-hashed; or an
-// existing hash: `password_hash`, alias `password_digest`. A self-describing hash (Argon2id,
-// bcrypt, Django / passlib PBKDF2 and scrypt, Node `scrypt$N$r$p$salt$key`, Firebase scrypt,
-// phpass, LDAP {SSHA}) is stored as given (a Node scrypt string whose salt is all digits is also a
-// valid Django one: 400 until you name `scrypt_node` or `scrypt_django`); any other is named with
+// CreateFull: Create a user from an email (`email_address`: a string, or an array of exactly one string; a
+// longer array is a 400, add further addresses with POST /v1/users/{id}/email_addresses) and
+// optional password (plaintext `password`, Argon2id-hashed; or an existing hash: `password_hash`,
+// alias `password_digest`. `password_normalize` (nfkc, nfc or none) names the Unicode form the old
+// system hashed the password in: the typed password is put through it before the imported hash is
+// checked, and the first sign-in rehash drops it. A self-describing hash (Argon2id, bcrypt, Django
+// / passlib PBKDF2 and scrypt, Node `scrypt$N$r$p$salt$key`, Firebase scrypt, phpass, LDAP {SSHA})
+// is stored as given (a Node scrypt string whose salt is all digits is also a valid Django one:
+// 400 until you name `scrypt_node` or `scrypt_django`); any other is named with
 // `password_hash_algorithm` (scrypt, pbkdf2, md5, sha1, sha256, sha512, hmac_sha256, …) plus
 // `password_hash_params` (e.g. scrypt { n, r, p, key_length, salt_encoding }) and `password_salt`,
 // or as `<name>$<salt>$<hash>`; `password_hasher` is the Clerk name, used only when the hash does

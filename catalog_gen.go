@@ -2046,6 +2046,19 @@ func (s *BetterAuthImportsService) SetPart(ctx context.Context, id string, part 
 	return out, nil
 }
 
+// SyncCheckout: Read a Stripe Checkout Session back with your own key and record the purchase, for an instance
+// that syncs without a Stripe webhook. The session's reference must name this instance; any other
+// session is a 404. Idempotent. `status` is `synced`, or `pending` when Stripe has not completed
+// the session yet.
+// POST /v1/billing/checkout/sync.
+func (s *BillingService) SyncCheckout(ctx context.Context, params BillingSyncCheckoutParams, opts ...RequestOption) (*BillingSyncCheckoutResult, error) {
+	out := &BillingSyncCheckoutResult{}
+	if err := s.client.do(ctx, "POST", "/v1/billing/checkout/sync", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BillingListConnectAccountsQuery holds the query parameters of BillingService.ListConnectAccounts.
 type BillingListConnectAccountsQuery struct {
 	// Page size.
@@ -2503,6 +2516,20 @@ func (s *BillingService) CreateStoreLink(ctx context.Context, params BillingCrea
 	return out, nil
 }
 
+// CreateStripeEvent: Forward a Stripe event from your own webhook endpoint, for an account that cannot add an Atlas
+// endpoint. Post `{ id: "evt_…" }` or the whole event; only the id is read. Atlas fetches the
+// event from Stripe with your own key and processes THAT object, never the posted body, and
+// ignores anything that is not one of this instance's subscriptions. Safe to repeat. `outcome` is
+// `processed` or `ignored`; both are 200.
+// POST /v1/billing/stripe/events.
+func (s *BillingService) CreateStripeEvent(ctx context.Context, params BillingCreateStripeEventParams, opts ...RequestOption) (*BillingCreateStripeEventResult, error) {
+	out := &BillingCreateStripeEventResult{}
+	if err := s.client.do(ctx, "POST", "/v1/billing/stripe/events", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ExtendTrialSubscription: Move a trialing subscription's trial end later, on the payment provider (Stripe today; others
 // answer 422 `unsupported`). Send exactly one of `days` (added to the current trial end) or
 // `trial_end` (an absolute time, epoch ms or ISO). A trial can be extended by at most 365 days in
@@ -2512,6 +2539,19 @@ func (s *BillingService) CreateStoreLink(ctx context.Context, params BillingCrea
 func (s *BillingService) ExtendTrialSubscription(ctx context.Context, id string, params BillingExtendTrialSubscriptionParams, opts ...RequestOption) (*BillingExtendTrialSubscriptionResult, error) {
 	out := &BillingExtendTrialSubscriptionResult{}
 	if err := s.client.do(ctx, "POST", "/v1/billing/subscriptions/"+url.PathEscape(id)+"/extend_trial", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SyncSubscription: Re-read one subscription from Stripe now, with your own key, and apply what Stripe reports
+// (status, plan, period, cancellation). For an instance that syncs without a Stripe webhook, or to
+// refresh one subscription on demand. A subscription on another account, or not Stripe, is
+// refused.
+// POST /v1/billing/subscriptions/{id}/sync.
+func (s *BillingService) SyncSubscription(ctx context.Context, id string, opts ...RequestOption) (*Subscription, error) {
+	out := &Subscription{}
+	if err := s.client.do(ctx, "POST", "/v1/billing/subscriptions/"+url.PathEscape(id)+"/sync", nil, nil, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -7238,6 +7278,25 @@ func (s *InstanceService) TestHookBeforeFirstSession(ctx context.Context, opts .
 	return out, nil
 }
 
+// CreateHostedMethodFilter: Limit a hosted sign-in or sign-up page to some sign-in methods. Send the methods (`password`,
+// `email_code`, `email_link`, `phone_code`, `passkey`, `username` counts as `password`, a family
+// such as `oauth` or `enterprise_sso`, or one provider such as `oauth_google`). The answer carries
+// `allowed_methods` and `allowed_methods_sig`: add both to the page URL (`query` is them ready to
+// append). The page then offers only those methods, and every sign-in or sign-up attempt the page
+// (or a client sending the `token` in `X-Atlas-Allowed-Methods`) starts is bound to the list, and
+// a session is refused with 403 SIGN_IN_METHOD_NOT_ALLOWED for any method outside it, whichever
+// way the attempt completes (passkey, a ticket exchanged by your app, a native code). A list that
+// is missing its signature or was edited is refused with 400. It narrows what the instance and the
+// OAuth client already allow; it never adds a method.
+// POST /v1/instance/hosted_method_filters.
+func (s *InstanceService) CreateHostedMethodFilter(ctx context.Context, params InstanceCreateHostedMethodFilterParams, opts ...RequestOption) (*InstanceCreateHostedMethodFilterResult, error) {
+	out := &InstanceCreateHostedMethodFilterResult{}
+	if err := s.client.do(ctx, "POST", "/v1/instance/hosted_method_filters", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GetImpersonationPolicy: The instance's staff impersonation policy: require_reason, reason_codes, max_duration_seconds,
 // require_approval, read_only_default and notify_user.
 // GET /v1/instance/impersonation_policy.
@@ -7714,14 +7773,16 @@ func (q InstanceSetScopesQuery) values() url.Values {
 // `requires_client_level` (`any`, `verified` or `certified`) sets the level a client needs
 // (`requires_verified_client: true` means `verified`; the stricter wins); a `certified` client is
 // an approved one the instance has certified (PATCH /v1/oauth_clients/{id} `certified`).
-// `owner_exempt: true` lets the developer who owns a client request the scope with it on their own
-// account whatever the client's level. A name ending `:*` (`listings:*`) is a wildcard entry: it
-// covers every `listings:<anything>` for gating, consent text and released claims, and a client or
-// grant that holds `listings:*` holds each of them. By default the whole list is checked and
-// nothing is written if any entry is bad (422, one problem per field). `?mode=partial` applies the
-// valid entries and answers 200 with `rejected: [{ index, name, errors }]` (a rejected entry
-// leaves the scope of that name as it was). `?too_long=truncate` cuts over-long labels and
-// descriptions instead of refusing them and lists each cut in `warnings`.
+// `optional: true` lets the user untick the scope on the consent screen (the token then carries
+// only the scopes they kept). `owner_exempt: true` lets the developer who owns a client request
+// the scope with it on their own account whatever the client's level. A name ending `:*`
+// (`listings:*`) is a wildcard entry: it covers every `listings:<anything>` for gating, consent
+// text and released claims, and a client or grant that holds `listings:*` holds each of them. By
+// default the whole list is checked and nothing is written if any entry is bad (422, one problem
+// per field). `?mode=partial` applies the valid entries and answers 200 with `rejected: [{ index,
+// name, errors }]` (a rejected entry leaves the scope of that name as it was).
+// `?too_long=truncate` cuts over-long labels and descriptions instead of refusing them and lists
+// each cut in `warnings`.
 // PUT /v1/instance/scopes.
 func (s *InstanceService) SetScopesWithQuery(ctx context.Context, query InstanceSetScopesQuery, params InstanceSetScopesParams, opts ...RequestOption) error {
 	return s.client.do(ctx, "PUT", "/v1/instance/scopes", query.values(), params, nil, opts...)
@@ -9810,7 +9871,10 @@ func (s *OAuthClientsService) GetWebhook(ctx context.Context, id string, opts ..
 // only what the user's granted scopes allow (email with the email scope, name and picture with
 // profile). enabled_events may also name your own types declared with PUT
 // /v1/instance/app_event_types; those reach the client only for users who granted the type's
-// required scope. The signing secret is returned once, on create (201). Audited.
+// required scope. The signing secret is returned once, on create (201). Every delivery carries a
+// top-level `creator` ({ id }, the user as this client sees them: exactly the `sub` of the tokens
+// issued to it, pairwise or external_id included; null when the event has no acting user).
+// Audited.
 // PUT /v1/oauth_clients/{id}/webhook.
 func (s *OAuthClientsService) SetWebhook(ctx context.Context, id string, params OAuthClientsSetWebhookParams, opts ...RequestOption) (*OAuthClientsSetWebhookResult, error) {
 	out := &OAuthClientsSetWebhookResult{}
@@ -9824,6 +9888,35 @@ func (s *OAuthClientsService) SetWebhook(ctx context.Context, id string, params 
 // DELETE /v1/oauth_clients/{id}/webhook.
 func (s *OAuthClientsService) DeleteWebhook(ctx context.Context, id string, opts ...RequestOption) error {
 	return s.client.do(ctx, "DELETE", "/v1/oauth_clients/"+url.PathEscape(id)+"/webhook", nil, nil, nil, opts...)
+}
+
+// RotateSecretWebhook: Rotate the client webhook's signing secret. The new secret is returned exactly once. The
+// previous secret keeps signing for `overlap_seconds` (default 86400 = 24 hours, 0 to 604800 = 7
+// days; 0 stops it now): during the overlap every delivery's signature header carries one entry
+// per secret, the new one first, so a receiver holding either secret verifies it.
+// `previous_secret_expires_at` says when the old one stops (epoch ms), or null. 404 when the
+// client has no webhook. An operator token needs a recent MFA. Audited.
+// POST /v1/oauth_clients/{id}/webhook/rotate_secret.
+func (s *OAuthClientsService) RotateSecretWebhook(ctx context.Context, id string, params OAuthClientsRotateSecretWebhookParams, opts ...RequestOption) (*OAuthClientsRotateSecretWebhookResult, error) {
+	out := &OAuthClientsRotateSecretWebhookResult{}
+	if err := s.client.do(ctx, "POST", "/v1/oauth_clients/"+url.PathEscape(id)+"/webhook/rotate_secret", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// TestWebhook: Send ONE signed `webhook.test` delivery to this client's webhook URL (and to nobody else), in
+// the same envelope as a real delivery, and return the attempt: the HTTP status your endpoint
+// answered with, how long it took and the error, if any. With `user_id` (the Atlas user id, or the
+// `sub` this client receives) the delivery's `creator` is that user (404 for an unknown user; no
+// grant is needed); otherwise `creator` is null. Not retried. Audited.
+// POST /v1/oauth_clients/{id}/webhook/test.
+func (s *OAuthClientsService) TestWebhook(ctx context.Context, id string, params OAuthClientsTestWebhookParams, opts ...RequestOption) (*OAuthClientsTestWebhookResult, error) {
+	out := &OAuthClientsTestWebhookResult{}
+	if err := s.client.do(ctx, "POST", "/v1/oauth_clients/"+url.PathEscape(id)+"/webhook/test", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // OAuthConsentRequestsService is the generated surface of /v1/oauth_consent_requests.
@@ -10967,6 +11060,33 @@ func (s *OrganizationsService) GetItHealth(ctx context.Context, id string, opts 
 func (s *OrganizationsService) CreateMembershipImport(ctx context.Context, id string, params OrganizationsCreateMembershipImportParams, opts ...RequestOption) (*OrganizationsCreateMembershipImportResult, error) {
 	out := &OrganizationsCreateMembershipImportResult{}
 	if err := s.client.do(ctx, "POST", "/v1/organizations/"+url.PathEscape(id)+"/membership_imports", nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SetMembershipsByExternalID: Seat a person by the id your own system gives them (`external_id`), before they have signed in.
+// Same body as PUT .../memberships/{userId}. When a user with that external_id exists this is that
+// create-or-update (201 when it adds the member, 200 when it changes it, `status: "active"`). When
+// none exists the seat waits: 202 with `status: "pending"`, and it is attached (with
+// `organizationMembership.created`) when a user with that external_id is created, imported or
+// given the id. `user.created` then carries the user's `organization_memberships`. `{id}` is the
+// organization's Atlas id or its own external_id. Repeating the call replaces the waiting seat.
+// PUT /v1/organizations/{id}/memberships/by_external_id/{userExternalId}.
+func (s *OrganizationsService) SetMembershipsByExternalID(ctx context.Context, id string, userExternalID string, params OrganizationsSetMembershipsByExternalIDParams, opts ...RequestOption) (*OrganizationsSetMembershipsByExternalIDResult, error) {
+	out := &OrganizationsSetMembershipsByExternalIDResult{}
+	if err := s.client.do(ctx, "PUT", "/v1/organizations/"+url.PathEscape(id)+"/memberships/by_external_id/"+url.PathEscape(userExternalID), nil, params, out, opts...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteMembershipsByExternalID: Cancel a seat that is still waiting for its person. 404 when none is waiting (a seat that was
+// already attached is removed by the user id).
+// DELETE /v1/organizations/{id}/memberships/by_external_id/{userExternalId}.
+func (s *OrganizationsService) DeleteMembershipsByExternalID(ctx context.Context, id string, userExternalID string, opts ...RequestOption) (*OrganizationsDeleteMembershipsByExternalIDResult, error) {
+	out := &OrganizationsDeleteMembershipsByExternalIDResult{}
+	if err := s.client.do(ctx, "DELETE", "/v1/organizations/"+url.PathEscape(id)+"/memberships/by_external_id/"+url.PathEscape(userExternalID), nil, nil, out, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -13591,11 +13711,13 @@ func (q ResourceServersListRevokedTokensQuery) values() url.Values {
 // instead of asking Atlas per request (`createAccessTokenVerifier({ revocation: true })`). Each
 // item is a refresh-token family that ended (`family_id`, the `fid` claim of every access token
 // minted from it: a refresh token was reused, the client called /oauth2/revoke, or an admin, the
-// user or a logout ended the grant) or one access token revoked on its own (`jti`). Reject a token
-// whose `fid` or `jti` is listed. Rows are kept for 48 hours (`retention_seconds`), longer than
-// any access token can live. Page with `after` (the `next_cursor` of the previous page);
-// `server_time` is when the answer was computed: poll again with `since` a little before it. The
-// `oauth_tokens.revoked` webhook carries the same facts for a push.
+// user or a logout ended the grant) or one access token revoked on its own (`jti`), or a whole
+// client (`kind: "client"`: its `client_id`, with `revoked_at` the cut-off: reject any token whose
+// `azp` is that client and whose `iat` is at or before it). Reject a token whose `fid` or `jti` is
+// listed. Rows are kept for 48 hours (`retention_seconds`), longer than any access token can live.
+// Page with `after` (the `next_cursor` of the previous page); `server_time` is when the answer was
+// computed: poll again with `since` a little before it. The `oauth_tokens.revoked` webhook carries
+// the same facts for a push.
 // GET /v1/resource_servers/{id}/revoked_tokens.
 func (s *ResourceServersService) ListRevokedTokens(ctx context.Context, id string, query ResourceServersListRevokedTokensQuery, opts ...RequestOption) (*ResourceServersListRevokedTokensResult, error) {
 	out := &ResourceServersListRevokedTokensResult{}

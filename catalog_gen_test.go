@@ -399,6 +399,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.BetterAuthImports.SetPart(ctx, "p1", "p2", BetterAuthImportsSetPartParams{}, opts...)
 			return err
 		}},
+		{"POST", "/v1/billing/checkout/sync", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Billing.SyncCheckout(ctx, BillingSyncCheckoutParams{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/billing/connect/accounts", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Billing.ListConnectAccounts(ctx, BillingListConnectAccountsQuery{}, opts...)
 			return err
@@ -491,8 +495,16 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Billing.CreateStoreLink(ctx, BillingCreateStoreLinkParams{}, opts...)
 			return err
 		}},
+		{"POST", "/v1/billing/stripe/events", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Billing.CreateStripeEvent(ctx, BillingCreateStripeEventParams{}, opts...)
+			return err
+		}},
 		{"POST", "/v1/billing/subscriptions/p1/extend_trial", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Billing.ExtendTrialSubscription(ctx, "p1", BillingExtendTrialSubscriptionParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/billing/subscriptions/p1/sync", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Billing.SyncSubscription(ctx, "p1", opts...)
 			return err
 		}},
 		{"GET", "/v1/billing/usage", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -1429,6 +1441,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.Instance.TestHookBeforeFirstSession(ctx, opts...)
 			return err
 		}},
+		{"POST", "/v1/instance/hosted_method_filters", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Instance.CreateHostedMethodFilter(ctx, InstanceCreateHostedMethodFilterParams{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/instance/impersonation_policy", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Instance.GetImpersonationPolicy(ctx, opts...)
 			return err
@@ -1933,6 +1949,14 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		{"DELETE", "/v1/oauth_clients/p1/webhook", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			return c.OAuthClients.DeleteWebhook(ctx, "p1", opts...)
 		}},
+		{"POST", "/v1/oauth_clients/p1/webhook/rotate_secret", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthClients.RotateSecretWebhook(ctx, "p1", OAuthClientsRotateSecretWebhookParams{}, opts...)
+			return err
+		}},
+		{"POST", "/v1/oauth_clients/p1/webhook/test", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthClients.TestWebhook(ctx, "p1", OAuthClientsTestWebhookParams{}, opts...)
+			return err
+		}},
 		{"PUT", "/v1/oauth_consent_requests/switch_account", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.OAuthConsentRequests.SetSwitchAccount(ctx, OAuthConsentRequestsSetSwitchAccountQuery{}, opts...)
 			return err
@@ -2142,6 +2166,14 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"POST", "/v1/organizations/p1/membership_imports", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Organizations.CreateMembershipImport(ctx, "p1", OrganizationsCreateMembershipImportParams{}, opts...)
+			return err
+		}},
+		{"PUT", "/v1/organizations/p1/memberships/by_external_id/p2", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Organizations.SetMembershipsByExternalID(ctx, "p1", "p2", OrganizationsSetMembershipsByExternalIDParams{}, opts...)
+			return err
+		}},
+		{"DELETE", "/v1/organizations/p1/memberships/by_external_id/p2", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.Organizations.DeleteMembershipsByExternalID(ctx, "p1", "p2", opts...)
 			return err
 		}},
 		{"GET", "/v1/organizations/p1/memberships/p2", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
@@ -3404,6 +3436,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.OAuthClients.ListFull(ctx, OAuthClientsListFullQuery{}, opts...)
 			return err
 		}},
+		{"GET", "/v1/oauth_consent_requests", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthConsentRequests.GetFull(ctx, OAuthConsentRequestsGetFullQuery{}, opts...)
+			return err
+		}},
 		{"GET", "/v1/oauth_initial_access_tokens", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.OAuthInitialAccessTokens.ListFull(ctx, OAuthInitialAccessTokensListFullQuery{}, opts...)
 			return err
@@ -3596,6 +3632,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 			_, err := c.NotificationTemplatesOps.CreateFull(ctx, NotificationTemplatesOpsCreateFullParams{}, opts...)
 			return err
 		}},
+		{"POST", "/v1/oauth_clients", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthClients.CreateFull(ctx, OAuthClientsCreateFullParams{}, opts...)
+			return err
+		}},
 		{"POST", "/v1/organizations/p1/invitations", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.Organizations.CreateInvitationFull(ctx, "p1", OrganizationsCreateInvitationFullParams{}, opts...)
 			return err
@@ -3658,6 +3698,10 @@ func TestGeneratedCatalogOperations(t *testing.T) {
 		}},
 		{"PUT", "/v1/messaging_providers/sms", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
 			_, err := c.MessagingProviders.SetSMSFull(ctx, MessagingProvidersSetSMSFullParams{}, opts...)
+			return err
+		}},
+		{"PUT", "/v1/oauth_consent_requests/accept", `{}`, func(c *Client, ctx context.Context, opts ...RequestOption) error {
+			_, err := c.OAuthConsentRequests.SetAcceptFull(ctx, OAuthConsentRequestsSetAcceptFullQuery{}, OAuthConsentRequestsSetAcceptFullParams{}, opts...)
 			return err
 		}},
 	}
